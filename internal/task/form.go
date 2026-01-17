@@ -102,11 +102,11 @@ func (f Form) View() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("62")).
 		Padding(1, 2).
-		MarginBottom(1)
+		Margin(1, 2)
 
 	helpStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241")).
-		MarginTop(1)
+		MarginLeft(2)
 
 	titleSection := lipgloss.JoinVertical(
 		lipgloss.Left,
