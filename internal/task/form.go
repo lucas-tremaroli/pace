@@ -26,10 +26,6 @@ func NewForm(title, description string, board *Board) *Form {
 		board:       board,
 	}
 
-	if title == "" {
-		title = "task name"
-	}
-
 	form.title.Placeholder = title
 	form.description.Placeholder = description
 	form.description.SetHeight(10)
