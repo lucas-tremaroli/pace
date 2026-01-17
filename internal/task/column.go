@@ -122,7 +122,8 @@ func (c *column) getStyle() lipgloss.Style {
 	}
 	return lipgloss.NewStyle().
 		Padding(1, 2).
-		Border(lipgloss.HiddenBorder()).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("236")).
 		Height(c.height).
 		Width(c.width)
 }
