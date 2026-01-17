@@ -1,15 +1,15 @@
-# grind
+# pace
 
-A CLI tool for managing tasks and notes.
+A CLI tool for managing tasks, notes, and more.
 
 ## Installation
 
 ```bash
-go install github.com/lucas-tremaroli/grind@latest
+go install github.com/lucas-tremaroli/pace@latest
 ```
 
 ## Usage
 
 ```bash
-grind
+pace
 ```

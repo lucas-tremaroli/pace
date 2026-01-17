@@ -1,6 +1,6 @@
 package main
 
-import "github.com/lucas-tremaroli/grind/cmd"
+import "github.com/lucas-tremaroli/pace/cmd"
 
 func main() {
 	cmd.Execute()

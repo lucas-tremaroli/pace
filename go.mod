@@ -1,4 +1,4 @@
-module github.com/lucas-tremaroli/grind
+module github.com/lucas-tremaroli/pace
 
 go 1.25.1
 

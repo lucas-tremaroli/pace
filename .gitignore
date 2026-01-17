@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-grind
+pace
 bin/
 
 # Test binary, built with `go test -c`

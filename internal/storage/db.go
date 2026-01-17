@@ -45,28 +45,28 @@ func (db *DB) Close() error {
 	return db.conn.Close()
 }
 
-// GetGrindConfigDir returns the grind configuration directory path
-func GetGrindConfigDir() (string, error) {
+// GetpaceConfigDir returns the pace configuration directory path
+func GetpaceConfigDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
 
-	grindDir := filepath.Join(homeDir, ".config", "grind")
-	if err := os.MkdirAll(grindDir, 0755); err != nil {
+	paceDir := filepath.Join(homeDir, ".config", "pace")
+	if err := os.MkdirAll(paceDir, 0755); err != nil {
 		return "", err
 	}
 
-	return grindDir, nil
+	return paceDir, nil
 }
 
 func getDBPath() (string, error) {
-	grindDir, err := GetGrindConfigDir()
+	paceDir, err := GetpaceConfigDir()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(grindDir, "tasks.db"), nil
+	return filepath.Join(paceDir, "tasks.db"), nil
 }
 
 func (db *DB) createTables() error {

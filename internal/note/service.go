@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lucas-tremaroli/grind/internal/storage"
+	"github.com/lucas-tremaroli/pace/internal/storage"
 )
 
 // NoteService defines the interface for note operations
@@ -28,12 +28,12 @@ func (s *FileNoteService) SaveNote(filename, content string) error {
 		filename += ".md"
 	}
 
-	grindDir, err := storage.GetGrindConfigDir()
+	paceDir, err := storage.GetpaceConfigDir()
 	if err != nil {
 		return err
 	}
 
-	notesDir := filepath.Join(grindDir, "notes")
+	notesDir := filepath.Join(paceDir, "notes")
 	if err := os.MkdirAll(notesDir, 0755); err != nil {
 		return err
 	}
