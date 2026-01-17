@@ -7,7 +7,6 @@ import (
 type keyMap struct {
 	New    key.Binding
 	Edit   key.Binding
-	View   key.Binding
 	Delete key.Binding
 	Up     key.Binding
 	Down   key.Binding
@@ -16,7 +15,6 @@ type keyMap struct {
 	Enter  key.Binding
 	Help   key.Binding
 	Quit   key.Binding
-	Back   key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
@@ -25,9 +23,9 @@ func (k keyMap) ShortHelp() []key.Binding {
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Left, k.Right, k.Enter},
-		{k.New, k.Edit, k.View, k.Delete},
-		{k.Back, k.Help, k.Quit},
+		{k.Up, k.Down, k.Left, k.Right},
+		{k.New, k.Edit, k.Delete, k.Enter},
+		{k.Help, k.Quit},
 	}
 }
 
@@ -58,29 +56,25 @@ var keys = keyMap{
 		key.WithKeys("e"),
 		key.WithHelp("e", "edit"),
 	),
-	View: key.NewBinding(
-		key.WithKeys("v"),
-		key.WithHelp("v", "view"),
-	),
 	Delete: key.NewBinding(
 		key.WithKeys("d"),
 		key.WithHelp("d", "delete"),
 	),
 	Up: key.NewBinding(
 		key.WithKeys("up", "k"),
-		key.WithHelp("↑/k", "navigate up"),
+		key.WithHelp("↑/k", "up"),
 	),
 	Down: key.NewBinding(
 		key.WithKeys("down", "j"),
-		key.WithHelp("↓/j", "navigate down"),
+		key.WithHelp("↓/j", "down"),
 	),
 	Right: key.NewBinding(
 		key.WithKeys("right", "l"),
-		key.WithHelp("→/l", "navigate right"),
+		key.WithHelp("→/l", "right"),
 	),
 	Left: key.NewBinding(
 		key.WithKeys("left", "h"),
-		key.WithHelp("←/h", "navigate left"),
+		key.WithHelp("←/h", "left"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
@@ -91,12 +85,8 @@ var keys = keyMap{
 		key.WithHelp("?", "toggle help"),
 	),
 	Quit: key.NewBinding(
-		key.WithKeys("q", "ctrl+c"),
-		key.WithHelp("q/ctrl+c", "quit"),
-	),
-	Back: key.NewBinding(
-		key.WithKeys("esc"),
-		key.WithHelp("esc", "back"),
+		key.WithKeys("q"),
+		key.WithHelp("q", "quit"),
 	),
 }
 

@@ -26,10 +26,6 @@ func NewForm(title, description string, board *Board) *Form {
 		board:       board,
 	}
 
-	if title == "" {
-		title = "task name"
-	}
-
 	form.title.Placeholder = title
 	form.description.Placeholder = description
 	form.description.SetHeight(10)
@@ -88,10 +84,51 @@ func (f Form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (f Form) View() string {
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("205")).
+		MarginBottom(1)
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")).
+		Bold(true).
+		MarginBottom(1)
+
+	formStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		Padding(1, 2).
+		Margin(1, 2)
+
+	helpStyle := lipgloss.NewStyle().
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		MarginLeft(2)
+
+	titleSection := lipgloss.JoinVertical(
+		lipgloss.Left,
+		labelStyle.Render("Title:"),
+		f.title.View(),
+	)
+
+	descriptionSection := lipgloss.JoinVertical(
+		lipgloss.Left,
+		labelStyle.Render("Description:"),
+		f.description.View(),
+	)
+
+	formContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		titleStyle.Render("✨ Create a New Task"),
+		titleSection,
+		"",
+		descriptionSection,
+	)
+
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		"Create a new task",
-		f.title.View(),
-		f.description.View(),
-		f.help.View(formKeys))
+		formStyle.Render(formContent),
+		helpStyle.Render(f.help.View(formKeys)),
+	)
 }

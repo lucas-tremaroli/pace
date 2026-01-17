@@ -107,18 +107,47 @@ func (m *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Board) View() string {
 	if m.quitting {
-		return ""
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Render("Goodbye! 👋")
 	}
 	if !m.loaded {
-		return "loading..."
+		loadingStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("205")).
+			MarginTop(1).
+			MarginLeft(2)
+		return loadingStyle.Render("🔄 Loading your tasks...")
 	}
+
+	// Add spacing between columns
+	columnGap := lipgloss.NewStyle().Width(2).Render("")
+
 	board := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		m.cols[todo].View(),
+		columnGap,
 		m.cols[inProgress].View(),
+		columnGap,
 		m.cols[done].View(),
 	)
-	return lipgloss.JoinVertical(lipgloss.Left, board, m.help.View(keys))
+
+	// Style the board with margin to align with help box
+	boardStyle := lipgloss.NewStyle().
+		Margin(1, 2)
+
+	styledBoard := boardStyle.Render(board)
+
+	// Style the help section
+	helpStyle := lipgloss.NewStyle().
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		MarginLeft(2)
+
+	styledHelp := helpStyle.Render(m.help.View(keys))
+
+	return lipgloss.JoinVertical(lipgloss.Left, styledBoard, styledHelp)
 }
 
 func (b *Board) initLists() {

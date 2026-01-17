@@ -65,12 +65,6 @@ func (c column) update(msg tea.Msg, board *Board) (tea.Model, tea.Cmd) {
 				f.col = c
 				return f.Update(nil)
 			}
-		case key.Matches(msg, keys.View):
-			if len(c.list.VisibleItems()) != 0 {
-				task := c.list.SelectedItem().(Task)
-				v := NewViewer(task, board)
-				return v.Update(nil)
-			}
 		case key.Matches(msg, keys.New):
 			f := NewForm("", "", board)
 			f.index = AppendIndex
@@ -87,6 +81,7 @@ func (c column) update(msg tea.Msg, board *Board) (tea.Model, tea.Cmd) {
 }
 
 func (c column) View() string {
+	c.list.SetShowStatusBar(len(c.list.Items()) > 0)
 	return c.getStyle().Render(c.list.View())
 }
 
@@ -128,7 +123,8 @@ func (c *column) getStyle() lipgloss.Style {
 	}
 	return lipgloss.NewStyle().
 		Padding(1, 2).
-		Border(lipgloss.HiddenBorder()).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("236")).
 		Height(c.height).
 		Width(c.width)
 }
