@@ -81,6 +81,7 @@ func (c column) update(msg tea.Msg, board *Board) (tea.Model, tea.Cmd) {
 }
 
 func (c column) View() string {
+	c.list.SetShowStatusBar(len(c.list.Items()) > 0)
 	return c.getStyle().Render(c.list.View())
 }
 
