@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/lucas-tremaroli/grind/cmd/note"
-	"github.com/lucas-tremaroli/grind/cmd/task"
+	"github.com/lucas-tremaroli/pace/cmd/note"
+	"github.com/lucas-tremaroli/pace/cmd/task"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "grind",
-	Short: "grind is a simple CLI tool",
-	Long:  `grind is a simple CLI tool to manage tasks and notes`,
+	Use:  "pace",
+	Long: `A simple CLI tool to manage tasks, notes, and more.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},

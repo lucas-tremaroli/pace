@@ -3,7 +3,7 @@ package task
 import (
 	"log"
 
-	"github.com/lucas-tremaroli/grind/internal/storage"
+	"github.com/lucas-tremaroli/pace/internal/storage"
 )
 
 // Service handles task business logic and database operations
