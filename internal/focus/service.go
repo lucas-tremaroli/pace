@@ -26,9 +26,9 @@ func (m model) Init() tea.Cmd {
 	return m.timer.Init()
 }
 
-func NewModel() model {
+func NewModel(timeout time.Duration) model {
 	return model{
-		timer: timer.New(25 * 60 * time.Second),
+		timer: timer.NewWithInterval(timeout, time.Millisecond),
 		keymap: keymap{
 			startStop: key.NewBinding(
 				key.WithKeys("s"),
@@ -54,7 +54,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keymap.startStop):
 			return m, m.timer.Toggle()
 		case key.Matches(msg, m.keymap.reset):
-			return m, m.timer.Stop()
+			// Reset the timer
 		case key.Matches(msg, m.keymap.quit):
 			m.quitting = true
 			return m, tea.Quit
@@ -64,9 +64,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.timer, cmd = m.timer.Update(msg)
 		return m, cmd
 	case timer.TimeoutMsg:
-		var cmd tea.Cmd
-		m.timer, cmd = m.timer.Update(msg)
-		return m, cmd
+		m.quitting = true
+		return m, tea.Quit
 	}
 	var cmd tea.Cmd
 	m.timer, cmd = m.timer.Update(msg)
@@ -84,19 +83,30 @@ func (k keymap) FullHelp() [][]key.Binding {
 }
 
 func (m model) View() string {
-	if m.quitting {
-		return ""
+	s := "Time left: " + m.timer.View()
+	if m.timer.Timedout() {
+		s = "Time's up!"
 	}
-	return m.timer.View() + "\n\n" + m.help.View(m.keymap)
+	s += "\n"
+	if !m.quitting {
+		s += m.help.View(m.keymap)
+	}
+	return s
 }
 
-func NewService() *Service {
-	return &Service{}
+func NewService(minutes int) *Service {
+	return &Service{
+		minutes: minutes,
+	}
 }
 
-type Service struct{}
+type Service struct {
+	minutes int
+}
 
 func (s *Service) Start() {
-	p := tea.NewProgram(NewModel())
-	p.Start()
+	p := tea.NewProgram(NewModel(
+		time.Duration(s.minutes) * time.Minute,
+	))
+	p.Run()
 }

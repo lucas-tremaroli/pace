@@ -10,7 +10,12 @@ var FocusCmd = &cobra.Command{
 	Short: "Start a simple timer for focus mode",
 	Long:  `Starts a simple timer to help you focus for a set period of time.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		svc := focus.NewService()
+		minutes, _ := cmd.Flags().GetInt("minutes")
+		svc := focus.NewService(minutes)
 		svc.Start()
 	},
+}
+
+func init() {
+	FocusCmd.Flags().IntP("minutes", "m", 25, "Duration of the focus timer in minutes")
 }
