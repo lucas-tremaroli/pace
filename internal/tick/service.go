@@ -1,4 +1,4 @@
-package focus
+package tick
 
 import (
 	"time"
