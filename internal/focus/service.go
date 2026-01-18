@@ -10,10 +10,11 @@ import (
 )
 
 type model struct {
-	timer    timer.Model
-	keymap   keymap
-	help     help.Model
-	quitting bool
+	timer          timer.Model
+	keymap         keymap
+	help           help.Model
+	quitting       bool
+	initialTimeout time.Duration
 }
 
 type keymap struct {
@@ -28,7 +29,8 @@ func (m model) Init() tea.Cmd {
 
 func NewModel(timeout time.Duration) model {
 	return model{
-		timer: timer.NewWithInterval(timeout, time.Millisecond),
+		timer:          timer.NewWithInterval(timeout, time.Millisecond),
+		initialTimeout: timeout,
 		keymap: keymap{
 			startStop: key.NewBinding(
 				key.WithKeys("s"),
@@ -54,7 +56,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keymap.startStop):
 			return m, m.timer.Toggle()
 		case key.Matches(msg, m.keymap.reset):
-			// Reset the timer
+			m.timer = timer.NewWithInterval(m.initialTimeout, time.Millisecond)
+			return m, m.timer.Init()
 		case key.Matches(msg, m.keymap.quit):
 			m.quitting = true
 			return m, tea.Quit
