@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/lucas-tremaroli/pace/cmd/focus"
 	"github.com/lucas-tremaroli/pace/cmd/note"
 	"github.com/lucas-tremaroli/pace/cmd/task"
 	"github.com/spf13/cobra"
@@ -31,4 +32,5 @@ func Execute() error {
 func init() {
 	rootCmd.AddCommand(task.TaskCmd)
 	rootCmd.AddCommand(note.NoteCmd)
+	rootCmd.AddCommand(focus.FocusCmd)
 }
