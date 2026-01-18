@@ -2,42 +2,59 @@ package note
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/lucas-tremaroli/pace/internal/storage"
 )
 
-// NoteService defines the interface for note operations
-type NoteService interface {
-	SaveNote(filename, content string) error
+type Service struct {
+	notesDir string
 }
 
-// FileNoteService implements NoteService using the filesystem
-type FileNoteService struct{}
-
-// NewFileNoteService creates a new FileNoteService
-func NewFileNoteService() *FileNoteService {
-	return &FileNoteService{}
+func NewService() (*Service, error) {
+	paceDir, err := storage.GetpaceConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	notesDir := filepath.Join(paceDir, "notes")
+	if err := os.MkdirAll(notesDir, 0755); err != nil {
+		return nil, err
+	}
+	return &Service{notesDir: notesDir}, nil
 }
 
-// SaveNote saves a note to the filesystem
-func (s *FileNoteService) SaveNote(filename, content string) error {
-	// Ensure filename has .md extension
+func (s *Service) GetNotePath(filename string) string {
+	if filename == "" {
+		filename = time.Now().Format("2006-01-02")
+	}
 	if !strings.HasSuffix(filename, ".md") {
 		filename += ".md"
 	}
+	return filepath.Join(s.notesDir, filename)
+}
 
-	paceDir, err := storage.GetpaceConfigDir()
-	if err != nil {
-		return err
-	}
+func (s *Service) OpenInEditor(filename string) error {
+	path := s.GetNotePath(filename)
+	nvim := exec.Command("nvim", path)
+	nvim.Stdin = os.Stdin
+	nvim.Stdout = os.Stdout
+	nvim.Stderr = os.Stderr
+	return nvim.Run()
+}
 
-	notesDir := filepath.Join(paceDir, "notes")
-	if err := os.MkdirAll(notesDir, 0755); err != nil {
-		return err
-	}
+func (s *Service) WriteNote(filename, content string) error {
+	path := s.GetNotePath(filename)
+	return os.WriteFile(path, []byte(content+"\n"), 0644)
+}
 
-	filePath := filepath.Join(notesDir, filename)
-	return os.WriteFile(filePath, []byte(content), 0644)
+func (s *Service) GetNotesDir() string {
+	return s.notesDir
+}
+
+func (s *Service) DeleteNote(filename string) error {
+	path := filepath.Join(s.notesDir, filename)
+	return os.Remove(path)
 }
