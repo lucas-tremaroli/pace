@@ -54,7 +54,7 @@ var NoteCmd = &cobra.Command{
 
 func runFilePicker(svc *note.Service) error {
 	picker := note.NewPicker(svc)
-	p := tea.NewProgram(picker)
+	p := tea.NewProgram(picker, tea.WithAltScreen())
 
 	finalModel, err := p.Run()
 	if err != nil {

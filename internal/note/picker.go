@@ -24,11 +24,16 @@ var (
 	confirmStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")).
 			Bold(true).
-			MarginLeft(2)
+			MarginLeft(5).
+			MarginTop(1)
 
 	messageStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("10")).
-			MarginLeft(2)
+			MarginLeft(5).
+			MarginTop(1)
+
+	helpTextStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241"))
 )
 
 type pickerState int
@@ -102,7 +107,7 @@ func (p Picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.height = msg.Height
 		// Account for borders, padding, margins
 		listWidth := msg.Width - 12
-		listHeight := msg.Height - 14
+		listHeight := msg.Height - 22
 		p.list.SetSize(listWidth, listHeight)
 		return p, nil
 
@@ -120,7 +125,7 @@ func (p Picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (p Picker) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "ctrl+c":
+	case "q", "ctrl+c", "esc":
 		p.quitting = true
 		return p, tea.Quit
 
@@ -184,25 +189,27 @@ func (p Picker) View() string {
 	// Help box
 	var helpText string
 	if p.state == stateConfirmDelete {
-		helpText = "y confirm • n cancel • q quit"
+		helpText = "y confirm • n/esc cancel • q quit"
 	} else {
-		helpText = "↑/k up • ↓/j down • enter/o open • d delete • q quit"
+		helpText = "↑/k up • ↓/j down • enter/o open • d delete • esc/q quit"
 	}
-	helpView := helpBoxStyle.Render(helpText)
-
-	// Combine list and help
-	content := lipgloss.JoinVertical(lipgloss.Left, listView, helpView)
+	helpView := helpBoxStyle.Render(helpTextStyle.Render(helpText))
 
 	// Add status message if present
+	var statusView string
 	if p.state == stateConfirmDelete {
 		if item := p.list.SelectedItem(); item != nil {
-			content += "\n" + confirmStyle.Render("Delete "+string(item.(noteItem))+"? [y/n]")
+			statusView = confirmStyle.Render("Delete " + string(item.(noteItem)) + "? [y/n]")
 		}
 	} else if p.message != "" {
-		content += "\n" + messageStyle.Render(p.message)
+		statusView = messageStyle.Render(p.message)
 	}
 
-	return content
+	// Combine list, help, and status
+	if statusView != "" {
+		return lipgloss.JoinVertical(lipgloss.Left, listView, helpView, statusView)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, listView, helpView)
 }
 
 func (p Picker) ShouldOpenFile() bool {
