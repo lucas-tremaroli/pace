@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/lucas-tremaroli/pace/cmd/joke"
 	"github.com/lucas-tremaroli/pace/cmd/note"
 	"github.com/lucas-tremaroli/pace/cmd/task"
 	"github.com/lucas-tremaroli/pace/cmd/tick"
@@ -33,4 +34,5 @@ func init() {
 	rootCmd.AddCommand(task.TaskCmd)
 	rootCmd.AddCommand(note.NoteCmd)
 	rootCmd.AddCommand(tick.TickCmd)
+	rootCmd.AddCommand(joke.JokeCmd)
 }
