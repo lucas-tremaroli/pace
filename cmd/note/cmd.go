@@ -1,6 +1,9 @@
 package note
 
 import (
+	"fmt"
+
+	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +27,17 @@ var NoteCmd = &cobra.Command{
 		}
 
 		if content != "" {
-			return svc.WriteNote(filename, content)
+			if err := svc.WriteNote(filename, content); err != nil {
+				return err
+			}
+			successStyle := lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("10"))
+			pathStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("12")).
+				Underline(true)
+			fmt.Println(successStyle.Render("✓ Note created: ") + pathStyle.Render(svc.GetNotePath(filename)))
+			return nil
 		}
 		return svc.OpenInEditor(filename)
 	},
