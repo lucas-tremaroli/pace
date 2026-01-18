@@ -2,13 +2,18 @@ package note
 
 import (
 	"fmt"
+	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/spf13/cobra"
 )
 
-var content string
+var (
+	content  string
+	listFlag bool
+)
 
 var NoteCmd = &cobra.Command{
 	Use:   "note [filename]",
@@ -19,6 +24,10 @@ var NoteCmd = &cobra.Command{
 		svc, err := note.NewService()
 		if err != nil {
 			return err
+		}
+
+		if listFlag {
+			return runFilePicker(svc)
 		}
 
 		var filename string
@@ -43,6 +52,29 @@ var NoteCmd = &cobra.Command{
 	},
 }
 
+func runFilePicker(svc *note.Service) error {
+	picker := note.NewPicker(svc)
+	p := tea.NewProgram(picker)
+
+	finalModel, err := p.Run()
+	if err != nil {
+		return err
+	}
+
+	// Check if we should open a file after exiting the TUI
+	if m, ok := finalModel.(note.Picker); ok {
+		if m.ShouldOpenFile() {
+			fileToOpen := m.FileToOpen()
+			// Strip .md extension for OpenInEditor since it adds it back
+			fileToOpen = strings.TrimSuffix(fileToOpen, ".md")
+			return svc.OpenInEditor(fileToOpen)
+		}
+	}
+
+	return nil
+}
+
 func init() {
 	NoteCmd.Flags().StringVarP(&content, "content", "c", "", "Write content directly to the note without opening the editor")
+	NoteCmd.Flags().BoolVarP(&listFlag, "list", "l", false, "List and browse existing notes")
 }

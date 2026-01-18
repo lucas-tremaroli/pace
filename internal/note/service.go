@@ -49,3 +49,12 @@ func (s *Service) WriteNote(filename, content string) error {
 	path := s.GetNotePath(filename)
 	return os.WriteFile(path, []byte(content+"\n"), 0644)
 }
+
+func (s *Service) GetNotesDir() string {
+	return s.notesDir
+}
+
+func (s *Service) DeleteNote(filename string) error {
+	path := filepath.Join(s.notesDir, filename)
+	return os.Remove(path)
+}
