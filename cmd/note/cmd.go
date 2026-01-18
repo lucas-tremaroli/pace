@@ -5,6 +5,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var content string
+
 var NoteCmd = &cobra.Command{
 	Use:   "note [filename]",
 	Short: "Opens a note in neovim",
@@ -20,6 +22,14 @@ var NoteCmd = &cobra.Command{
 		if len(args) == 1 {
 			filename = args[0]
 		}
+
+		if content != "" {
+			return svc.WriteNote(filename, content)
+		}
 		return svc.OpenInEditor(filename)
 	},
+}
+
+func init() {
+	NoteCmd.Flags().StringVarP(&content, "content", "c", "", "Write content directly to the note without opening the editor")
 }

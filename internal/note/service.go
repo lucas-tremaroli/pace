@@ -44,3 +44,8 @@ func (s *Service) OpenInEditor(filename string) error {
 	nvim.Stderr = os.Stderr
 	return nvim.Run()
 }
+
+func (s *Service) WriteNote(filename, content string) error {
+	path := s.GetNotePath(filename)
+	return os.WriteFile(path, []byte(content+"\n"), 0644)
+}
