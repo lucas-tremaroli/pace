@@ -85,11 +85,3 @@ Get a random dad joke to brighten your day:
 ```bash
 pace joke
 ```
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
-
-## License
-
-[MIT](LICENSE)
