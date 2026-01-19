@@ -1,6 +1,7 @@
 package note
 
 import (
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,27 +11,34 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List and browse existing notes",
-	Long:  `Opens an interactive file picker to browse and open existing notes.`,
+	Short: "Browse and open your existing notes in a TUI",
+	Long:  `Launch a TUI to browse and open your existing notes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		svc, err := note.NewService()
 		if err != nil {
 			return err
 		}
 
-		picker := note.NewPicker(svc)
-		p := tea.NewProgram(picker, tea.WithAltScreen())
+		for {
+			picker := note.NewPicker(svc)
+			p := tea.NewProgram(picker, tea.WithAltScreen())
 
-		finalModel, err := p.Run()
-		if err != nil {
-			return err
-		}
+			finalModel, err := p.Run()
+			if err != nil {
+				return err
+			}
 
-		if m, ok := finalModel.(note.Picker); ok {
-			if m.ShouldOpenFile() {
-				fileToOpen := m.FileToOpen()
-				fileToOpen = strings.TrimSuffix(fileToOpen, ".md")
-				return svc.OpenInEditor(fileToOpen)
+			m, ok := finalModel.(note.Picker)
+			if !ok || !m.ShouldOpenFile() {
+				break
+			}
+
+			// Clear screen to avoid flash between picker and editor
+			fmt.Print("\033[H\033[2J")
+
+			fileToOpen := strings.TrimSuffix(m.FileToOpen(), ".md")
+			if err := svc.OpenInEditor(fileToOpen); err != nil {
+				return err
 			}
 		}
 
