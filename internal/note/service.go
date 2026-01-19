@@ -58,3 +58,12 @@ func (s *Service) DeleteNote(filename string) error {
 	path := filepath.Join(s.notesDir, filename)
 	return os.Remove(path)
 }
+
+func (s *Service) ReadNote(filename string) (string, error) {
+	path := s.GetNotePath(filename)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}

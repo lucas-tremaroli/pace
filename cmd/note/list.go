@@ -12,7 +12,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Browse and open your existing notes in a TUI",
-	Long:  `Launch a TUI to browse and open your existing notes.`,
+	Long:  `Launch a TUI to browse, view, and open your existing notes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		svc, err := note.NewService()
 		if err != nil {
@@ -20,6 +20,9 @@ var listCmd = &cobra.Command{
 		}
 
 		for {
+			// Clear screen to avoid flash between transitions
+			fmt.Print("\033[H\033[2J")
+
 			picker := note.NewPicker(svc)
 			p := tea.NewProgram(picker, tea.WithAltScreen())
 
@@ -29,17 +32,40 @@ var listCmd = &cobra.Command{
 			}
 
 			m, ok := finalModel.(note.Picker)
-			if !ok || !m.ShouldOpenFile() {
+			if !ok {
 				break
 			}
 
-			// Clear screen to avoid flash between picker and editor
-			fmt.Print("\033[H\033[2J")
-
-			fileToOpen := strings.TrimSuffix(m.FileToOpen(), ".md")
-			if err := svc.OpenInEditor(fileToOpen); err != nil {
-				return err
+			fileToOpen := m.FileToOpen()
+			if fileToOpen == "" {
+				break
 			}
+
+			filename := strings.TrimSuffix(fileToOpen, ".md")
+
+			if m.ShouldViewFile() {
+				content, err := svc.ReadNote(filename)
+				if err != nil {
+					return fmt.Errorf("failed to read note: %w", err)
+				}
+
+				rendered := note.RenderMarkdown(content)
+				viewer := note.NewViewer(fileToOpen, rendered)
+				vp := tea.NewProgram(viewer, tea.WithAltScreen())
+				if _, err := vp.Run(); err != nil {
+					return err
+				}
+				continue
+			}
+
+			if m.ShouldOpenFile() {
+				if err := svc.OpenInEditor(filename); err != nil {
+					return err
+				}
+				continue
+			}
+
+			break
 		}
 
 		return nil
