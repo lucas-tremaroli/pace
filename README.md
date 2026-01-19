@@ -88,7 +88,7 @@ pace joke
 
 ## Contributing
 
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ## License
 
