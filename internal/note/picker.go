@@ -28,6 +28,7 @@ type Picker struct {
 	list          list.Model
 	fileToOpen    string
 	shouldOpen    bool
+	shouldView    bool
 	quitting      bool
 	service       *Service
 	width         int
@@ -52,6 +53,7 @@ func NewPicker(svc *Service) Picker {
 	additionalKeys := func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("o", "enter"), key.WithHelp("o", "open")),
+			key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view")),
 			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
 		}
 	}
@@ -165,6 +167,14 @@ func (p Picker) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return p, tea.Quit
 		}
 
+	case "v":
+		if item := p.list.SelectedItem(); item != nil {
+			p.fileToOpen = item.(noteItem).filename
+			p.shouldView = true
+			p.quitting = true
+			return p, tea.Quit
+		}
+
 	case "d":
 		if item := p.list.SelectedItem(); item != nil {
 			p.fileToDelete = item.(noteItem).filename
@@ -209,6 +219,10 @@ func (p Picker) View() string {
 
 func (p Picker) ShouldOpenFile() bool {
 	return p.shouldOpen
+}
+
+func (p Picker) ShouldViewFile() bool {
+	return p.shouldView
 }
 
 func (p Picker) FileToOpen() string {
