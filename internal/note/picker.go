@@ -9,29 +9,11 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	listStyle = lipgloss.NewStyle().Padding(1, 2).MarginTop(1)
-
-	confirmStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Bold(true).
-			MarginLeft(2).
-			MarginTop(1)
-
-	messageStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("10")).
-			MarginLeft(2)
-)
-
-type pickerState int
-
-const (
-	stateBrowsing pickerState = iota
-	stateConfirmDelete
-)
+var listStyle = lipgloss.NewStyle().Padding(1, 2).MarginTop(1)
 
 type noteItem struct {
 	filename  string
@@ -43,15 +25,16 @@ func (n noteItem) Description() string { return n.firstLine }
 func (n noteItem) FilterValue() string { return n.filename }
 
 type Picker struct {
-	list       list.Model
-	state      pickerState
-	fileToOpen string
-	shouldOpen bool
-	quitting   bool
-	service    *Service
-	message    string
-	width      int
-	height     int
+	list          list.Model
+	fileToOpen    string
+	shouldOpen    bool
+	quitting      bool
+	service       *Service
+	width         int
+	height        int
+	confirmForm   *huh.Form
+	confirmResult *bool
+	fileToDelete  string
 }
 
 func NewPicker(svc *Service) Picker {
@@ -77,7 +60,6 @@ func NewPicker(svc *Service) Picker {
 
 	return Picker{
 		list:    l,
-		state:   stateBrowsing,
 		service: svc,
 	}
 }
@@ -120,19 +102,40 @@ func (p Picker) Init() tea.Cmd {
 }
 
 func (p Picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if p.confirmForm != nil {
+		form, cmd := p.confirmForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			p.confirmForm = f
+			if p.confirmForm.State == huh.StateCompleted {
+				if p.confirmResult != nil && *p.confirmResult {
+					p.service.DeleteNote(p.fileToDelete)
+					items := loadNotes(p.service.GetNotesDir())
+					p.list.SetItems(items)
+				}
+				p.confirmForm = nil
+				p.confirmResult = nil
+				p.fileToDelete = ""
+				return p, nil
+			}
+			if p.confirmForm.State == huh.StateAborted {
+				p.confirmForm = nil
+				p.confirmResult = nil
+				p.fileToDelete = ""
+				return p, nil
+			}
+		}
+		return p, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		p.width = msg.Width
 		p.height = msg.Height
-		// Account for padding
 		p.list.SetSize(msg.Width-4, msg.Height-4)
 		return p, nil
 
 	case tea.KeyMsg:
-		if p.state == stateConfirmDelete {
-			return p.updateConfirmDelete(msg)
-		}
-		return p.updateBrowsing(msg)
+		return p.handleKeyMsg(msg)
 	}
 
 	var cmd tea.Cmd
@@ -140,7 +143,7 @@ func (p Picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return p, cmd
 }
 
-func (p Picker) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (p Picker) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c":
 		p.quitting = true
@@ -163,9 +166,19 @@ func (p Picker) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "d":
-		if p.list.SelectedItem() != nil {
-			p.state = stateConfirmDelete
-			return p, nil
+		if item := p.list.SelectedItem(); item != nil {
+			p.fileToDelete = item.(noteItem).filename
+			p.confirmResult = new(bool)
+			p.confirmForm = huh.NewForm(
+				huh.NewGroup(
+					huh.NewConfirm().
+						Title("Delete " + p.fileToDelete + "?").
+						Affirmative("Yes").
+						Negative("No").
+						Value(p.confirmResult),
+				),
+			).WithWidth(40)
+			return p, p.confirmForm.Init()
 		}
 	}
 
@@ -174,52 +187,22 @@ func (p Picker) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return p, cmd
 }
 
-func (p Picker) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "y":
-		if item := p.list.SelectedItem(); item != nil {
-			filename := item.(noteItem).filename
-			if err := p.service.DeleteNote(filename); err != nil {
-				p.message = "Error: " + err.Error()
-			} else {
-				// Refresh list
-				items := loadNotes(p.service.GetNotesDir())
-				p.list.SetItems(items)
-			}
-		}
-		p.state = stateBrowsing
-		return p, nil
-
-	case "n", "esc":
-		p.state = stateBrowsing
-		return p, nil
-
-	case "q", "ctrl+c":
-		p.quitting = true
-		return p, tea.Quit
-	}
-
-	return p, nil
-}
-
 func (p Picker) View() string {
 	if p.quitting {
 		return ""
 	}
 
-	listView := listStyle.Render(p.list.View())
-
-	if p.state == stateConfirmDelete {
-		if item := p.list.SelectedItem(); item != nil {
-			status := confirmStyle.Render("Delete " + item.(noteItem).filename + "? [y/n]")
-			return lipgloss.JoinVertical(lipgloss.Left, listView, status)
-		}
-	} else if p.message != "" {
-		status := messageStyle.Render(p.message)
-		return lipgloss.JoinVertical(lipgloss.Left, listView, status)
+	if p.confirmForm != nil {
+		return lipgloss.Place(
+			p.width,
+			p.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			p.confirmForm.View(),
+		)
 	}
 
-	return listView
+	return listStyle.Render(p.list.View())
 }
 
 func (p Picker) ShouldOpenFile() bool {
