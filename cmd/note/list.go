@@ -10,8 +10,8 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List and browse existing notes",
-	Long:  `Opens an interactive file picker to browse and open existing notes.`,
+	Short: "Browse and open your existing notes in a TUI",
+	Long:  `Launch a TUI to browse and open your existing notes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		svc, err := note.NewService()
 		if err != nil {

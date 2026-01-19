@@ -11,8 +11,8 @@ import (
 
 var TaskCmd = &cobra.Command{
 	Use:   "task",
-	Short: "Opens the task management tool",
-	Long:  `Opens the task management tool`,
+	Short: "Manage your tasks in a TUI",
+	Long:  `Launch a TUI to manage your tasks.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		p := tea.NewProgram(task.NewBoard(), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
