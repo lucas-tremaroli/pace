@@ -2,8 +2,10 @@ package joke
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/term"
 	"github.com/lucas-tremaroli/pace/internal/joke"
 	"github.com/spf13/cobra"
 )
@@ -21,11 +23,24 @@ var JokeCmd = &cobra.Command{
 			return err
 		}
 
+		// Get terminal width, default to 80 if unavailable
+		width := 80
+		if w, _, err := term.GetSize(os.Stdout.Fd()); err == nil && w > 0 {
+			width = w
+		}
+
+		// Account for border (2) + padding (4) + margin
+		maxWidth := width - 10
+		if maxWidth < 20 {
+			maxWidth = 20
+		}
+
 		jokeStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("62")).
 			Padding(1, 2).
-			MarginTop(1)
+			MarginTop(1).
+			Width(maxWidth)
 
 		fmt.Println(jokeStyle.Render(jokeText))
 

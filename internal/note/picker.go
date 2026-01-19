@@ -172,12 +172,13 @@ func (p Picker) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			p.confirmForm = huh.NewForm(
 				huh.NewGroup(
 					huh.NewConfirm().
-						Title("Delete " + p.fileToDelete + "?").
+						Title(p.fileToDelete).
+						Description("Delete this note?").
 						Affirmative("Yes").
 						Negative("No").
 						Value(p.confirmResult),
 				),
-			).WithWidth(40)
+			)
 			return p, p.confirmForm.Init()
 		}
 	}
@@ -193,12 +194,13 @@ func (p Picker) View() string {
 	}
 
 	if p.confirmForm != nil {
+		dialog := lipgloss.NewStyle().Width(50).Render(p.confirmForm.View())
 		return lipgloss.Place(
 			p.width,
 			p.height,
 			lipgloss.Center,
 			lipgloss.Center,
-			p.confirmForm.View(),
+			dialog,
 		)
 	}
 
