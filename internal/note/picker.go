@@ -1,39 +1,29 @@
 package note
 
 import (
+	"bufio"
 	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 var (
-	listStyle = lipgloss.NewStyle().
-			Padding(1, 2).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62")).
-			Margin(1, 2)
-
-	helpBoxStyle = lipgloss.NewStyle().
-			Padding(1, 2).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			MarginLeft(2)
+	listStyle = lipgloss.NewStyle().Padding(1, 2).MarginTop(1)
 
 	confirmStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")).
 			Bold(true).
-			MarginLeft(5).
+			MarginLeft(2).
 			MarginTop(1)
 
 	messageStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("10")).
-			MarginLeft(5).
-			MarginTop(1)
-
-	helpTextStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241"))
+			MarginLeft(2)
 )
 
 type pickerState int
@@ -43,11 +33,14 @@ const (
 	stateConfirmDelete
 )
 
-type noteItem string
+type noteItem struct {
+	filename  string
+	firstLine string
+}
 
-func (n noteItem) Title() string       { return string(n) }
-func (n noteItem) Description() string { return "" }
-func (n noteItem) FilterValue() string { return string(n) }
+func (n noteItem) Title() string       { return n.filename }
+func (n noteItem) Description() string { return n.firstLine }
+func (n noteItem) FilterValue() string { return n.filename }
 
 type Picker struct {
 	list       list.Model
@@ -65,14 +58,22 @@ func NewPicker(svc *Service) Picker {
 	items := loadNotes(svc.GetNotesDir())
 
 	delegate := list.NewDefaultDelegate()
-	delegate.ShowDescription = false
+	delegate.ShowDescription = true
 
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Notes"
 	l.SetShowStatusBar(false)
-	l.SetShowHelp(false)
-	l.SetFilteringEnabled(false)
-	l.Styles.Title = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62")).MarginLeft(1)
+	l.SetShowHelp(true)
+	l.SetFilteringEnabled(true)
+	l.Styles.Title = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62"))
+	additionalKeys := func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(key.WithKeys("o", "enter"), key.WithHelp("o", "open")),
+			key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
+		}
+	}
+	l.AdditionalShortHelpKeys = additionalKeys
+	l.AdditionalFullHelpKeys = additionalKeys
 
 	return Picker{
 		list:    l,
@@ -90,10 +91,28 @@ func loadNotes(dir string) []list.Item {
 	var items []list.Item
 	for _, e := range entries {
 		if !e.IsDir() && len(e.Name()) > 3 && e.Name()[len(e.Name())-3:] == ".md" {
-			items = append(items, noteItem(e.Name()))
+			firstLine := readFirstLine(filepath.Join(dir, e.Name()))
+			items = append(items, noteItem{filename: e.Name(), firstLine: firstLine})
 		}
 	}
 	return items
+}
+
+func readFirstLine(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	if scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// Strip leading markdown heading markers
+		line = strings.TrimLeft(line, "# ")
+		return line
+	}
+	return ""
 }
 
 func (p Picker) Init() tea.Cmd {
@@ -105,10 +124,8 @@ func (p Picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		p.width = msg.Width
 		p.height = msg.Height
-		// Account for borders, padding, margins
-		listWidth := msg.Width - 12
-		listHeight := msg.Height - 22
-		p.list.SetSize(listWidth, listHeight)
+		// Account for padding
+		p.list.SetSize(msg.Width-4, msg.Height-4)
 		return p, nil
 
 	case tea.KeyMsg:
@@ -125,13 +142,21 @@ func (p Picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (p Picker) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "ctrl+c", "esc":
+	case "ctrl+c":
+		p.quitting = true
+		return p, tea.Quit
+
+	case "q", "esc":
+		// Don't quit if filtering - let the list handle it
+		if p.list.FilterState() == list.Filtering {
+			break
+		}
 		p.quitting = true
 		return p, tea.Quit
 
 	case "enter", "o":
 		if item := p.list.SelectedItem(); item != nil {
-			p.fileToOpen = string(item.(noteItem))
+			p.fileToOpen = item.(noteItem).filename
 			p.shouldOpen = true
 			p.quitting = true
 			return p, tea.Quit
@@ -153,11 +178,10 @@ func (p Picker) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y":
 		if item := p.list.SelectedItem(); item != nil {
-			filename := string(item.(noteItem))
+			filename := item.(noteItem).filename
 			if err := p.service.DeleteNote(filename); err != nil {
 				p.message = "Error: " + err.Error()
 			} else {
-				p.message = "Deleted " + filename
 				// Refresh list
 				items := loadNotes(p.service.GetNotesDir())
 				p.list.SetItems(items)
@@ -183,33 +207,19 @@ func (p Picker) View() string {
 		return ""
 	}
 
-	// List in bordered box with margin
 	listView := listStyle.Render(p.list.View())
 
-	// Help box
-	var helpText string
-	if p.state == stateConfirmDelete {
-		helpText = "y confirm • n/esc cancel • q quit"
-	} else {
-		helpText = "↑/k up • ↓/j down • enter/o open • d delete • esc/q quit"
-	}
-	helpView := helpBoxStyle.Render(helpTextStyle.Render(helpText))
-
-	// Add status message if present
-	var statusView string
 	if p.state == stateConfirmDelete {
 		if item := p.list.SelectedItem(); item != nil {
-			statusView = confirmStyle.Render("Delete " + string(item.(noteItem)) + "? [y/n]")
+			status := confirmStyle.Render("Delete " + item.(noteItem).filename + "? [y/n]")
+			return lipgloss.JoinVertical(lipgloss.Left, listView, status)
 		}
 	} else if p.message != "" {
-		statusView = messageStyle.Render(p.message)
+		status := messageStyle.Render(p.message)
+		return lipgloss.JoinVertical(lipgloss.Left, listView, status)
 	}
 
-	// Combine list, help, and status
-	if statusView != "" {
-		return lipgloss.JoinVertical(lipgloss.Left, listView, helpView, statusView)
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, listView, helpView)
+	return listView
 }
 
 func (p Picker) ShouldOpenFile() bool {

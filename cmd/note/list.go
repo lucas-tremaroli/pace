@@ -1,6 +1,7 @@
 package note
 
 import (
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,19 +19,26 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
-		picker := note.NewPicker(svc)
-		p := tea.NewProgram(picker, tea.WithAltScreen())
+		for {
+			picker := note.NewPicker(svc)
+			p := tea.NewProgram(picker, tea.WithAltScreen())
 
-		finalModel, err := p.Run()
-		if err != nil {
-			return err
-		}
+			finalModel, err := p.Run()
+			if err != nil {
+				return err
+			}
 
-		if m, ok := finalModel.(note.Picker); ok {
-			if m.ShouldOpenFile() {
-				fileToOpen := m.FileToOpen()
-				fileToOpen = strings.TrimSuffix(fileToOpen, ".md")
-				return svc.OpenInEditor(fileToOpen)
+			m, ok := finalModel.(note.Picker)
+			if !ok || !m.ShouldOpenFile() {
+				break
+			}
+
+			// Clear screen to avoid flash between picker and editor
+			fmt.Print("\033[H\033[2J")
+
+			fileToOpen := strings.TrimSuffix(m.FileToOpen(), ".md")
+			if err := svc.OpenInEditor(fileToOpen); err != nil {
+				return err
 			}
 		}
 
