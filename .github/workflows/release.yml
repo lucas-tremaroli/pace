@@ -15,9 +15,20 @@ jobs:
         include:
           - os: ubuntu-latest
             goos: linux
+            goarch: amd64
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - os: macos-13
+            goos: darwin
+            goarch: amd64
           - os: macos-latest
             goos: darwin
+            goarch: arm64
     runs-on: ${{ matrix.os }}
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,14 +44,12 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: build --clean
-        env:
-          GOOS: ${{ matrix.goos }}
+          args: build --clean --single-target
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.goos }}
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
           retention-days: 1
 
