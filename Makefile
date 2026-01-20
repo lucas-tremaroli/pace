@@ -1,4 +1,4 @@
-.PHONY: help build install uninstall clean
+.PHONY: help build test install uninstall clean
 
 BINARY_NAME=pace
 INSTALL_PATH ?= $(HOME)/go/bin
@@ -6,6 +6,7 @@ INSTALL_PATH ?= $(HOME)/go/bin
 help:
 	@echo "Available commands:"
 	@echo "  make build      Build the project"
+	@echo "  make test       Run tests"
 	@echo "  make install    Install the project to $(INSTALL_PATH)"
 	@echo "  make uninstall  Remove the installed binary"
 	@echo "  make clean      Remove build artifacts"
@@ -14,6 +15,10 @@ build:
 	@echo "Building the project..."
 	go build -ldflags="-s -w" -o bin/$(BINARY_NAME) .
 	@echo "Build completed. Binary is located at bin/$(BINARY_NAME)"
+
+test:
+	@echo "Running tests..."
+	go test -v ./...
 
 install: build
 	@echo "Installing to $(INSTALL_PATH)..."

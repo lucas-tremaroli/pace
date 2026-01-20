@@ -1,8 +1,6 @@
 package task
 
 import (
-	"log"
-
 	"github.com/lucas-tremaroli/pace/internal/storage"
 )
 
@@ -34,12 +32,7 @@ func (s *Service) CreateTask(task Task) error {
 		return err
 	}
 
-	_, err := s.db.CreateTask(task.Title(), task.Description(), int(task.Status()))
-	if err != nil {
-		log.Printf("Failed to save task to database: %v", err)
-		return err
-	}
-	return nil
+	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()))
 }
 
 // UpdateTask updates an existing task in the database
@@ -48,29 +41,18 @@ func (s *Service) UpdateTask(task Task) error {
 		return err
 	}
 
-	err := s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()))
-	if err != nil {
-		log.Printf("Failed to update task in database: %v", err)
-		return err
-	}
-	return nil
+	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()))
 }
 
 // DeleteTask removes a task from the database
 func (s *Service) DeleteTask(taskID string) error {
-	err := s.db.DeleteTask(taskID)
-	if err != nil {
-		log.Printf("Failed to delete task from database: %v", err)
-		return err
-	}
-	return nil
+	return s.db.DeleteTask(taskID)
 }
 
 // LoadAllTasks retrieves all tasks from the database
 func (s *Service) LoadAllTasks() ([]Task, error) {
 	taskRecords, err := s.db.GetAllTasks()
 	if err != nil {
-		log.Printf("Failed to load tasks from database: %v", err)
 		return nil, err
 	}
 

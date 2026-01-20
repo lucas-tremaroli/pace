@@ -1,11 +1,14 @@
 package joke
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 )
+
+const defaultBaseURL = "https://icanhazdadjoke.com/"
 
 type JokeResponse struct {
 	ID     string `json:"id"`
@@ -14,17 +17,27 @@ type JokeResponse struct {
 }
 
 type Service struct {
-	client *http.Client
+	client  *http.Client
+	baseURL string
 }
 
 func NewService() *Service {
 	return &Service{
-		client: &http.Client{Timeout: 5 * time.Second},
+		client:  &http.Client{Timeout: 5 * time.Second},
+		baseURL: defaultBaseURL,
 	}
 }
 
-func (s *Service) FetchJoke() (string, error) {
-	req, err := http.NewRequest("GET", "https://icanhazdadjoke.com/", nil)
+// NewServiceWithURL creates a service with a custom base URL (for testing)
+func NewServiceWithURL(baseURL string) *Service {
+	return &Service{
+		client:  &http.Client{Timeout: 5 * time.Second},
+		baseURL: baseURL,
+	}
+}
+
+func (s *Service) FetchJoke(ctx context.Context) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", s.baseURL, nil)
 	if err != nil {
 		return "", err
 	}

@@ -6,4 +6,9 @@ const (
 
 	// Special index value for appending items to lists
 	AppendIndex = -1
+
+	// Column titles
+	ColumnTitleTodo       = "To Do"
+	ColumnTitleInProgress = "In Progress"
+	ColumnTitleDone       = "Done"
 )
