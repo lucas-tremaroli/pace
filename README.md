@@ -30,7 +30,7 @@ Your command line buddy to make work actually enjoyable.
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install --cask lucas-tremaroli/tap/pace
+brew install lucas-tremaroli/tap/pace
 ```
 
 ### Go
