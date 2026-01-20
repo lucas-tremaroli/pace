@@ -47,10 +47,6 @@ changelog:
       - Merge pull request
       - Merge branch
 
-# Partial config for split builds
-partial:
-  by: goos
-
 homebrew:
   - repository:
       owner: lucas-tremaroli
