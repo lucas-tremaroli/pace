@@ -27,18 +27,16 @@ Your command line buddy to make work actually enjoyable.
 
 ## Installation
 
-### Using Go
+### Homebrew (macOS/Linux)
+
+```bash
+brew install --cask lucas-tremaroli/tap/pace
+```
+
+### Go
 
 ```bash
 go install github.com/lucas-tremaroli/pace@latest
-```
-
-### From Source
-
-```bash
-git clone https://github.com/lucas-tremaroli/pace.git
-cd pace
-make install
 ```
 
 ## Usage
