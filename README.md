@@ -4,24 +4,16 @@
       ___         ___           ___           ___              
      /\  \       /\  \         /\__\         /\__\             
     /::\  \     /::\  \       /:/  /        /:/ _/_            
-   /:/\:\__\   /:/\:\  \     /:/  /        /:/ /\__\           
-  /:/ /:/  /  /:/ /::\  \   /:/  /  ___   /:/ /:/ _/_          
- /:/_/:/  /  /:/_/:/\:\__\ /:/__/  /\__\ /:/_/:/ /\__\         
- \:\/:/  /   \:\/:/  \/__/ \:\  \ /:/  / \:\/:/ /:/  /         
-  \::/__/     \::/__/       \:\  /:/  /   \::/_/:/  /          
+   /:/\:\__\   /:/\:\  \     /:/  /        /:/ /\__\           Kanban Board,
+  /:/ /:/  /  /:/ /::\  \   /:/  /  ___   /:/ /:/ _/_                Focus Timer,
+ /:/_/:/  /  /:/_/:/\:\__\ /:/__/  /\__\ /:/_/:/ /\__\                     Note Management,
+ \:\/:/  /   \:\/:/  \/__/ \:\  \ /:/  / \:\/:/ /:/  /                           Questionable Humor,
+  \::/__/     \::/__/       \:\  /:/  /   \::/_/:/  /                                  All in your terminal.
    \:\  \      \:\  \        \:\/:/  /     \:\/:/  /           
     \:\__\      \:\__\        \::/  /       \::/  /            
-     \/__/       \/__/         \/__/         \/__/                       
+     \/__/       \/__/         \/__/         \/__/
 
-      Kanban boards, focus timers, and questionable humor. In your terminal.
 ```
-
-## Features
-
-- **Task Board** - Kanban-style task management in your terminal
-- **Notes** - Create and browse markdown notes with a nice TUI
-- **Focus Timer** - Pomodoro-style timer to help you enter flow state
-- **Dad Jokes** - Because why not
 
 ## Installation
 
