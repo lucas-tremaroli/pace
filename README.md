@@ -89,3 +89,5 @@ Get a random dad joke to brighten your day:
 ```bash
 pace joke
 ```
+
+![Joke Demo](./.github/assets/joke.demo.gif)
