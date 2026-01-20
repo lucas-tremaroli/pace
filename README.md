@@ -61,7 +61,7 @@ pace note list
 pace note create meeting-notes
 
 # Create a note with content directly
-pace note create todo -c "Buy groceries"
+pace note create todo -c "Review PRs"
 ```
 
 ### Focus Timer
