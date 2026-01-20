@@ -66,6 +66,8 @@ pace note create meeting-notes
 pace note create todo -c "Review PRs"
 ```
 
+![Notes Demo](./.github/assets/note.demo.gif)
+
 ### Focus Timer
 
 Start a focus timer to help you stay productive:
