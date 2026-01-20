@@ -4,8 +4,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var content string
-
 var NoteCmd = &cobra.Command{
 	Use:   "note",
 	Short: "Manage your markdown notes",

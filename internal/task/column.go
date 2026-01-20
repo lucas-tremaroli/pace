@@ -11,7 +11,6 @@ type column struct {
 	focus  bool
 	status status
 	list   list.Model
-	height int
 	width  int
 }
 
@@ -118,14 +117,12 @@ func (c *column) getStyle() lipgloss.Style {
 			Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("62")).
-			Height(c.height).
 			Width(c.width)
 	}
 	return lipgloss.NewStyle().
 		Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("236")).
-		Height(c.height).
 		Width(c.width)
 }
 

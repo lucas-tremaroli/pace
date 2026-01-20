@@ -27,14 +27,6 @@ func NewTaskWithID(id string, status status, title, description string) Task {
 	}
 }
 
-func (t *Task) Next() {
-	if t.status == done {
-		t.status = todo
-	} else {
-		t.status++
-	}
-}
-
 func (t Task) FilterValue() string {
 	return t.title
 }

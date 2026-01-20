@@ -15,7 +15,7 @@ type Service struct {
 }
 
 func NewService() (*Service, error) {
-	paceDir, err := storage.GetpaceConfigDir()
+	paceDir, err := storage.GetPaceConfigDir()
 	if err != nil {
 		return nil, err
 	}

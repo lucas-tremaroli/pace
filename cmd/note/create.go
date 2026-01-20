@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var content string
+
 var createCmd = &cobra.Command{
 	Use:   "create [filename]",
 	Short: "Create a new note",

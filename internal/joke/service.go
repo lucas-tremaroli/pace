@@ -2,6 +2,7 @@ package joke
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -36,6 +37,10 @@ func (s *Service) FetchJoke() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
 
 	var res JokeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
