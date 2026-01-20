@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "github.com/marcboeker/go-duckdb"
+	_ "modernc.org/sqlite"
 )
 
 type DB struct {
@@ -26,7 +26,7 @@ func NewDB() (*DB, error) {
 		return nil, fmt.Errorf("failed to get database path: %w", err)
 	}
 
-	conn, err := sql.Open("duckdb", dbPath)
+	conn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
