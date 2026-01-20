@@ -80,6 +80,8 @@ pace tick
 pace tick -m 45
 ```
 
+![Focus Timer Demo](./.github/assets/tick.demo.gif)
+
 ### Dad Jokes
 
 Get a random dad joke to brighten your day:
