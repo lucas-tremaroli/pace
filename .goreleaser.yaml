@@ -47,7 +47,11 @@ changelog:
       - Merge pull request
       - Merge branch
 
-brews:
+# Partial config for split builds
+partial:
+  by: goos
+
+homebrew:
   - repository:
       owner: lucas-tremaroli
       name: homebrew-tap
