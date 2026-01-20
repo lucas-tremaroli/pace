@@ -9,7 +9,7 @@ before:
 
 builds:
   - env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - linux
       - darwin
@@ -23,7 +23,9 @@ builds:
       - -X main.date={{.Date}}
 
 archives:
-  - format: tar.gz
+  - format_overrides:
+      - goos: windows
+        format: zip
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
