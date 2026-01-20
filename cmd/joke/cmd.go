@@ -1,6 +1,7 @@
 package joke
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -18,7 +19,7 @@ var JokeCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		svc := joke.NewService()
 
-		jokeText, err := svc.FetchJoke()
+		jokeText, err := svc.FetchJoke(context.Background())
 		if err != nil {
 			return err
 		}

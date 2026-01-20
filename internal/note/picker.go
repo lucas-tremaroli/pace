@@ -74,7 +74,7 @@ func loadNotes(dir string) []list.Item {
 
 	var items []list.Item
 	for _, e := range entries {
-		if !e.IsDir() && len(e.Name()) > 3 && e.Name()[len(e.Name())-3:] == ".md" {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
 			firstLine := readFirstLine(filepath.Join(dir, e.Name()))
 			items = append(items, noteItem{filename: e.Name(), firstLine: firstLine})
 		}

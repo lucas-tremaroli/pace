@@ -1,8 +1,6 @@
 package task
 
 import (
-	"log"
-
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -19,19 +17,18 @@ type Board struct {
 	service  *Service
 }
 
-func NewBoard() *Board {
+func NewBoard() (*Board, error) {
 	help := help.New()
 	help.ShowAll = true
 
 	service, err := NewService()
 	if err != nil {
-		log.Printf("Failed to initialize service: %v", err)
-		return nil
+		return nil, err
 	}
 
 	board := &Board{help: help, focused: todo, service: service}
 	board.initLists()
-	return board
+	return board, nil
 }
 
 func (m *Board) Init() tea.Cmd {
@@ -56,27 +53,19 @@ func (m *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		task := msg.CreateTask()
 		if msg.index == AppendIndex {
 			// Creating new task
-			if err := m.service.CreateTask(task); err != nil {
-				log.Printf("Failed to save task: %v", err)
-			}
+			m.service.CreateTask(task)
 		} else {
 			// Editing existing task - get the original task ID
 			originalTask := m.cols[m.focused].list.Items()[msg.index].(Task)
 			task = NewTaskWithID(originalTask.ID(), task.Status(), task.Title(), task.Description())
-			if err := m.service.UpdateTask(task); err != nil {
-				log.Printf("Failed to update task: %v", err)
-			}
+			m.service.UpdateTask(task)
 		}
 		return m, m.cols[m.focused].Set(msg.index, task)
 	case moveMsg:
-		if err := m.service.UpdateTask(msg.Task); err != nil {
-			log.Printf("Failed to update task: %v", err)
-		}
+		m.service.UpdateTask(msg.Task)
 		return m, m.cols[m.focused.getNext()].Set(AppendIndex, msg.Task)
 	case deleteMsg:
-		if err := m.service.DeleteTask(msg.Task.ID()); err != nil {
-			log.Printf("Failed to delete task: %v", err)
-		}
+		m.service.DeleteTask(msg.Task.ID())
 		return m, nil
 	case tea.KeyMsg:
 		switch {
@@ -156,9 +145,9 @@ func (b *Board) initLists() {
 		newColumn(inProgress),
 		newColumn(done),
 	}
-	b.cols[todo].list.Title = "To Do"
-	b.cols[inProgress].list.Title = "In Progress"
-	b.cols[done].list.Title = "Done"
+	b.cols[todo].list.Title = ColumnTitleTodo
+	b.cols[inProgress].list.Title = ColumnTitleInProgress
+	b.cols[done].list.Title = ColumnTitleDone
 
 	b.loadTasksFromDB()
 }
@@ -171,7 +160,6 @@ func (b *Board) loadTasksFromDB() {
 
 	tasks, err := b.service.LoadAllTasks()
 	if err != nil {
-		log.Printf("Failed to load tasks: %v", err)
 		b.loadDefaultTasks()
 		return
 	}

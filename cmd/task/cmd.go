@@ -2,7 +2,6 @@ package task
 
 import (
 	"fmt"
-	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/lucas-tremaroli/pace/internal/task"
@@ -13,11 +12,15 @@ var TaskCmd = &cobra.Command{
 	Use:   "task",
 	Short: "Manage your tasks in a TUI",
 	Long:  `Launch a TUI to manage your tasks.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		p := tea.NewProgram(task.NewBoard(), tea.WithAltScreen())
-		if _, err := p.Run(); err != nil {
-			fmt.Printf("Error running program: %v", err)
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		board, err := task.NewBoard()
+		if err != nil {
+			return fmt.Errorf("failed to initialize task board: %w", err)
 		}
+		p := tea.NewProgram(board, tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			return fmt.Errorf("error running program: %w", err)
+		}
+		return nil
 	},
 }

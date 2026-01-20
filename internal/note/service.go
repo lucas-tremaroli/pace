@@ -26,6 +26,11 @@ func NewService() (*Service, error) {
 	return &Service{notesDir: notesDir}, nil
 }
 
+// NewServiceWithDir creates a service with a custom notes directory (for testing)
+func NewServiceWithDir(notesDir string) *Service {
+	return &Service{notesDir: notesDir}
+}
+
 func (s *Service) GetNotePath(filename string) string {
 	if filename == "" {
 		filename = time.Now().Format("2006-01-02")
