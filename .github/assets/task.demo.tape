@@ -2,8 +2,8 @@ Output task.demo.gif
 
 Set Shell zsh
 Set FontSize 20
-Set Width 2560
-Set Height 1440
+Set Width 1920
+Set Height 1080
 Set TypingSpeed 100ms
 
 Sleep 2s
