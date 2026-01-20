@@ -1,29 +1,27 @@
 # Pace
 
-Your command line buddy to make work actually enjoyable.
-
 ```plaintext
+      ___         ___           ___           ___              
+     /\  \       /\  \         /\__\         /\__\             
+    /::\  \     /::\  \       /:/  /        /:/ _/_            
+   /:/\:\__\   /:/\:\  \     /:/  /        /:/ /\__\           
+  /:/ /:/  /  /:/ /::\  \   /:/  /  ___   /:/ /:/ _/_          
+ /:/_/:/  /  /:/_/:/\:\__\ /:/__/  /\__\ /:/_/:/ /\__\         
+ \:\/:/  /   \:\/:/  \/__/ \:\  \ /:/  / \:\/:/ /:/  /         
+  \::/__/     \::/__/       \:\  /:/  /   \::/_/:/  /          
+   \:\  \      \:\  \        \:\/:/  /     \:\/:/  /           
+    \:\__\      \:\__\        \::/  /       \::/  /            
+     \/__/       \/__/         \/__/         \/__/                       
 
-      ___         ___           ___           ___
-     /\  \       /\  \         /\__\         /\__\
-    /::\  \     /::\  \       /:/  /        /:/ _/_
-   /:/\:\__\   /:/\:\  \     /:/  /        /:/ /\__\
-  /:/ /:/  /  /:/ /::\  \   /:/  /  ___   /:/ /:/ _/_
- /:/_/:/  /  /:/_/:/\:\__\ /:/__/  /\__\ /:/_/:/ /\__\
- \:\/:/  /   \:\/:/  \/__/ \:\  \ /:/  / \:\/:/ /:/  /
-  \::/__/     \::/__/       \:\  /:/  /   \::/_/:/  /
-   \:\  \      \:\  \        \:\/:/  /     \:\/:/  /
-    \:\__\      \:\__\        \::/  /       \::/  /
-     \/__/       \/__/         \/__/         \/__/
-
+      Kanban boards, focus timers, and questionable humor. In your terminal.
 ```
 
 ## Features
 
 - **Task Board** - Kanban-style task management in your terminal
-- **Notes** - Create and browse markdown notes with a beautiful TUI
+- **Notes** - Create and browse markdown notes with a nice TUI
 - **Focus Timer** - Pomodoro-style timer to help you enter flow state
-- **Dad Jokes** - Because everyone needs a laugh sometimes
+- **Dad Jokes** - Because why not
 
 ## Installation
 
