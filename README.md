@@ -49,6 +49,8 @@ Launch an interactive Kanban board to manage your tasks:
 pace task
 ```
 
+![Task Demo](./.github/assets/task.demo.gif)
+
 ### Notes
 
 Create and manage markdown notes:
