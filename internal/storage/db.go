@@ -45,8 +45,8 @@ func (db *DB) Close() error {
 	return db.conn.Close()
 }
 
-// GetpaceConfigDir returns the pace configuration directory path
-func GetpaceConfigDir() (string, error) {
+// GetPaceConfigDir returns the pace configuration directory path
+func GetPaceConfigDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -61,7 +61,7 @@ func GetpaceConfigDir() (string, error) {
 }
 
 func getDBPath() (string, error) {
-	paceDir, err := GetpaceConfigDir()
+	paceDir, err := GetPaceConfigDir()
 	if err != nil {
 		return "", err
 	}

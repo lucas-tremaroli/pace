@@ -161,35 +161,41 @@ func (p Picker) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter", "o":
 		if item := p.list.SelectedItem(); item != nil {
-			p.fileToOpen = item.(noteItem).filename
-			p.shouldOpen = true
-			p.quitting = true
-			return p, tea.Quit
+			if note, ok := item.(noteItem); ok {
+				p.fileToOpen = note.filename
+				p.shouldOpen = true
+				p.quitting = true
+				return p, tea.Quit
+			}
 		}
 
 	case "v":
 		if item := p.list.SelectedItem(); item != nil {
-			p.fileToOpen = item.(noteItem).filename
-			p.shouldView = true
-			p.quitting = true
-			return p, tea.Quit
+			if note, ok := item.(noteItem); ok {
+				p.fileToOpen = note.filename
+				p.shouldView = true
+				p.quitting = true
+				return p, tea.Quit
+			}
 		}
 
 	case "d":
 		if item := p.list.SelectedItem(); item != nil {
-			p.fileToDelete = item.(noteItem).filename
-			p.confirmResult = new(bool)
-			p.confirmForm = huh.NewForm(
-				huh.NewGroup(
-					huh.NewConfirm().
-						Title(p.fileToDelete).
-						Description("Delete this note?").
-						Affirmative("Yes").
-						Negative("No").
-						Value(p.confirmResult),
-				),
-			)
-			return p, p.confirmForm.Init()
+			if note, ok := item.(noteItem); ok {
+				p.fileToDelete = note.filename
+				p.confirmResult = new(bool)
+				p.confirmForm = huh.NewForm(
+					huh.NewGroup(
+						huh.NewConfirm().
+							Title(p.fileToDelete).
+							Description("Delete this note?").
+							Affirmative("Yes").
+							Negative("No").
+							Value(p.confirmResult),
+					),
+				)
+				return p, p.confirmForm.Init()
+			}
 		}
 	}
 

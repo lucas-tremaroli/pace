@@ -48,7 +48,6 @@ func (f Form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case column:
 		f.col = msg
-		f.col.list.Index()
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, formKeys.Quit):
