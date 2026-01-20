@@ -32,8 +32,7 @@ func (s *Service) CreateTask(task Task) error {
 		return err
 	}
 
-	_, err := s.db.CreateTask(task.Title(), task.Description(), int(task.Status()))
-	return err
+	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()))
 }
 
 // UpdateTask updates an existing task in the database

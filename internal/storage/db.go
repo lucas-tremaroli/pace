@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/uuid"
 	_ "github.com/marcboeker/go-duckdb"
 )
 
@@ -82,11 +81,10 @@ func (db *DB) createTables() error {
 	return err
 }
 
-func (db *DB) CreateTask(title, description string, status int) (string, error) {
-	id := uuid.New().String()
+func (db *DB) CreateTask(id, title, description string, status int) error {
 	query := `INSERT INTO tasks (id, title, description, status) VALUES (?, ?, ?, ?)`
 	_, err := db.conn.Exec(query, id, title, description, status)
-	return id, err
+	return err
 }
 
 func (db *DB) GetAllTasks() ([]TaskRecord, error) {
