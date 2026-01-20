@@ -44,7 +44,7 @@ changelog:
       - Merge pull request
       - Merge branch
 
-homebrew_casks:
+brews:
   - repository:
       owner: lucas-tremaroli
       name: homebrew-tap
