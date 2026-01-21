@@ -14,7 +14,7 @@
        \/__/       \/__/         \/__/         \/__/    
                                                         
    -----------------------------------------------------
-   Focus Timer · Kanban Board · Notes Management · Jokes
+        Focus Timer · Kanban Board · Notes · Jokes
    -----------------------------------------------------
 ```
 
