@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var listEditor string
+
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Browse and open your existing notes in a TUI",
@@ -59,7 +61,7 @@ var listCmd = &cobra.Command{
 			}
 
 			if m.ShouldOpenFile() {
-				if err := svc.OpenInEditor(filename); err != nil {
+				if err := svc.OpenInEditor(filename, listEditor); err != nil {
 					return err
 				}
 				continue
@@ -70,4 +72,8 @@ var listCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func init() {
+	listCmd.Flags().StringVarP(&listEditor, "editor", "e", "nvim", "Editor to use for opening notes")
 }

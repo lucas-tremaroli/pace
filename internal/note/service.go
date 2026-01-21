@@ -41,13 +41,13 @@ func (s *Service) GetNotePath(filename string) string {
 	return filepath.Join(s.notesDir, filename)
 }
 
-func (s *Service) OpenInEditor(filename string) error {
+func (s *Service) OpenInEditor(filename, editor string) error {
 	path := s.GetNotePath(filename)
-	nvim := exec.Command("nvim", path)
-	nvim.Stdin = os.Stdin
-	nvim.Stdout = os.Stdout
-	nvim.Stderr = os.Stderr
-	return nvim.Run()
+	cmd := exec.Command(editor, path)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func (s *Service) WriteNote(filename, content string) error {

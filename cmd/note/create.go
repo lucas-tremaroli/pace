@@ -9,6 +9,7 @@ import (
 )
 
 var content string
+var editor string
 
 var createCmd = &cobra.Command{
 	Use:   "create [filename]",
@@ -30,6 +31,9 @@ var createCmd = &cobra.Command{
 			if err := svc.WriteNote(filename, content); err != nil {
 				return err
 			}
+			if cmd.Flags().Changed("editor") {
+				return svc.OpenInEditor(filename, editor)
+			}
 			successStyle := lipgloss.NewStyle().
 				Bold(true).
 				Foreground(lipgloss.Color("10"))
@@ -39,10 +43,11 @@ var createCmd = &cobra.Command{
 			fmt.Println(successStyle.Render("✓ Note created: ") + pathStyle.Render(svc.GetNotePath(filename)))
 			return nil
 		}
-		return svc.OpenInEditor(filename)
+		return svc.OpenInEditor(filename, editor)
 	},
 }
 
 func init() {
 	createCmd.Flags().StringVarP(&content, "content", "c", "", "Write content directly to the note without opening the editor")
+	createCmd.Flags().StringVarP(&editor, "editor", "e", "nvim", "Editor to use for writing the note")
 }
