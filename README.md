@@ -49,11 +49,17 @@ Create and manage markdown notes:
 # Open a TUI to browse and edit existing notes
 pace note list
 
-# Create a new note (opens in your default editor)
+# Create a new note (opens in nvim by default)
 pace note create meeting-notes
+
+# Create a note with a specific editor
+pace note create meeting-notes --editor vim
 
 # Create a note with content directly
 pace note create todo -c "Review PRs"
+
+# Create a note with content and open in editor
+pace note create todo -c "Review PRs" --editor code
 ```
 
 ![Notes Demo](./.github/assets/note.demo.gif)
