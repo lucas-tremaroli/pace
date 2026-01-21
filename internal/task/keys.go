@@ -8,6 +8,7 @@ type keyMap struct {
 	New    key.Binding
 	Edit   key.Binding
 	Delete key.Binding
+	View   key.Binding
 	Up     key.Binding
 	Down   key.Binding
 	Right  key.Binding
@@ -23,7 +24,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right},
-		{k.New, k.Edit, k.Delete, k.Enter},
+		{k.New, k.Edit, k.Delete, k.View, k.Enter},
 		{k.Quit},
 	}
 }
@@ -58,6 +59,10 @@ var keys = keyMap{
 	Delete: key.NewBinding(
 		key.WithKeys("d"),
 		key.WithHelp("d", "delete"),
+	),
+	View: key.NewBinding(
+		key.WithKeys("v"),
+		key.WithHelp("v", "view"),
 	),
 	Up: key.NewBinding(
 		key.WithKeys("up", "k"),
