@@ -31,7 +31,10 @@ func newColumn(status status) column {
 	if status == todo {
 		focus = true
 	}
-	defaultList := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
+	delegate := list.NewDefaultDelegate()
+	delegate.SetHeight(1)
+	delegate.ShowDescription = false
+	defaultList := list.New([]list.Item{}, delegate, 0, 0)
 	defaultList.SetShowHelp(false)
 	return column{focus: focus, status: status, list: defaultList}
 }
@@ -71,6 +74,11 @@ func (c column) update(msg tea.Msg, board *Board) (tea.Model, tea.Cmd) {
 			return f.Update(nil)
 		case key.Matches(msg, keys.Delete):
 			return c, c.DeleteCurrent()
+		case key.Matches(msg, keys.View):
+			if len(c.list.VisibleItems()) != 0 {
+				task := c.list.SelectedItem().(Task)
+				return NewViewer(task, board), nil
+			}
 		case key.Matches(msg, keys.Enter):
 			return c, c.MoveToNext()
 		}

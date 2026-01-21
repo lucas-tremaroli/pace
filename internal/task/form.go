@@ -27,6 +27,7 @@ func NewForm(title, description string, board *Board) *Form {
 	}
 
 	form.title.Placeholder = title
+	form.title.CharLimit = 35
 	form.description.Placeholder = description
 	form.description.SetHeight(10)
 	form.title.SetValue(title)
