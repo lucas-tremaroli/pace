@@ -29,15 +29,16 @@ If you encounter any bugs or have feature requests, please open an [issue](https
 
 Releases are automated via [GoReleaser](https://goreleaser.com/) and triggered by Git tags.
 
-### Creating a Release
+### Flow
 
-1. Ensure all changes are merged to `main`
-2. Create and push a version tag:
+1. All changes are merged to `main`
+2. A version tag will be created and pushed:
+
    ```bash
    git tag v1.0.0
    git push origin v1.0.0
    ```
-3. The GitHub Actions workflow will automatically:
+4. The GitHub Actions workflow will automatically:
    - Build binaries for Linux and macOS (amd64/arm64)
    - Create a GitHub release with artifacts
    - Update the Homebrew formula
@@ -49,9 +50,3 @@ Follow [Semantic Versioning](https://semver.org/):
 - **MAJOR**: Breaking changes
 - **MINOR**: New features (backward compatible)
 - **PATCH**: Bug fixes (backward compatible)
-
-### Testing a Release Locally
-
-```bash
-goreleaser release --snapshot --clean
-```
