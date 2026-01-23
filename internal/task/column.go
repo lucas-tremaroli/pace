@@ -9,7 +9,7 @@ import (
 
 type column struct {
 	focus  bool
-	status status
+	status Status
 	list   list.Model
 	width  int
 }
@@ -26,9 +26,9 @@ func (c *column) Focused() bool {
 	return c.focus
 }
 
-func newColumn(status status) column {
+func newColumn(status Status) column {
 	var focus bool
-	if status == todo {
+	if status == Todo {
 		focus = true
 	}
 	delegate := list.NewDefaultDelegate()

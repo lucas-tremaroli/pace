@@ -32,7 +32,7 @@ func (s *Service) CreateTask(task Task) error {
 		return err
 	}
 
-	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()))
+	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority())
 }
 
 // UpdateTask updates an existing task in the database
@@ -41,7 +41,7 @@ func (s *Service) UpdateTask(task Task) error {
 		return err
 	}
 
-	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()))
+	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority())
 }
 
 // DeleteTask removes a task from the database
@@ -58,9 +58,20 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 
 	var tasks []Task
 	for _, record := range taskRecords {
-		task := NewTaskWithID(record.ID, status(record.Status), record.Title, record.Description)
+		task := NewTaskFull(record.ID, Status(record.Status), record.Title, record.Description, record.Priority)
 		tasks = append(tasks, task)
 	}
 
 	return tasks, nil
+}
+
+// GetTaskByID retrieves a single task by its ID
+func (s *Service) GetTaskByID(taskID string) (*Task, error) {
+	record, err := s.db.GetTaskByID(taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	task := NewTaskFull(record.ID, Status(record.Status), record.Title, record.Description, record.Priority)
+	return &task, nil
 }

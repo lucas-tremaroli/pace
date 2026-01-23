@@ -10,8 +10,8 @@ import (
 
 var TaskCmd = &cobra.Command{
 	Use:   "task",
-	Short: "Manage your tasks in a TUI",
-	Long:  `Launch a TUI to manage your tasks.`,
+	Short: "Manage your tasks in a TUI or via subcommands",
+	Long:  `Launch a TUI to manage your tasks, or use subcommands for programmatic access.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		board, err := task.NewBoard()
 		if err != nil {
@@ -23,4 +23,12 @@ var TaskCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func init() {
+	TaskCmd.AddCommand(listCmd)
+	TaskCmd.AddCommand(getCmd)
+	TaskCmd.AddCommand(createCmd)
+	TaskCmd.AddCommand(updateCmd)
+	TaskCmd.AddCommand(deleteCmd)
 }
