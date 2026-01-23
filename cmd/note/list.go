@@ -6,21 +6,50 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/lucas-tremaroli/pace/internal/note"
+	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/spf13/cobra"
 )
 
 var listEditor string
+var listOutput string
+
+type noteListResponse struct {
+	Notes []note.NoteInfo `json:"notes"`
+	Count int             `json:"count"`
+}
 
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Browse and open your existing notes in a TUI",
-	Long:  `Launch a TUI to browse, view, and open your existing notes.`,
+	Long:  `Launch a TUI to browse, view, and open your existing notes. Use --json to output the list of notes in JSON format.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		svc, err := note.NewService()
+
+		if cmd.Flags().Changed("json") {
+			listOutput = "json"
+		}
+
 		if err != nil {
+			if listOutput == "json" {
+				output.Error(err)
+			}
 			return err
 		}
 
+		// JSON output mode
+		if listOutput == "json" {
+			notes, err := svc.ListNotes()
+			if err != nil {
+				output.Error(err)
+			}
+			output.JSON(noteListResponse{
+				Notes: notes,
+				Count: len(notes),
+			})
+			return nil
+		}
+
+		// TUI mode (default)
 		for {
 			// Clear screen to avoid flash between transitions
 			fmt.Print("\033[H\033[2J")
@@ -76,4 +105,5 @@ var listCmd = &cobra.Command{
 
 func init() {
 	listCmd.Flags().StringVarP(&listEditor, "editor", "e", "nvim", "Editor to use for opening notes")
+	listCmd.Flags().Bool("json", false, "Output result in JSON format")
 }

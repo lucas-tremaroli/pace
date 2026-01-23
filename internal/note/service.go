@@ -1,6 +1,7 @@
 package note
 
 import (
+	"bufio"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,4 +72,47 @@ func (s *Service) ReadNote(filename string) (string, error) {
 		return "", err
 	}
 	return string(content), nil
+}
+
+type NoteInfo struct {
+	Filename  string `json:"filename"`
+	Path      string `json:"path"`
+	FirstLine string `json:"firstLine"`
+}
+
+func (s *Service) ListNotes() ([]NoteInfo, error) {
+	entries, err := os.ReadDir(s.notesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var notes []NoteInfo
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+			path := filepath.Join(s.notesDir, e.Name())
+			firstLine := readFirstLineFromPath(path)
+			notes = append(notes, NoteInfo{
+				Filename:  e.Name(),
+				Path:      path,
+				FirstLine: firstLine,
+			})
+		}
+	}
+	return notes, nil
+}
+
+func readFirstLineFromPath(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	if scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		line = strings.TrimLeft(line, "# ")
+		return line
+	}
+	return ""
 }

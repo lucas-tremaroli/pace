@@ -11,7 +11,7 @@ import (
 type Board struct {
 	help     help.Model
 	loaded   bool
-	focused  status
+	focused  Status
 	cols     []column
 	quitting bool
 	service  *Service
@@ -26,7 +26,7 @@ func NewBoard() (*Board, error) {
 		return nil, err
 	}
 
-	board := &Board{help: help, focused: todo, service: service}
+	board := &Board{help: help, focused: Todo, service: service}
 	board.initLists()
 	return board, nil
 }
@@ -114,11 +114,11 @@ func (m *Board) View() string {
 
 	board := lipgloss.JoinHorizontal(
 		lipgloss.Left,
-		m.cols[todo].View(),
+		m.cols[Todo].View(),
 		columnGap,
-		m.cols[inProgress].View(),
+		m.cols[InProgress].View(),
 		columnGap,
-		m.cols[done].View(),
+		m.cols[Done].View(),
 	)
 
 	// Style the board with margin to align with help box
@@ -141,13 +141,13 @@ func (m *Board) View() string {
 
 func (b *Board) initLists() {
 	b.cols = []column{
-		newColumn(todo),
-		newColumn(inProgress),
-		newColumn(done),
+		newColumn(Todo),
+		newColumn(InProgress),
+		newColumn(Done),
 	}
-	b.cols[todo].list.Title = ColumnTitleTodo
-	b.cols[inProgress].list.Title = ColumnTitleInProgress
-	b.cols[done].list.Title = ColumnTitleDone
+	b.cols[Todo].list.Title = ColumnTitleTodo
+	b.cols[InProgress].list.Title = ColumnTitleInProgress
+	b.cols[Done].list.Title = ColumnTitleDone
 
 	b.loadTasksFromDB()
 }
@@ -168,30 +168,30 @@ func (b *Board) loadTasksFromDB() {
 
 	for _, task := range tasks {
 		switch task.Status() {
-		case todo:
+		case Todo:
 			todoItems = append(todoItems, task)
-		case inProgress:
+		case InProgress:
 			inProgressItems = append(inProgressItems, task)
-		case done:
+		case Done:
 			doneItems = append(doneItems, task)
 		}
 	}
 
-	b.cols[todo].list.SetItems(todoItems)
-	b.cols[inProgress].list.SetItems(inProgressItems)
-	b.cols[done].list.SetItems(doneItems)
+	b.cols[Todo].list.SetItems(todoItems)
+	b.cols[InProgress].list.SetItems(inProgressItems)
+	b.cols[Done].list.SetItems(doneItems)
 }
 
 func (b *Board) loadDefaultTasks() {
-	b.cols[todo].list.SetItems([]list.Item{
-		NewTask(todo, "buy milk", "strawberry milk"),
-		NewTask(todo, "eat sushi", "negitoro roll, miso soup, rice"),
-		NewTask(todo, "fold laundry", "or wear wrinkly t-shirts"),
+	b.cols[Todo].list.SetItems([]list.Item{
+		NewTask(Todo, "buy milk", "strawberry milk"),
+		NewTask(Todo, "eat sushi", "negitoro roll, miso soup, rice"),
+		NewTask(Todo, "fold laundry", "or wear wrinkly t-shirts"),
 	})
-	b.cols[inProgress].list.SetItems([]list.Item{
-		NewTask(inProgress, "write code", "don't worry, it's Go"),
+	b.cols[InProgress].list.SetItems([]list.Item{
+		NewTask(InProgress, "write code", "don't worry, it's Go"),
 	})
-	b.cols[done].list.SetItems([]list.Item{
-		NewTask(done, "stay cool", "as a cucumber"),
+	b.cols[Done].list.SetItems([]list.Item{
+		NewTask(Done, "stay cool", "as a cucumber"),
 	})
 }
