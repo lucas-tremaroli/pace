@@ -2,16 +2,19 @@ package task
 
 import (
 	"fmt"
+	"slices"
 )
 
 type Task struct {
 	id          string
 	status      Status
+	taskType    TaskType
 	title       string
 	description string
 	priority    int
 	blockedBy   []string
 	blocks      []string
+	labels      []string
 }
 
 // TaskJSON is the JSON-serializable representation of a Task
@@ -20,9 +23,11 @@ type TaskJSON struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Status      string   `json:"status"`
+	Type        string   `json:"type"`
 	Priority    int      `json:"priority"`
 	BlockedBy   []string `json:"blocked_by,omitempty"`
 	Blocks      []string `json:"blocks,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
 }
 
 // NewTask creates a new task with the given ID
@@ -41,20 +46,16 @@ func NewTaskWithID(id string, status Status, title, description string) Task {
 	return NewTask(id, status, title, description)
 }
 
-// NewTaskFull creates a new task with all fields specified
-func NewTaskFull(id string, status Status, title, description string, priority int) Task {
+// NewTaskComplete creates a new task with all fields including type
+func NewTaskComplete(id string, status Status, taskType TaskType, title, description string, priority int) Task {
 	return Task{
 		id:          id,
 		status:      status,
+		taskType:    taskType,
 		title:       title,
 		description: description,
 		priority:    priority,
 	}
-}
-
-// NewTaskWithPriority creates a new task with specified ID and priority
-func NewTaskWithPriority(id string, status Status, title, description string, priority int) Task {
-	return NewTaskFull(id, status, title, description, priority)
 }
 
 func (t Task) FilterValue() string {
@@ -81,6 +82,10 @@ func (t Task) Priority() int {
 	return t.priority
 }
 
+func (t Task) Type() TaskType {
+	return t.taskType
+}
+
 // BlockedBy returns the IDs of tasks that block this task
 func (t Task) BlockedBy() []string {
 	return t.blockedBy
@@ -103,20 +108,16 @@ func (t *Task) SetBlocks(ids []string) {
 
 // AddBlockedBy adds a task ID to the blockedBy list
 func (t *Task) AddBlockedBy(id string) {
-	for _, existing := range t.blockedBy {
-		if existing == id {
-			return // Already exists
-		}
+	if slices.Contains(t.blockedBy, id) {
+		return // Already exists
 	}
 	t.blockedBy = append(t.blockedBy, id)
 }
 
 // AddBlocks adds a task ID to the blocks list
 func (t *Task) AddBlocks(id string) {
-	for _, existing := range t.blocks {
-		if existing == id {
-			return // Already exists
-		}
+	if slices.Contains(t.blocks, id) {
+		return // Already exists
 	}
 	t.blocks = append(t.blocks, id)
 }
@@ -141,6 +142,46 @@ func (t *Task) RemoveBlocks(id string) {
 	}
 }
 
+// Labels returns the task's labels
+func (t Task) Labels() []string {
+	return t.labels
+}
+
+// SetLabels sets the task's labels
+func (t *Task) SetLabels(labels []string) {
+	t.labels = labels
+}
+
+// AddLabel adds a label to the task
+func (t *Task) AddLabel(label string) {
+	for _, existing := range t.labels {
+		if existing == label {
+			return // Already exists
+		}
+	}
+	t.labels = append(t.labels, label)
+}
+
+// RemoveLabel removes a label from the task
+func (t *Task) RemoveLabel(label string) {
+	for i, existing := range t.labels {
+		if existing == label {
+			t.labels = append(t.labels[:i], t.labels[i+1:]...)
+			return
+		}
+	}
+}
+
+// HasLabel returns true if the task has the given label
+func (t Task) HasLabel(label string) bool {
+	for _, l := range t.labels {
+		if l == label {
+			return true
+		}
+	}
+	return false
+}
+
 // IsBlocked returns true if this task has any unresolved blockers
 func (t Task) IsBlocked() bool {
 	return len(t.blockedBy) > 0
@@ -153,9 +194,11 @@ func (t Task) ToJSON() TaskJSON {
 		Title:       t.title,
 		Description: t.description,
 		Status:      t.status.String(),
+		Type:        t.taskType.String(),
 		Priority:    t.priority,
 		BlockedBy:   t.blockedBy,
 		Blocks:      t.blocks,
+		Labels:      t.labels,
 	}
 }
 
@@ -226,5 +269,68 @@ func ParseStatus(s string) (Status, error) {
 		return Done, nil
 	default:
 		return 0, fmt.Errorf("invalid status: %s (valid: todo, in-progress, done)", s)
+	}
+}
+
+// TaskType represents the type of task
+type TaskType int
+
+const (
+	TypeTask TaskType = iota
+	TypeBug
+	TypeFeature
+	TypeChore
+	TypeDocs
+)
+
+// String returns the string representation of a task type
+func (t TaskType) String() string {
+	switch t {
+	case TypeTask:
+		return "task"
+	case TypeBug:
+		return "bug"
+	case TypeFeature:
+		return "feature"
+	case TypeChore:
+		return "chore"
+	case TypeDocs:
+		return "docs"
+	default:
+		return "task"
+	}
+}
+
+// Symbol returns a short symbol for the task type (for TUI display)
+func (t TaskType) Symbol() string {
+	switch t {
+	case TypeBug:
+		return "B"
+	case TypeFeature:
+		return "F"
+	case TypeChore:
+		return "C"
+	case TypeDocs:
+		return "D"
+	default:
+		return "T"
+	}
+}
+
+// ParseTaskType parses a string into a task type value
+func ParseTaskType(s string) (TaskType, error) {
+	switch s {
+	case "task", "":
+		return TypeTask, nil
+	case "bug":
+		return TypeBug, nil
+	case "feature":
+		return TypeFeature, nil
+	case "chore":
+		return TypeChore, nil
+	case "docs":
+		return TypeDocs, nil
+	default:
+		return TypeTask, fmt.Errorf("invalid type: %s (valid: task, bug, feature, chore, docs)", s)
 	}
 }

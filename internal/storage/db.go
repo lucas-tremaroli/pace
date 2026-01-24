@@ -18,6 +18,7 @@ type TaskRecord struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      int    `json:"status"`
+	TaskType    int    `json:"task_type"`
 	Priority    int    `json:"priority"`
 }
 
@@ -88,6 +89,11 @@ func (db *DB) createTables() error {
 	// Ignore error if column already exists
 	_ = err
 
+	// Migration: add task_type column if it doesn't exist (0 = task, 1 = bug, 2 = feature, 3 = chore, 4 = docs)
+	_, err = db.conn.Exec(`ALTER TABLE tasks ADD COLUMN task_type INTEGER NOT NULL DEFAULT 0`)
+	// Ignore error if column already exists
+	_ = err
+
 	// Create task_dependencies table for blocking relationships
 	depQuery := `
 		CREATE TABLE IF NOT EXISTS task_dependencies (
@@ -113,6 +119,19 @@ func (db *DB) createTables() error {
 		return err
 	}
 
+	// Create task_labels table for label associations
+	labelsQuery := `
+		CREATE TABLE IF NOT EXISTS task_labels (
+			task_id VARCHAR NOT NULL,
+			label VARCHAR NOT NULL,
+			PRIMARY KEY (task_id, label),
+			FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+		);
+	`
+	if _, err := db.conn.Exec(labelsQuery); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -132,14 +151,14 @@ func (db *DB) SetConfig(key, value string) error {
 	return err
 }
 
-func (db *DB) CreateTask(id, title, description string, status, priority int) error {
-	query := `INSERT INTO tasks (id, title, description, status, priority) VALUES (?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(query, id, title, description, status, priority)
+func (db *DB) CreateTask(id, title, description string, status, taskType, priority int) error {
+	query := `INSERT INTO tasks (id, title, description, status, task_type, priority) VALUES (?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(query, id, title, description, status, taskType, priority)
 	return err
 }
 
 func (db *DB) GetAllTasks() ([]TaskRecord, error) {
-	query := `SELECT id, title, description, status, priority FROM tasks ORDER BY priority DESC, title`
+	query := `SELECT id, title, description, status, task_type, priority FROM tasks ORDER BY priority DESC, title`
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
@@ -149,7 +168,7 @@ func (db *DB) GetAllTasks() ([]TaskRecord, error) {
 	var tasks []TaskRecord
 	for rows.Next() {
 		var task TaskRecord
-		err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.Priority)
+		err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.TaskType, &task.Priority)
 		if err != nil {
 			return nil, err
 		}
@@ -159,9 +178,9 @@ func (db *DB) GetAllTasks() ([]TaskRecord, error) {
 	return tasks, rows.Err()
 }
 
-func (db *DB) UpdateTask(id, title, description string, status, priority int) error {
-	query := `UPDATE tasks SET title = ?, description = ?, status = ?, priority = ? WHERE id = ?`
-	_, err := db.conn.Exec(query, title, description, status, priority, id)
+func (db *DB) UpdateTask(id, title, description string, status, taskType, priority int) error {
+	query := `UPDATE tasks SET title = ?, description = ?, status = ?, task_type = ?, priority = ? WHERE id = ?`
+	_, err := db.conn.Exec(query, title, description, status, taskType, priority, id)
 	return err
 }
 
@@ -172,11 +191,11 @@ func (db *DB) DeleteTask(id string) error {
 }
 
 func (db *DB) GetTaskByID(id string) (*TaskRecord, error) {
-	query := `SELECT id, title, description, status, priority FROM tasks WHERE id = ?`
+	query := `SELECT id, title, description, status, task_type, priority FROM tasks WHERE id = ?`
 	row := db.conn.QueryRow(query, id)
 
 	var task TaskRecord
-	err := row.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.Priority)
+	err := row.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.TaskType, &task.Priority)
 	if err != nil {
 		return nil, err
 	}
@@ -265,5 +284,66 @@ func (db *DB) GetAllDependencies() (map[string][]string, map[string][]string, er
 func (db *DB) RemoveAllDependencies(taskID string) error {
 	query := `DELETE FROM task_dependencies WHERE blocker_id = ? OR blocked_id = ?`
 	_, err := db.conn.Exec(query, taskID, taskID)
+	return err
+}
+
+// AddLabel adds a label to a task
+func (db *DB) AddLabel(taskID, label string) error {
+	query := `INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)`
+	_, err := db.conn.Exec(query, taskID, label)
+	return err
+}
+
+// RemoveLabel removes a label from a task
+func (db *DB) RemoveLabel(taskID, label string) error {
+	query := `DELETE FROM task_labels WHERE task_id = ? AND label = ?`
+	_, err := db.conn.Exec(query, taskID, label)
+	return err
+}
+
+// GetLabels returns all labels for a task
+func (db *DB) GetLabels(taskID string) ([]string, error) {
+	query := `SELECT label FROM task_labels WHERE task_id = ? ORDER BY label`
+	rows, err := db.conn.Query(query, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var labels []string
+	for rows.Next() {
+		var label string
+		if err := rows.Scan(&label); err != nil {
+			return nil, err
+		}
+		labels = append(labels, label)
+	}
+	return labels, rows.Err()
+}
+
+// GetAllLabels returns a map of task ID to labels for all tasks
+func (db *DB) GetAllLabels() (map[string][]string, error) {
+	query := `SELECT task_id, label FROM task_labels ORDER BY task_id, label`
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	labels := make(map[string][]string)
+	for rows.Next() {
+		var taskID, label string
+		if err := rows.Scan(&taskID, &label); err != nil {
+			return nil, err
+		}
+		labels[taskID] = append(labels[taskID], label)
+	}
+	return labels, rows.Err()
+}
+
+// RemoveAllLabels removes all labels for a task
+func (db *DB) RemoveAllLabels(taskID string) error {
+	query := `DELETE FROM task_labels WHERE task_id = ?`
+	_, err := db.conn.Exec(query, taskID)
 	return err
 }
