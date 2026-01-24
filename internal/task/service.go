@@ -51,7 +51,7 @@ func (s *Service) CreateTask(task Task) error {
 		return err
 	}
 
-	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority())
+	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), int(task.Type()), task.Priority())
 }
 
 // UpdateTask updates an existing task in the database
@@ -60,19 +60,23 @@ func (s *Service) UpdateTask(task Task) error {
 		return err
 	}
 
-	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority())
+	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), int(task.Type()), task.Priority())
 }
 
-// DeleteTask removes a task from the database and cleans up dependencies
+// DeleteTask removes a task from the database and cleans up dependencies and labels
 func (s *Service) DeleteTask(taskID string) error {
 	// Remove all dependencies involving this task first
 	if err := s.db.RemoveAllDependencies(taskID); err != nil {
 		return err
 	}
+	// Remove all labels for this task
+	if err := s.db.RemoveAllLabels(taskID); err != nil {
+		return err
+	}
 	return s.db.DeleteTask(taskID)
 }
 
-// LoadAllTasks retrieves all tasks from the database with dependencies
+// LoadAllTasks retrieves all tasks from the database with dependencies and labels
 func (s *Service) LoadAllTasks() ([]Task, error) {
 	taskRecords, err := s.db.GetAllTasks()
 	if err != nil {
@@ -85,25 +89,32 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 		return nil, err
 	}
 
+	// Load all labels at once for efficiency
+	labelsMap, err := s.db.GetAllLabels()
+	if err != nil {
+		return nil, err
+	}
+
 	var tasks []Task
 	for _, record := range taskRecords {
-		task := NewTaskFull(record.ID, Status(record.Status), record.Title, record.Description, record.Priority)
+		task := NewTaskComplete(record.ID, Status(record.Status), TaskType(record.TaskType), record.Title, record.Description, record.Priority)
 		task.SetBlockedBy(blockedByMap[record.ID])
 		task.SetBlocks(blocksMap[record.ID])
+		task.SetLabels(labelsMap[record.ID])
 		tasks = append(tasks, task)
 	}
 
 	return tasks, nil
 }
 
-// GetTaskByID retrieves a single task by its ID with dependencies
+// GetTaskByID retrieves a single task by its ID with dependencies and labels
 func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	record, err := s.db.GetTaskByID(taskID)
 	if err != nil {
 		return nil, err
 	}
 
-	task := NewTaskFull(record.ID, Status(record.Status), record.Title, record.Description, record.Priority)
+	task := NewTaskComplete(record.ID, Status(record.Status), TaskType(record.TaskType), record.Title, record.Description, record.Priority)
 
 	// Load dependencies for this task
 	blockedBy, err := s.db.GetBlockers(taskID)
@@ -116,6 +127,13 @@ func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	}
 	task.SetBlockedBy(blockedBy)
 	task.SetBlocks(blocks)
+
+	// Load labels for this task
+	labels, err := s.db.GetLabels(taskID)
+	if err != nil {
+		return nil, err
+	}
+	task.SetLabels(labels)
 
 	return &task, nil
 }
@@ -135,6 +153,20 @@ func (s *Service) AddDependency(blockerID, blockedID string) error {
 // RemoveDependency removes a blocking relationship
 func (s *Service) RemoveDependency(blockerID, blockedID string) error {
 	return s.db.RemoveDependency(blockerID, blockedID)
+}
+
+// AddLabel adds a label to a task
+func (s *Service) AddLabel(taskID, label string) error {
+	// Verify task exists
+	if _, err := s.db.GetTaskByID(taskID); err != nil {
+		return err
+	}
+	return s.db.AddLabel(taskID, label)
+}
+
+// RemoveLabel removes a label from a task
+func (s *Service) RemoveLabel(taskID, label string) error {
+	return s.db.RemoveLabel(taskID, label)
 }
 
 // GetReadyTasks returns tasks that have no blockers or all blockers are done
