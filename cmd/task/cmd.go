@@ -34,4 +34,5 @@ func init() {
 	TaskCmd.AddCommand(deleteCmd)
 	TaskCmd.AddCommand(depCmd)
 	TaskCmd.AddCommand(readyCmd)
+	TaskCmd.AddCommand(searchCmd)
 }

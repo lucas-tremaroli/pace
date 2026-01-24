@@ -65,7 +65,7 @@ func init() {
 	createCmd.Flags().StringVar(&createDescription, "description", "", "Task description")
 	createCmd.Flags().StringVar(&createStatus, "status", "todo", "Task status (todo, in-progress, done)")
 	createCmd.Flags().StringVar(&createType, "type", "task", "Task type (task, bug, feature, chore, docs)")
-	createCmd.Flags().IntVar(&createPriority, "priority", 0, "Task priority (0=none, 1=urgent, 2=high, 3=normal, 4=low)")
+	createCmd.Flags().IntVar(&createPriority, "priority", 3, "Task priority (1=urgent, 2=high, 3=normal, 4=low)")
 	createCmd.Flags().StringSliceVar(&createLabels, "label", nil, "Task labels (can be specified multiple times)")
 	createCmd.MarkFlagRequired("title")
 }
