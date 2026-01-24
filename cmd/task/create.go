@@ -33,7 +33,7 @@ var createCmd = &cobra.Command{
 		}
 		defer svc.Close()
 
-		newTask := task.NewTaskWithPriority(status, createTitle, createDescription, createPriority)
+		newTask := task.NewTaskWithPriority(svc.GenerateTaskID(), status, createTitle, createDescription, createPriority)
 
 		if err := svc.CreateTask(newTask); err != nil {
 			output.Error(err)

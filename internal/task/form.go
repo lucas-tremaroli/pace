@@ -37,7 +37,11 @@ func NewForm(title, description string, board *Board) *Form {
 }
 
 func (f Form) CreateTask() Task {
-	return NewTask(f.col.status, f.title.Value(), f.description.Value())
+	id := ""
+	if f.board != nil && f.board.service != nil {
+		id = f.board.service.GenerateTaskID()
+	}
+	return NewTask(id, f.col.status, f.title.Value(), f.description.Value())
 }
 
 func (f Form) Init() tea.Cmd {

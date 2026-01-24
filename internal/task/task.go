@@ -2,8 +2,6 @@ package task
 
 import (
 	"fmt"
-
-	"github.com/google/uuid"
 )
 
 type Task struct {
@@ -12,28 +10,23 @@ type Task struct {
 	title       string
 	description string
 	priority    int
+	blockedBy   []string
+	blocks      []string
 }
 
 // TaskJSON is the JSON-serializable representation of a Task
 type TaskJSON struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Status      string `json:"status"`
-	Priority    int    `json:"priority"`
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	Priority    int      `json:"priority"`
+	BlockedBy   []string `json:"blocked_by,omitempty"`
+	Blocks      []string `json:"blocks,omitempty"`
 }
 
-func NewTask(status Status, title, description string) Task {
-	return Task{
-		id:          uuid.New().String(),
-		status:      status,
-		title:       title,
-		description: description,
-		priority:    0,
-	}
-}
-
-func NewTaskWithID(id string, status Status, title, description string) Task {
+// NewTask creates a new task with the given ID
+func NewTask(id string, status Status, title, description string) Task {
 	return Task{
 		id:          id,
 		status:      status,
@@ -43,6 +36,12 @@ func NewTaskWithID(id string, status Status, title, description string) Task {
 	}
 }
 
+// NewTaskWithID is an alias for NewTask for compatibility
+func NewTaskWithID(id string, status Status, title, description string) Task {
+	return NewTask(id, status, title, description)
+}
+
+// NewTaskFull creates a new task with all fields specified
 func NewTaskFull(id string, status Status, title, description string, priority int) Task {
 	return Task{
 		id:          id,
@@ -53,14 +52,9 @@ func NewTaskFull(id string, status Status, title, description string, priority i
 	}
 }
 
-func NewTaskWithPriority(status Status, title, description string, priority int) Task {
-	return Task{
-		id:          uuid.New().String(),
-		status:      status,
-		title:       title,
-		description: description,
-		priority:    priority,
-	}
+// NewTaskWithPriority creates a new task with specified ID and priority
+func NewTaskWithPriority(id string, status Status, title, description string, priority int) Task {
+	return NewTaskFull(id, status, title, description, priority)
 }
 
 func (t Task) FilterValue() string {
@@ -87,6 +81,71 @@ func (t Task) Priority() int {
 	return t.priority
 }
 
+// BlockedBy returns the IDs of tasks that block this task
+func (t Task) BlockedBy() []string {
+	return t.blockedBy
+}
+
+// Blocks returns the IDs of tasks that this task blocks
+func (t Task) Blocks() []string {
+	return t.blocks
+}
+
+// SetBlockedBy sets the tasks that block this task
+func (t *Task) SetBlockedBy(ids []string) {
+	t.blockedBy = ids
+}
+
+// SetBlocks sets the tasks that this task blocks
+func (t *Task) SetBlocks(ids []string) {
+	t.blocks = ids
+}
+
+// AddBlockedBy adds a task ID to the blockedBy list
+func (t *Task) AddBlockedBy(id string) {
+	for _, existing := range t.blockedBy {
+		if existing == id {
+			return // Already exists
+		}
+	}
+	t.blockedBy = append(t.blockedBy, id)
+}
+
+// AddBlocks adds a task ID to the blocks list
+func (t *Task) AddBlocks(id string) {
+	for _, existing := range t.blocks {
+		if existing == id {
+			return // Already exists
+		}
+	}
+	t.blocks = append(t.blocks, id)
+}
+
+// RemoveBlockedBy removes a task ID from the blockedBy list
+func (t *Task) RemoveBlockedBy(id string) {
+	for i, existing := range t.blockedBy {
+		if existing == id {
+			t.blockedBy = append(t.blockedBy[:i], t.blockedBy[i+1:]...)
+			return
+		}
+	}
+}
+
+// RemoveBlocks removes a task ID from the blocks list
+func (t *Task) RemoveBlocks(id string) {
+	for i, existing := range t.blocks {
+		if existing == id {
+			t.blocks = append(t.blocks[:i], t.blocks[i+1:]...)
+			return
+		}
+	}
+}
+
+// IsBlocked returns true if this task has any unresolved blockers
+func (t Task) IsBlocked() bool {
+	return len(t.blockedBy) > 0
+}
+
 // ToJSON converts a Task to its JSON-serializable form
 func (t Task) ToJSON() TaskJSON {
 	return TaskJSON{
@@ -95,6 +154,8 @@ func (t Task) ToJSON() TaskJSON {
 		Description: t.description,
 		Status:      t.status.String(),
 		Priority:    t.priority,
+		BlockedBy:   t.blockedBy,
+		Blocks:      t.blocks,
 	}
 }
 

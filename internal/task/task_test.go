@@ -5,7 +5,7 @@ import (
 )
 
 func TestValidate_EmptyTitle(t *testing.T) {
-	task := NewTask(Todo, "", "description")
+	task := NewTask("test-1", Todo, "", "description")
 	err := task.Validate()
 	if err != ErrEmptyTitle {
 		t.Errorf("expected ErrEmptyTitle, got %v", err)
@@ -32,19 +32,19 @@ func TestValidate_InvalidStatus(t *testing.T) {
 }
 
 func TestValidate_Success(t *testing.T) {
-	task := NewTask(Todo, "valid title", "description")
+	task := NewTask("test-1", Todo, "valid title", "description")
 	err := task.Validate()
 	if err != nil {
 		t.Errorf("expected nil error, got %v", err)
 	}
 
-	task = NewTask(InProgress, "another task", "")
+	task = NewTask("test-2", InProgress, "another task", "")
 	err = task.Validate()
 	if err != nil {
 		t.Errorf("expected nil error for InProgress task, got %v", err)
 	}
 
-	task = NewTask(Done, "done task", "with description")
+	task = NewTask("test-3", Done, "done task", "with description")
 	err = task.Validate()
 	if err != nil {
 		t.Errorf("expected nil error for Done task, got %v", err)
@@ -88,7 +88,7 @@ func TestStatusGetPrev(t *testing.T) {
 }
 
 func TestSetStatus(t *testing.T) {
-	task := NewTask(Todo, "test", "desc")
+	task := NewTask("test-1", Todo, "test", "desc")
 
 	err := task.SetStatus(InProgress)
 	if err != nil {
