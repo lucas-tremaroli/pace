@@ -26,6 +26,7 @@ var TaskCmd = &cobra.Command{
 }
 
 func init() {
+	TaskCmd.GroupID = "core"
 	TaskCmd.AddCommand(listCmd)
 	TaskCmd.AddCommand(getCmd)
 	TaskCmd.AddCommand(createCmd)
