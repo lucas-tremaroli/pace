@@ -183,15 +183,23 @@ func (b *Board) loadTasksFromDB() {
 }
 
 func (b *Board) loadDefaultTasks() {
+	// Generate IDs for demo tasks using the service if available
+	genID := func() string {
+		if b.service != nil {
+			return b.service.GenerateTaskID()
+		}
+		return GenerateID("demo")
+	}
+
 	b.cols[Todo].list.SetItems([]list.Item{
-		NewTask(Todo, "buy milk", "strawberry milk"),
-		NewTask(Todo, "eat sushi", "negitoro roll, miso soup, rice"),
-		NewTask(Todo, "fold laundry", "or wear wrinkly t-shirts"),
+		NewTask(genID(), Todo, "buy milk", "strawberry milk"),
+		NewTask(genID(), Todo, "eat sushi", "negitoro roll, miso soup, rice"),
+		NewTask(genID(), Todo, "fold laundry", "or wear wrinkly t-shirts"),
 	})
 	b.cols[InProgress].list.SetItems([]list.Item{
-		NewTask(InProgress, "write code", "don't worry, it's Go"),
+		NewTask(genID(), InProgress, "write code", "don't worry, it's Go"),
 	})
 	b.cols[Done].list.SetItems([]list.Item{
-		NewTask(Done, "stay cool", "as a cucumber"),
+		NewTask(genID(), Done, "stay cool", "as a cucumber"),
 	})
 }

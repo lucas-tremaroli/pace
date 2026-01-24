@@ -6,7 +6,8 @@ import (
 
 // Service handles task business logic and database operations
 type Service struct {
-	db *storage.DB
+	db     *storage.DB
+	prefix string
 }
 
 // NewService creates a new task service
@@ -15,7 +16,25 @@ func NewService() (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{db: db}, nil
+
+	// Initialize or get the ID prefix
+	prefix, err := GetOrInitPrefix(db)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return &Service{db: db, prefix: prefix}, nil
+}
+
+// Prefix returns the current ID prefix
+func (s *Service) Prefix() string {
+	return s.prefix
+}
+
+// GenerateTaskID creates a new unique task ID with the configured prefix
+func (s *Service) GenerateTaskID() string {
+	return GenerateID(s.prefix)
 }
 
 // Close closes the database connection
@@ -44,14 +63,24 @@ func (s *Service) UpdateTask(task Task) error {
 	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority())
 }
 
-// DeleteTask removes a task from the database
+// DeleteTask removes a task from the database and cleans up dependencies
 func (s *Service) DeleteTask(taskID string) error {
+	// Remove all dependencies involving this task first
+	if err := s.db.RemoveAllDependencies(taskID); err != nil {
+		return err
+	}
 	return s.db.DeleteTask(taskID)
 }
 
-// LoadAllTasks retrieves all tasks from the database
+// LoadAllTasks retrieves all tasks from the database with dependencies
 func (s *Service) LoadAllTasks() ([]Task, error) {
 	taskRecords, err := s.db.GetAllTasks()
+	if err != nil {
+		return nil, err
+	}
+
+	// Load all dependencies at once for efficiency
+	blockedByMap, blocksMap, err := s.db.GetAllDependencies()
 	if err != nil {
 		return nil, err
 	}
@@ -59,13 +88,15 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 	var tasks []Task
 	for _, record := range taskRecords {
 		task := NewTaskFull(record.ID, Status(record.Status), record.Title, record.Description, record.Priority)
+		task.SetBlockedBy(blockedByMap[record.ID])
+		task.SetBlocks(blocksMap[record.ID])
 		tasks = append(tasks, task)
 	}
 
 	return tasks, nil
 }
 
-// GetTaskByID retrieves a single task by its ID
+// GetTaskByID retrieves a single task by its ID with dependencies
 func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	record, err := s.db.GetTaskByID(taskID)
 	if err != nil {
@@ -73,5 +104,72 @@ func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	}
 
 	task := NewTaskFull(record.ID, Status(record.Status), record.Title, record.Description, record.Priority)
+
+	// Load dependencies for this task
+	blockedBy, err := s.db.GetBlockers(taskID)
+	if err != nil {
+		return nil, err
+	}
+	blocks, err := s.db.GetBlocking(taskID)
+	if err != nil {
+		return nil, err
+	}
+	task.SetBlockedBy(blockedBy)
+	task.SetBlocks(blocks)
+
 	return &task, nil
+}
+
+// AddDependency creates a blocking relationship where blocker blocks blocked
+func (s *Service) AddDependency(blockerID, blockedID string) error {
+	// Verify both tasks exist
+	if _, err := s.db.GetTaskByID(blockerID); err != nil {
+		return err
+	}
+	if _, err := s.db.GetTaskByID(blockedID); err != nil {
+		return err
+	}
+	return s.db.AddDependency(blockerID, blockedID)
+}
+
+// RemoveDependency removes a blocking relationship
+func (s *Service) RemoveDependency(blockerID, blockedID string) error {
+	return s.db.RemoveDependency(blockerID, blockedID)
+}
+
+// GetReadyTasks returns tasks that have no blockers or all blockers are done
+func (s *Service) GetReadyTasks() ([]Task, error) {
+	tasks, err := s.LoadAllTasks()
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a map of task status by ID
+	statusMap := make(map[string]Status)
+	for _, t := range tasks {
+		statusMap[t.ID()] = t.Status()
+	}
+
+	var ready []Task
+	for _, t := range tasks {
+		// Skip completed tasks
+		if t.Status() == Done {
+			continue
+		}
+
+		// Check if all blockers are done
+		isReady := true
+		for _, blockerID := range t.BlockedBy() {
+			if status, exists := statusMap[blockerID]; exists && status != Done {
+				isReady = false
+				break
+			}
+		}
+
+		if isReady {
+			ready = append(ready, t)
+		}
+	}
+
+	return ready, nil
 }

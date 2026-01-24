@@ -31,9 +31,7 @@ func newColumn(status Status) column {
 	if status == Todo {
 		focus = true
 	}
-	delegate := list.NewDefaultDelegate()
-	delegate.SetHeight(1)
-	delegate.ShowDescription = false
+	delegate := newTaskDelegate()
 	defaultList := list.New([]list.Item{}, delegate, 0, 0)
 	defaultList.SetShowHelp(false)
 	return column{focus: focus, status: status, list: defaultList}
