@@ -48,3 +48,7 @@ var JokeCmd = &cobra.Command{
 		return nil
 	},
 }
+
+func init() {
+	JokeCmd.GroupID = "recharge"
+}

@@ -15,6 +15,7 @@ var NoteCmd = &cobra.Command{
 }
 
 func init() {
+	NoteCmd.GroupID = "core"
 	NoteCmd.AddCommand(listCmd)
 	NoteCmd.AddCommand(createCmd)
 	NoteCmd.AddCommand(readCmd)

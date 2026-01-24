@@ -17,5 +17,6 @@ var TickCmd = &cobra.Command{
 }
 
 func init() {
+	TickCmd.GroupID = "recharge"
 	TickCmd.Flags().IntP("minutes", "m", 25, "Duration of the focus timer in minutes")
 }
