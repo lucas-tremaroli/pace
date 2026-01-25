@@ -12,10 +12,11 @@ import (
 var readOutput string
 
 var readCmd = &cobra.Command{
-	Use:   "read <filename>",
-	Short: "Read a note's content",
-	Long:  `Reads and outputs a note's content. Use --output json for JSON format.`,
-	Args:  cobra.ExactArgs(1),
+	Use:     "read <filename>",
+	Aliases: []string{"cat"},
+	Short:   "Read a note's content (alias: cat)",
+	Long:    `Reads and outputs a note's content. Use --json for JSON format. Alias: 'pace note cat'`,
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filename := args[0]
 
