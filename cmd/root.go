@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/lucas-tremaroli/pace/cmd/config"
 	"github.com/lucas-tremaroli/pace/cmd/joke"
 	"github.com/lucas-tremaroli/pace/cmd/note"
 	"github.com/lucas-tremaroli/pace/cmd/task"
@@ -100,12 +101,14 @@ func styledHelp(cmd *cobra.Command, _ []string) {
 
 func init() {
 	rootCmd.AddGroup(&cobra.Group{ID: "core", Title: "Core"})
+	rootCmd.AddGroup(&cobra.Group{ID: "configuration", Title: "Configuration"})
 	rootCmd.AddGroup(&cobra.Group{ID: "recharge", Title: "Recharge"})
 
 	rootCmd.AddCommand(task.TaskCmd)
 	rootCmd.AddCommand(note.NoteCmd)
 	rootCmd.AddCommand(tick.TickCmd)
 	rootCmd.AddCommand(joke.JokeCmd)
+	rootCmd.AddCommand(config.ConfigCmd)
 
 	rootCmd.SetHelpFunc(styledHelp)
 }

@@ -28,6 +28,11 @@ func NewDB() (*DB, error) {
 		return nil, fmt.Errorf("failed to get database path: %w", err)
 	}
 
+	return NewDBWithPath(dbPath)
+}
+
+// NewDBWithPath creates a new DB instance with a specific database path
+func NewDBWithPath(dbPath string) (*DB, error) {
 	conn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -48,17 +53,16 @@ func (db *DB) Close() error {
 
 // GetPaceConfigDir returns the pace configuration directory path
 func GetPaceConfigDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	resolved, err := ResolvePaceDir()
 	if err != nil {
 		return "", err
 	}
 
-	paceDir := filepath.Join(homeDir, ".config", "pace")
-	if err := os.MkdirAll(paceDir, 0755); err != nil {
+	if err := os.MkdirAll(resolved.Path, 0755); err != nil {
 		return "", err
 	}
 
-	return paceDir, nil
+	return resolved.Path, nil
 }
 
 func getDBPath() (string, error) {
@@ -149,6 +153,43 @@ func (db *DB) SetConfig(key, value string) error {
 	query := `INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)`
 	_, err := db.conn.Exec(query, key, value)
 	return err
+}
+
+// DeleteConfig removes a config value by key
+func (db *DB) DeleteConfig(key string) error {
+	query := `DELETE FROM config WHERE key = ?`
+	result, err := db.conn.Exec(query, key)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// GetAllConfig retrieves all config key-value pairs
+func (db *DB) GetAllConfig() (map[string]string, error) {
+	query := `SELECT key, value FROM config ORDER BY key`
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	config := make(map[string]string)
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		config[key] = value
+	}
+	return config, rows.Err()
 }
 
 func (db *DB) CreateTask(id, title, description string, status, taskType, priority int) error {
