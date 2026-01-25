@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/lucas-tremaroli/pace/cmd/config"
 	"github.com/lucas-tremaroli/pace/cmd/joke"
 	"github.com/lucas-tremaroli/pace/cmd/note"
 	"github.com/lucas-tremaroli/pace/cmd/task"
@@ -107,6 +108,7 @@ func init() {
 	rootCmd.AddCommand(note.NoteCmd)
 	rootCmd.AddCommand(tick.TickCmd)
 	rootCmd.AddCommand(joke.JokeCmd)
+	rootCmd.AddCommand(config.ConfigCmd)
 
 	rootCmd.SetHelpFunc(styledHelp)
 }

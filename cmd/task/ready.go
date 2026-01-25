@@ -2,6 +2,7 @@ package task
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/task"
@@ -25,6 +26,11 @@ var readyCmd = &cobra.Command{
 		if err != nil {
 			output.Error(err)
 		}
+
+		// Sort by priority (P1 first, P4 last)
+		slices.SortFunc(tasks, func(a, b task.Task) int {
+			return a.Priority() - b.Priority()
+		})
 
 		if readyPretty {
 			if len(tasks) == 0 {

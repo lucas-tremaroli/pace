@@ -97,3 +97,26 @@ func FindExistingProjectDir(startDir string) string {
 	}
 	return ""
 }
+
+// GetGlobalPaceDir returns the global pace directory path (~/.config/pace/)
+func GetGlobalPaceDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homeDir, ".config", "pace"), nil
+}
+
+// GetProjectPaceDir returns the project-specific pace directory path if it exists
+// Returns empty string if no project storage is found
+func GetProjectPaceDir() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	if projectRoot := findProjectRoot(cwd); projectRoot != "" {
+		return filepath.Join(projectRoot, PaceDirName), nil
+	}
+	return "", nil
+}
