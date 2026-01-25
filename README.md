@@ -130,14 +130,9 @@ $ pace task ready
 
 These tasks have no unresolved blockers—I can pick one and start.
 
-### What I'd Love to See Added
+### What's Coming Next
 
-The roadmap already includes features I'm excited about:
-
-- **`--fields` flag** — Request only `id,title,status` to save tokens
-- **`--since` flag** — Get only tasks changed since my last check
-- **Session save/load** — Preserve working context across agent restarts
-- **Note-task linking** — Associate specs directly with implementation tasks
+There are some features in the works that will make this even better for AI workflows.
 
 ---
 
