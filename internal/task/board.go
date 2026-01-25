@@ -55,9 +55,21 @@ func (m *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Creating new task
 			m.service.CreateTask(task)
 		} else {
-			// Editing existing task - get the original task ID
+			// Editing existing task - preserve ID and dependencies from original
 			originalTask := m.cols[m.focused].list.Items()[msg.index].(Task)
-			task = NewTaskWithID(originalTask.ID(), task.Status(), task.Title(), task.Description())
+			// Use form values but with original ID
+			task = NewTaskComplete(
+				originalTask.ID(),
+				task.Status(),
+				task.Type(),
+				task.Title(),
+				task.Description(),
+				task.Priority(),
+			)
+			// Preserve dependencies and labels
+			task.SetBlockedBy(originalTask.BlockedBy())
+			task.SetBlocks(originalTask.Blocks())
+			task.SetLabels(originalTask.Labels())
 			m.service.UpdateTask(task)
 		}
 		return m, m.cols[m.focused].Set(msg.index, task)

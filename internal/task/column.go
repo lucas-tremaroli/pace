@@ -60,7 +60,7 @@ func (c column) update(msg tea.Msg, board *Board) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Edit):
 			if len(c.list.VisibleItems()) != 0 {
 				task := c.list.SelectedItem().(Task)
-				f := NewForm(task.title, task.description, board)
+				f := NewFormWithTask(task, board)
 				f.index = c.list.Index()
 				f.col = c
 				return f.Update(nil)
