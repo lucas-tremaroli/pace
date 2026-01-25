@@ -36,7 +36,7 @@ Most productivity tools are built for humans clicking through GUIs. Pace is diff
 - **Priority levels** — Urgent (1) through Low (4)
 - **Markdown notes** — Store specs, ADRs, and documentation alongside tasks
 - **Interactive TUI** — Kanban board and note picker for humans
-- **Focus timer** — Pomodoro-style timer with terminal notifications
+- **Focus timer** — Pomodoro-style timer in the terminal
 
 ## Installation
 
