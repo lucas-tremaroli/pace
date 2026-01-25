@@ -22,7 +22,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:  "pace",
-	Long: `A simple CLI tool to manage tasks, notes, and more.`,
+	Long: `A simple CLI productivity tool for both humans and machines.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
