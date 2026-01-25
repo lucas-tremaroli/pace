@@ -75,9 +75,10 @@ func (s *Service) ReadNote(filename string) (string, error) {
 }
 
 type NoteInfo struct {
-	Filename  string `json:"filename"`
-	Path      string `json:"path"`
-	FirstLine string `json:"firstLine"`
+	Filename  string    `json:"filename"`
+	Path      string    `json:"path"`
+	FirstLine string    `json:"firstLine"`
+	ModTime   time.Time `json:"modTime"`
 }
 
 func (s *Service) ListNotes() ([]NoteInfo, error) {
@@ -91,10 +92,16 @@ func (s *Service) ListNotes() ([]NoteInfo, error) {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
 			path := filepath.Join(s.notesDir, e.Name())
 			firstLine := readFirstLineFromPath(path)
+			info, err := e.Info()
+			var modTime time.Time
+			if err == nil {
+				modTime = info.ModTime()
+			}
 			notes = append(notes, NoteInfo{
 				Filename:  e.Name(),
 				Path:      path,
 				FirstLine: firstLine,
+				ModTime:   modTime,
 			})
 		}
 	}

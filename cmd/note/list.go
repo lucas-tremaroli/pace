@@ -2,6 +2,7 @@ package note
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,6 +13,7 @@ import (
 
 var listEditor string
 var listOutput string
+var listSort string
 
 type noteListResponse struct {
 	Notes []note.NoteInfo `json:"notes"`
@@ -42,6 +44,7 @@ var listCmd = &cobra.Command{
 			if err != nil {
 				output.Error(err)
 			}
+			sortNotes(notes, listSort)
 			output.JSON(noteListResponse{
 				Notes: notes,
 				Count: len(notes),
@@ -106,4 +109,20 @@ var listCmd = &cobra.Command{
 func init() {
 	listCmd.Flags().StringVarP(&listEditor, "editor", "e", "nvim", "Editor to use for opening notes")
 	listCmd.Flags().Bool("json", false, "Output result in JSON format")
+	listCmd.Flags().StringVar(&listSort, "sort", "name", "Sort by: name, modified, created")
+}
+
+func sortNotes(notes []note.NoteInfo, sortBy string) {
+	switch sortBy {
+	case "modified", "created":
+		// Sort by modification time (newest first)
+		slices.SortFunc(notes, func(a, b note.NoteInfo) int {
+			return b.ModTime.Compare(a.ModTime)
+		})
+	default: // "name"
+		// Sort alphabetically by filename
+		slices.SortFunc(notes, func(a, b note.NoteInfo) int {
+			return strings.Compare(a.Filename, b.Filename)
+		})
+	}
 }
