@@ -2,6 +2,8 @@ package note
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/charmbracelet/lipgloss"
@@ -36,6 +38,21 @@ var createCmd = &cobra.Command{
 
 		if len(args) == 1 {
 			filename = args[0]
+		}
+
+		// Read from stdin if piped and no content flag provided
+		if !cmd.Flags().Changed("content") {
+			stat, _ := os.Stdin.Stat()
+			if (stat.Mode() & os.ModeCharDevice) == 0 {
+				stdinBytes, err := io.ReadAll(os.Stdin)
+				if err != nil {
+					if createOutput == "json" {
+						output.Error(err)
+					}
+					return err
+				}
+				content = string(stdinBytes)
+			}
 		}
 
 		if content != "" {
