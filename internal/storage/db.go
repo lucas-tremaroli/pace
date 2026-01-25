@@ -48,17 +48,16 @@ func (db *DB) Close() error {
 
 // GetPaceConfigDir returns the pace configuration directory path
 func GetPaceConfigDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	resolved, err := ResolvePaceDir()
 	if err != nil {
 		return "", err
 	}
 
-	paceDir := filepath.Join(homeDir, ".config", "pace")
-	if err := os.MkdirAll(paceDir, 0755); err != nil {
+	if err := os.MkdirAll(resolved.Path, 0755); err != nil {
 		return "", err
 	}
 
-	return paceDir, nil
+	return resolved.Path, nil
 }
 
 func getDBPath() (string, error) {

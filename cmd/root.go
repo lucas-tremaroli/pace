@@ -100,6 +100,7 @@ func styledHelp(cmd *cobra.Command, _ []string) {
 
 func init() {
 	rootCmd.AddGroup(&cobra.Group{ID: "core", Title: "Core"})
+	rootCmd.AddGroup(&cobra.Group{ID: "configuration", Title: "Configuration"})
 	rootCmd.AddGroup(&cobra.Group{ID: "recharge", Title: "Recharge"})
 
 	rootCmd.AddCommand(task.TaskCmd)
