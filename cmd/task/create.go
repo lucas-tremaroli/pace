@@ -13,6 +13,7 @@ var (
 	createType        string
 	createPriority    int
 	createLabels      []string
+	createLink        string
 )
 
 var createCmd = &cobra.Command{
@@ -40,7 +41,7 @@ var createCmd = &cobra.Command{
 		}
 		defer svc.Close()
 
-		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, taskType, createTitle, createDescription, createPriority)
+		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, taskType, createTitle, createDescription, createPriority, createLink)
 
 		if err := svc.CreateTask(newTask); err != nil {
 			output.Error(err)
@@ -67,5 +68,6 @@ func init() {
 	createCmd.Flags().StringVar(&createType, "type", "task", "Task type (task, bug, feature, chore, docs)")
 	createCmd.Flags().IntVar(&createPriority, "priority", 3, "Task priority (1=urgent, 2=high, 3=normal, 4=low)")
 	createCmd.Flags().StringSliceVar(&createLabels, "label", nil, "Task labels (can be specified multiple times)")
+	createCmd.Flags().StringVar(&createLink, "link", "", "Link/URL associated with the task")
 	createCmd.MarkFlagRequired("title")
 }
