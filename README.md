@@ -227,6 +227,7 @@ pace migrate --from global --to project
 
 - `--status`: `todo`, `in-progress`, `done`
 - `--type`: `task`, `bug`, `feature`, `chore`, `docs`
+- `--link`: URL/link associated with task (e.g., PR, issue, documentation)
 - `--priority`: `1` (urgent), `2` (high), `3` (normal), `4` (low)
 - `--label`: string tag (repeatable)
 

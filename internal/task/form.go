@@ -17,6 +17,7 @@ type formField int
 const (
 	fieldTitle formField = iota
 	fieldDescription
+	fieldLink
 	fieldType
 	fieldPriority
 )
@@ -25,6 +26,7 @@ type Form struct {
 	help        help.Model
 	title       textinput.Model
 	description textarea.Model
+	link        textinput.Model
 	taskType    TaskType
 	priority    int
 	col         column
@@ -39,6 +41,7 @@ func NewForm(title, description string, board *Board) *Form {
 		help:        help.New(),
 		title:       textinput.New(),
 		description: textarea.New(),
+		link:        textinput.New(),
 		taskType:    TypeTask,
 		priority:    3,
 		board:       board,
@@ -50,6 +53,8 @@ func NewForm(title, description string, board *Board) *Form {
 	form.title.CharLimit = 50
 	form.description.Placeholder = "Description (optional)"
 	form.description.SetHeight(5)
+	form.link.Placeholder = "Link/URL (optional)"
+	form.link.CharLimit = 200
 	form.title.SetValue(title)
 	form.description.SetValue(description)
 	form.title.Focus()
@@ -61,6 +66,7 @@ func NewFormWithTask(t Task, board *Board) *Form {
 	form := NewForm(t.Title(), t.Description(), board)
 	form.taskType = t.Type()
 	form.priority = t.Priority()
+	form.link.SetValue(t.Link())
 	form.isEdit = true
 	return form
 }
@@ -70,7 +76,7 @@ func (f Form) CreateTask() Task {
 	if f.board != nil && f.board.service != nil {
 		id = f.board.service.GenerateTaskID()
 	}
-	return NewTaskComplete(id, f.col.status, f.taskType, f.title.Value(), f.description.Value(), f.priority)
+	return NewTaskComplete(id, f.col.status, f.taskType, f.title.Value(), f.description.Value(), f.priority, f.link.Value())
 }
 
 func (f Form) Init() tea.Cmd {
@@ -125,6 +131,8 @@ func (f Form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.title, cmd = f.title.Update(msg)
 	case fieldDescription:
 		f.description, cmd = f.description.Update(msg)
+	case fieldLink:
+		f.link, cmd = f.link.Update(msg)
 	}
 	return f, cmd
 }
@@ -136,10 +144,12 @@ func (f *Form) cycleField() {
 		f.title.Blur()
 	case fieldDescription:
 		f.description.Blur()
+	case fieldLink:
+		f.link.Blur()
 	}
 
 	// Move to next field
-	f.focused = (f.focused + 1) % 4
+	f.focused = (f.focused + 1) % 5
 }
 
 func (f *Form) focusCurrentField() tea.Cmd {
@@ -150,6 +160,9 @@ func (f *Form) focusCurrentField() tea.Cmd {
 	case fieldDescription:
 		f.description.Focus()
 		return textarea.Blink
+	case fieldLink:
+		f.link.Focus()
+		return textinput.Blink
 	}
 	return nil
 }
@@ -234,6 +247,17 @@ func (f Form) View() string {
 		f.description.View(),
 	)
 
+	// Link label
+	linkLabel := labelStyle
+	if f.focused == fieldLink {
+		linkLabel = selectedLabelStyle
+	}
+	linkSection := lipgloss.JoinVertical(
+		lipgloss.Left,
+		linkLabel.Render("Link:"),
+		f.link.View(),
+	)
+
 	// Type selector
 	typeLabel := labelStyle
 	if f.focused == fieldType {
@@ -277,6 +301,8 @@ func (f Form) View() string {
 		titleSection,
 		"",
 		descriptionSection,
+		"",
+		linkSection,
 		"",
 		optionsRow,
 	)

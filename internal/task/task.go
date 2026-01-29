@@ -15,6 +15,7 @@ type Task struct {
 	blockedBy   []string
 	blocks      []string
 	labels      []string
+	link        string
 }
 
 // TaskJSON is the JSON-serializable representation of a Task
@@ -28,6 +29,7 @@ type TaskJSON struct {
 	BlockedBy   []string `json:"blocked_by,omitempty"`
 	Blocks      []string `json:"blocks,omitempty"`
 	Labels      []string `json:"labels,omitempty"`
+	Link        string   `json:"link,omitempty"`
 }
 
 // NewTask creates a new task with the given ID
@@ -47,7 +49,7 @@ func NewTaskWithID(id string, status Status, title, description string) Task {
 }
 
 // NewTaskComplete creates a new task with all fields including type
-func NewTaskComplete(id string, status Status, taskType TaskType, title, description string, priority int) Task {
+func NewTaskComplete(id string, status Status, taskType TaskType, title, description string, priority int, link string) Task {
 	return Task{
 		id:          id,
 		status:      status,
@@ -55,6 +57,7 @@ func NewTaskComplete(id string, status Status, taskType TaskType, title, descrip
 		title:       title,
 		description: description,
 		priority:    priority,
+		link:        link,
 	}
 }
 
@@ -84,6 +87,10 @@ func (t Task) Priority() int {
 
 func (t Task) Type() TaskType {
 	return t.taskType
+}
+
+func (t Task) Link() string {
+	return t.link
 }
 
 // BlockedBy returns the IDs of tasks that block this task
@@ -199,6 +206,7 @@ func (t Task) ToJSON() TaskJSON {
 		BlockedBy:   t.blockedBy,
 		Blocks:      t.blocks,
 		Labels:      t.labels,
+		Link:        t.link,
 	}
 }
 

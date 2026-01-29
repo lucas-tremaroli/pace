@@ -65,6 +65,7 @@ func (m *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				task.Title(),
 				task.Description(),
 				task.Priority(),
+				task.Link(),
 			)
 			// Preserve dependencies and labels
 			task.SetBlockedBy(originalTask.BlockedBy())
