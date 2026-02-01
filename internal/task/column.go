@@ -1,6 +1,11 @@
 package task
 
 import (
+	"net/url"
+	"os/exec"
+	"runtime"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -77,6 +82,14 @@ func (c column) update(msg tea.Msg, board *Board) (tea.Model, tea.Cmd) {
 				task := c.list.SelectedItem().(Task)
 				return NewViewer(task, board), nil
 			}
+		case key.Matches(msg, keys.Open):
+			if len(c.list.VisibleItems()) != 0 {
+				task := c.list.SelectedItem().(Task)
+				if task.Link() != "" {
+					return c, c.OpenLink(task.Link())
+				}
+			}
+			return c, nil
 		case key.Matches(msg, keys.Enter):
 			return c, c.MoveToNext()
 		}
@@ -138,6 +151,51 @@ type moveMsg struct {
 
 type deleteMsg struct {
 	Task
+}
+
+func (c *column) OpenLink(link string) tea.Cmd {
+	return func() tea.Msg {
+		// Validate and sanitize the link
+		link = strings.TrimSpace(link)
+		if link == "" {
+			return nil
+		}
+
+		// Parse and validate the URL
+		parsedURL, err := url.Parse(link)
+		if err != nil {
+			return nil // Invalid URL format
+		}
+
+		// Require an explicit scheme - no assumptions
+		if parsedURL.Scheme == "" {
+			return nil
+		}
+
+		// Only allow http and http/https protocol for security
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			return nil
+		}
+
+		// Require a valid host
+		if parsedURL.Host == "" {
+			return nil
+		}
+
+		// Use OS-specific command to open URL in default browser
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("open", link)
+		case "linux":
+			cmd = exec.Command("xdg-open", link)
+		default:
+			// Fallback: try xdg-open (common on Unix-like systems)
+			cmd = exec.Command("xdg-open", link)
+		}
+		_ = cmd.Start()
+		return nil
+	}
 }
 
 func (c *column) MoveToNext() tea.Cmd {

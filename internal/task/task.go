@@ -2,7 +2,9 @@ package task
 
 import (
 	"fmt"
+	"net/url"
 	"slices"
+	"strings"
 )
 
 type Task struct {
@@ -15,6 +17,7 @@ type Task struct {
 	blockedBy   []string
 	blocks      []string
 	labels      []string
+	link        string
 }
 
 // TaskJSON is the JSON-serializable representation of a Task
@@ -28,6 +31,7 @@ type TaskJSON struct {
 	BlockedBy   []string `json:"blocked_by,omitempty"`
 	Blocks      []string `json:"blocks,omitempty"`
 	Labels      []string `json:"labels,omitempty"`
+	Link        string   `json:"link,omitempty"`
 }
 
 // NewTask creates a new task with the given ID
@@ -47,7 +51,8 @@ func NewTaskWithID(id string, status Status, title, description string) Task {
 }
 
 // NewTaskComplete creates a new task with all fields including type
-func NewTaskComplete(id string, status Status, taskType TaskType, title, description string, priority int) Task {
+func NewTaskComplete(id string, status Status, taskType TaskType, title, description string, priority int, link string) Task {
+	link = NormalizeLink(link)
 	return Task{
 		id:          id,
 		status:      status,
@@ -55,6 +60,7 @@ func NewTaskComplete(id string, status Status, taskType TaskType, title, descrip
 		title:       title,
 		description: description,
 		priority:    priority,
+		link:        link,
 	}
 }
 
@@ -84,6 +90,10 @@ func (t Task) Priority() int {
 
 func (t Task) Type() TaskType {
 	return t.taskType
+}
+
+func (t Task) Link() string {
+	return t.link
 }
 
 // BlockedBy returns the IDs of tasks that block this task
@@ -199,6 +209,7 @@ func (t Task) ToJSON() TaskJSON {
 		BlockedBy:   t.blockedBy,
 		Blocks:      t.blocks,
 		Labels:      t.labels,
+		Link:        t.link,
 	}
 }
 
@@ -211,6 +222,36 @@ func (t *Task) SetStatus(s Status) error {
 	return nil
 }
 
+// NormalizeLink prepends https:// to a link if no scheme is present
+func NormalizeLink(link string) string {
+	link = strings.TrimSpace(link)
+	if link == "" {
+		return ""
+	}
+	if !strings.Contains(link, "://") {
+		link = "https://" + link
+	}
+	return link
+}
+
+// ValidateLink checks if a link is a valid http/https URL
+func ValidateLink(link string) error {
+	if link == "" {
+		return nil
+	}
+	parsedURL, err := url.Parse(link)
+	if err != nil {
+		return ErrInvalidLink
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return ErrInvalidLink
+	}
+	if parsedURL.Host == "" {
+		return ErrInvalidLink
+	}
+	return nil
+}
+
 // Validate checks if the task has valid data
 func (t Task) Validate() error {
 	if t.title == "" {
@@ -218,6 +259,9 @@ func (t Task) Validate() error {
 	}
 	if t.status < Todo || t.status > Done {
 		return ErrInvalidStatus
+	}
+	if err := ValidateLink(t.link); err != nil {
+		return err
 	}
 	return nil
 }
