@@ -189,8 +189,6 @@ func (c *column) OpenLink(link string) tea.Cmd {
 			cmd = exec.Command("open", link)
 		case "linux":
 			cmd = exec.Command("xdg-open", link)
-		case "windows":
-			cmd = exec.Command("cmd", "/c", "start", link)
 		default:
 			// Fallback: try xdg-open (common on Unix-like systems)
 			cmd = exec.Command("xdg-open", link)

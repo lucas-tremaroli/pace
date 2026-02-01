@@ -68,7 +68,7 @@ var updateCmd = &cobra.Command{
 		if cmd.Flags().Changed("priority") {
 			priority = updatePriority
 		}
-		if cmd.Flags().Changed("link") {
+		if cmd.Flags().Changed("url") {
 			link = updateLink
 		}
 
@@ -111,5 +111,5 @@ func init() {
 	updateCmd.Flags().IntVar(&updatePriority, "priority", 0, "Task priority (0=none, 1=urgent, 2=high, 3=normal, 4=low)")
 	updateCmd.Flags().StringSliceVar(&updateAddLabels, "label", nil, "Add labels (can be specified multiple times)")
 	updateCmd.Flags().StringSliceVar(&updateRemoveLabels, "remove-label", nil, "Remove labels (can be specified multiple times)")
-	updateCmd.Flags().StringVar(&updateLink, "link", "", "Link/URL associated with the task")
+	updateCmd.Flags().StringVar(&updateLink, "url", "", "URL associated with the task (e.g., google.com)")
 }

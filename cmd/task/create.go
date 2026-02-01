@@ -68,6 +68,6 @@ func init() {
 	createCmd.Flags().StringVar(&createType, "type", "task", "Task type (task, bug, feature, chore, docs)")
 	createCmd.Flags().IntVar(&createPriority, "priority", 3, "Task priority (1=urgent, 2=high, 3=normal, 4=low)")
 	createCmd.Flags().StringSliceVar(&createLabels, "label", nil, "Task labels (can be specified multiple times)")
-	createCmd.Flags().StringVar(&createLink, "link", "", "Link/URL associated with the task")
+	createCmd.Flags().StringVar(&createLink, "url", "", "URL associated with the task (e.g., google.com)")
 	createCmd.MarkFlagRequired("title")
 }
