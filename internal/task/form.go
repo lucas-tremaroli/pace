@@ -51,10 +51,12 @@ func NewForm(title, description string, board *Board) *Form {
 
 	form.title.Placeholder = "Task title"
 	form.title.CharLimit = 50
+	form.title.Width = 50
 	form.description.Placeholder = "Description (optional)"
 	form.description.SetHeight(5)
-	form.link.Placeholder = "Link/URL (optional)"
+	form.link.Placeholder = "github.com/... (https:// added automatically)"
 	form.link.CharLimit = 200
+	form.link.Width = 50
 	form.title.SetValue(title)
 	form.description.SetValue(description)
 	form.title.Focus()

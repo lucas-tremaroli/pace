@@ -43,21 +43,19 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	// Build the title with dependency indicators
 	title := task.title
 
-	// Add label indicators
+	// Add label indicator (first label only, with +N for extras)
 	var labelStr string
-	for _, label := range task.labels {
-		labelStr += fmt.Sprintf(" [%s]", label)
+	if len(task.labels) > 0 {
+		labelStr = fmt.Sprintf(" [%s]", task.labels[0])
+		if len(task.labels) > 1 {
+			labelStr += fmt.Sprintf(" +%d", len(task.labels)-1)
+		}
 	}
 
 	// Add dependency indicators
 	var indicators string
-	if len(task.blockedBy) > 0 {
-		// Show blocked indicator with count
-		indicators += fmt.Sprintf(" [blocked:%d]", len(task.blockedBy))
-	}
 	if len(task.blocks) > 0 {
-		// Show blocking indicator with count
-		indicators += fmt.Sprintf(" [blocks:%d]", len(task.blocks))
+		indicators += fmt.Sprintf(" [%d]", len(task.blocks))
 	}
 
 	// Type prefix
@@ -69,7 +67,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true)
 	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Underline(hasLink)
 	blockedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Underline(hasLink)
-	indicatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	indicatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Cyan for labels
 	typeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")) // Gray for type
 
