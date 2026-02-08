@@ -11,7 +11,7 @@ type TaskFilter struct {
 	Status   *Status
 	Type     *TaskType
 	Priority *int
-	Label    string
+	Labels   []string // Multiple labels use AND semantics (task must have all)
 }
 
 // ParseFilter parses a filter string in the format "key=value"
@@ -49,7 +49,7 @@ func ParseFilter(s string) (*TaskFilter, error) {
 		}
 		filter.Priority = &priority
 	case "label":
-		filter.Label = value
+		filter.Labels = []string{value}
 	default:
 		return nil, fmt.Errorf("unknown filter key: %s (valid: status, type, priority, label)", key)
 	}
@@ -68,93 +68,41 @@ func (f *TaskFilter) Matches(t Task) bool {
 	if f.Priority != nil && t.Priority() != *f.Priority {
 		return false
 	}
-	if f.Label != "" && !t.HasLabel(f.Label) {
-		return false
+	// All specified labels must be present (AND semantics)
+	for _, label := range f.Labels {
+		if !t.HasLabel(label) {
+			return false
+		}
 	}
 	return true
 }
 
-// MergeFilters combines multiple filters into one that requires all conditions
-func MergeFilters(filters []*TaskFilter) *TaskFilter {
+// MergeFilters combines multiple filters into one that requires all conditions.
+// Returns an error if duplicate status, type, or priority filters are specified.
+// Multiple label filters are allowed and use AND semantics (task must have all labels).
+func MergeFilters(filters []*TaskFilter) (*TaskFilter, error) {
 	merged := &TaskFilter{}
 	for _, f := range filters {
 		if f.Status != nil {
+			if merged.Status != nil {
+				return nil, fmt.Errorf("duplicate filter: status specified multiple times")
+			}
 			merged.Status = f.Status
 		}
 		if f.Type != nil {
+			if merged.Type != nil {
+				return nil, fmt.Errorf("duplicate filter: type specified multiple times")
+			}
 			merged.Type = f.Type
 		}
 		if f.Priority != nil {
+			if merged.Priority != nil {
+				return nil, fmt.Errorf("duplicate filter: priority specified multiple times")
+			}
 			merged.Priority = f.Priority
 		}
-		if f.Label != "" {
-			merged.Label = f.Label
-		}
+		// Labels can be specified multiple times (AND semantics)
+		merged.Labels = append(merged.Labels, f.Labels...)
 	}
-	return merged
-}
-
-// TaskUpdate represents changes to apply to a task
-type TaskUpdate struct {
-	Status   *Status
-	Type     *TaskType
-	Priority *int
-}
-
-// ParseSetValue parses a set string in the format "key=value"
-func ParseSetValue(s string) (*TaskUpdate, error) {
-	parts := strings.SplitN(s, "=", 2)
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid set format: %s (expected key=value)", s)
-	}
-
-	key := strings.TrimSpace(parts[0])
-	value := strings.TrimSpace(parts[1])
-
-	update := &TaskUpdate{}
-
-	switch key {
-	case "status":
-		status, err := ParseStatus(value)
-		if err != nil {
-			return nil, err
-		}
-		update.Status = &status
-	case "type":
-		taskType, err := ParseTaskType(value)
-		if err != nil {
-			return nil, err
-		}
-		update.Type = &taskType
-	case "priority":
-		priority, err := strconv.Atoi(value)
-		if err != nil {
-			return nil, fmt.Errorf("invalid priority: %s", value)
-		}
-		if priority < 1 || priority > 4 {
-			return nil, fmt.Errorf("priority must be 1-4, got %d", priority)
-		}
-		update.Priority = &priority
-	default:
-		return nil, fmt.Errorf("unknown set key: %s (valid: status, type, priority)", key)
-	}
-
-	return update, nil
-}
-
-// MergeUpdates combines multiple updates into one
-func MergeUpdates(updates []*TaskUpdate) *TaskUpdate {
-	merged := &TaskUpdate{}
-	for _, u := range updates {
-		if u.Status != nil {
-			merged.Status = u.Status
-		}
-		if u.Type != nil {
-			merged.Type = u.Type
-		}
-		if u.Priority != nil {
-			merged.Priority = u.Priority
-		}
-	}
-	return merged
+	return merged, nil
 }

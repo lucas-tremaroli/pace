@@ -92,7 +92,10 @@ func handleFilterDelete() error {
 		}
 		filters = append(filters, filter)
 	}
-	mergedFilter := task.MergeFilters(filters)
+	mergedFilter, err := task.MergeFilters(filters)
+	if err != nil {
+		output.Error(err)
+	}
 
 	svc, err := task.NewService()
 	if err != nil {

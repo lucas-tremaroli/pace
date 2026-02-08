@@ -56,9 +56,10 @@ type BulkResult struct {
 
 // BulkItem represents a single item in a bulk operation result
 type BulkItem struct {
-	ID    string `json:"id,omitempty"`
-	Title string `json:"title,omitempty"`
-	Error string `json:"error,omitempty"`
+	ID       string   `json:"id,omitempty"`
+	Title    string   `json:"title,omitempty"`
+	Error    string   `json:"error,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // BulkSuccess prints a bulk operation result

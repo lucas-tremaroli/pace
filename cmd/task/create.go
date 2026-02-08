@@ -162,21 +162,18 @@ func handleBulkCreate(bulkInput string) error {
 			continue
 		}
 
-		// Add labels if specified
+		// Add labels if specified, track warnings for failures
+		var warnings []string
 		for _, label := range input.Labels {
 			if err := svc.AddLabel(newTask.ID(), label); err != nil {
-				// Log label error but don't fail the task creation
-				result.Failed = append(result.Failed, output.BulkItem{
-					ID:    newTask.ID(),
-					Title: input.Title,
-					Error: "label error: " + err.Error(),
-				})
+				warnings = append(warnings, "add label '"+label+"': "+err.Error())
 			}
 		}
 
 		result.Succeeded = append(result.Succeeded, output.BulkItem{
-			ID:    newTask.ID(),
-			Title: input.Title,
+			ID:       newTask.ID(),
+			Title:    input.Title,
+			Warnings: warnings,
 		})
 	}
 
