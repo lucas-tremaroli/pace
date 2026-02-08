@@ -174,11 +174,63 @@ Examples:
 	},
 }
 
+var depChainCmd = &cobra.Command{
+	Use:   "chain <id1> <id2> [id3] ...",
+	Short: "Create a chain of dependencies",
+	Long: `Creates sequential dependencies between tasks.
+The first task blocks the second, the second blocks the third, and so on.
+
+Example:
+  pace task dep chain pace-001 pace-002 pace-003
+  Creates: pace-001 blocks pace-002, pace-002 blocks pace-003`,
+	Args: cobra.MinimumNArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, err := task.NewService()
+		if err != nil {
+			output.Error(err)
+		}
+		defer svc.Close()
+
+		var dependencies []map[string]string
+		var errors []string
+
+		// Create sequential dependencies
+		for i := 0; i < len(args)-1; i++ {
+			blockerID := args[i]
+			blockedID := args[i+1]
+
+			if err := svc.AddDependency(blockerID, blockedID); err != nil {
+				errors = append(errors, fmt.Sprintf("%s->%s: %s", blockerID, blockedID, err.Error()))
+			} else {
+				dependencies = append(dependencies, map[string]string{
+					"blocker": blockerID,
+					"blocked": blockedID,
+				})
+			}
+		}
+
+		if len(errors) > 0 && len(dependencies) == 0 {
+			output.ErrorMsg(strings.Join(errors, "; "))
+		}
+
+		data := map[string]any{
+			"dependencies": dependencies,
+		}
+		if len(errors) > 0 {
+			data["errors"] = errors
+		}
+
+		output.Success("dependency chain created", data)
+		return nil
+	},
+}
+
 func init() {
 	depCmd.AddCommand(depAddCmd)
 	depCmd.AddCommand(depRemoveCmd)
 	depCmd.AddCommand(depListCmd)
 	depCmd.AddCommand(depTreeCmd)
+	depCmd.AddCommand(depChainCmd)
 
 	// Tree command flags
 	depTreeCmd.Flags().StringVar(&treeDirection, "direction", "up", "Tree direction: 'up' (blockers), 'down' (blocks), or 'both'")

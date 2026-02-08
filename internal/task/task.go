@@ -34,6 +34,17 @@ type TaskJSON struct {
 	Link        string   `json:"link,omitempty"`
 }
 
+// TaskInput is used for parsing bulk task creation input
+type TaskInput struct {
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	Type        string   `json:"type"`
+	Priority    int      `json:"priority"`
+	Labels      []string `json:"labels"`
+	Link        string   `json:"link"`
+}
+
 // NewTask creates a new task with the given ID
 func NewTask(id string, status Status, title, description string) Task {
 	return Task{
