@@ -1,7 +1,6 @@
 package note
 
 import (
-	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,20 +82,11 @@ func loadNotes(dir string) []list.Item {
 }
 
 func readFirstLine(path string) string {
-	f, err := os.Open(path)
+	contentBytes, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	if scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		// Strip leading markdown heading markers
-		line = strings.TrimLeft(line, "# ")
-		return line
-	}
-	return ""
+	return extractFirstLine(string(contentBytes))
 }
 
 func (p Picker) Init() tea.Cmd {
