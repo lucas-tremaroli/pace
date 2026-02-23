@@ -52,17 +52,20 @@ func NewViewer(filename, renderedContent string) Viewer {
 }
 
 func RenderMarkdown(content string) string {
+	// Strip frontmatter before rendering
+	_, body, _ := ParseFrontmatter(content)
+
 	renderer, err := glamour.NewTermRenderer(
 		glamour.WithAutoStyle(),
 		glamour.WithWordWrap(100),
 	)
 	if err != nil {
-		return content
+		return body
 	}
 
-	rendered, err := renderer.Render(content)
+	rendered, err := renderer.Render(body)
 	if err != nil {
-		return content
+		return body
 	}
 
 	return rendered

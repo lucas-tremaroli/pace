@@ -85,6 +85,23 @@ var createCmd = &cobra.Command{
 			fmt.Println(successStyle.Render("✓ Note created: ") + pathStyle.Render(path))
 			return nil
 		}
+
+		// Write default frontmatter template for editor mode
+		defaultContent := `---
+description: ""
+labels: []
+---
+
+# Title
+
+Your content here...
+`
+		if err := svc.WriteNote(filename, defaultContent); err != nil {
+			if createOutput == "json" {
+				output.Error(err)
+			}
+			return err
+		}
 		return svc.OpenInEditor(filename, editor)
 	},
 }

@@ -77,10 +77,10 @@ func (s *Service) ReadNote(filename string) (string, error) {
 }
 
 type NoteInfo struct {
-	Filename  string    `json:"filename"`
-	Path      string    `json:"path"`
-	FirstLine string    `json:"firstLine"`
-	ModTime   time.Time `json:"modTime"`
+	Filename    string    `json:"filename"`
+	Path        string    `json:"path"`
+	Description string    `json:"description"`
+	ModTime     time.Time `json:"modTime"`
 }
 
 func (s *Service) ListNotes() ([]NoteInfo, error) {
@@ -93,29 +93,35 @@ func (s *Service) ListNotes() ([]NoteInfo, error) {
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
 			path := filepath.Join(s.notesDir, e.Name())
-			firstLine := readFirstLineFromPath(path)
+			description := getDescriptionFromPath(path)
 			info, err := e.Info()
 			var modTime time.Time
 			if err == nil {
 				modTime = info.ModTime()
 			}
 			notes = append(notes, NoteInfo{
-				Filename:  e.Name(),
-				Path:      path,
-				FirstLine: firstLine,
-				ModTime:   modTime,
+				Filename:    e.Name(),
+				Path:        path,
+				Description: description,
+				ModTime:     modTime,
 			})
 		}
 	}
 	return notes, nil
 }
 
-func readFirstLineFromPath(path string) string {
+// getDescriptionFromPath returns the description from frontmatter, or falls back to first content line
+func getDescriptionFromPath(path string) string {
 	contentBytes, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
-	return extractFirstLine(string(contentBytes))
+	content := string(contentBytes)
+	fm, _, _ := ParseFrontmatter(content)
+	if fm != nil && fm.Description != "" {
+		return fm.Description
+	}
+	return extractFirstLine(content)
 }
 
 // ParseFrontmatter extracts YAML frontmatter from content.
@@ -176,17 +182,22 @@ func (s *Service) ReadNoteWithMeta(filename string) (*Note, error) {
 	}
 
 	var labels []string
+	var description string
 	if fm != nil {
 		labels = fm.Labels
+		description = fm.Description
+	}
+	if description == "" {
+		description = extractFirstLine(content)
 	}
 
 	return &Note{
-		Filename:  filepath.Base(path),
-		Path:      path,
-		Content:   content,
-		FirstLine: extractFirstLine(content),
-		ModTime:   modTime,
-		Labels:    labels,
+		Filename:    filepath.Base(path),
+		Path:        path,
+		Content:     content,
+		Description: description,
+		ModTime:     modTime,
+		Labels:      labels,
 	}, nil
 }
 
@@ -239,16 +250,21 @@ func (s *Service) ListNotesWithMeta(includeContent bool) ([]Note, error) {
 			}
 
 			var labels []string
+			var description string
 			if fm != nil {
 				labels = fm.Labels
+				description = fm.Description
+			}
+			if description == "" {
+				description = extractFirstLine(content)
 			}
 
 			note := Note{
-				Filename:  e.Name(),
-				Path:      path,
-				FirstLine: extractFirstLine(content),
-				ModTime:   modTime,
-				Labels:    labels,
+				Filename:    e.Name(),
+				Path:        path,
+				Description: description,
+				ModTime:     modTime,
+				Labels:      labels,
 			}
 
 			if includeContent {
