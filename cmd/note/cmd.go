@@ -22,4 +22,5 @@ func init() {
 	NoteCmd.AddCommand(createCmd)
 	NoteCmd.AddCommand(readCmd)
 	NoteCmd.AddCommand(deleteCmd)
+	NoteCmd.AddCommand(mergeCmd)
 }

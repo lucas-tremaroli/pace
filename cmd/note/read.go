@@ -58,7 +58,7 @@ var readCmd = &cobra.Command{
 			// Raw output for all notes
 			for i, n := range notes {
 				if i > 0 {
-					fmt.Println("\n---\n")
+					fmt.Print("\n---\n\n")
 				}
 				fmt.Printf("# %s\n\n", n.Filename)
 				fmt.Print(n.Content)
