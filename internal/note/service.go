@@ -2,6 +2,7 @@ package note
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/lucas-tremaroli/pace/internal/storage"
+	"gopkg.in/yaml.v3"
 )
 
 type Service struct {
@@ -75,10 +77,10 @@ func (s *Service) ReadNote(filename string) (string, error) {
 }
 
 type NoteInfo struct {
-	Filename  string    `json:"filename"`
-	Path      string    `json:"path"`
-	FirstLine string    `json:"firstLine"`
-	ModTime   time.Time `json:"modTime"`
+	Filename    string    `json:"filename"`
+	Path        string    `json:"path"`
+	Description string    `json:"description"`
+	ModTime     time.Time `json:"modTime"`
 }
 
 func (s *Service) ListNotes() ([]NoteInfo, error) {
@@ -91,35 +93,255 @@ func (s *Service) ListNotes() ([]NoteInfo, error) {
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
 			path := filepath.Join(s.notesDir, e.Name())
-			firstLine := readFirstLineFromPath(path)
+			description := getDescriptionFromPath(path)
 			info, err := e.Info()
 			var modTime time.Time
 			if err == nil {
 				modTime = info.ModTime()
 			}
 			notes = append(notes, NoteInfo{
-				Filename:  e.Name(),
-				Path:      path,
-				FirstLine: firstLine,
-				ModTime:   modTime,
+				Filename:    e.Name(),
+				Path:        path,
+				Description: description,
+				ModTime:     modTime,
 			})
 		}
 	}
 	return notes, nil
 }
 
-func readFirstLineFromPath(path string) string {
-	f, err := os.Open(path)
+// getDescriptionFromPath returns the description from frontmatter, or falls back to first content line
+func getDescriptionFromPath(path string) string {
+	contentBytes, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	content := string(contentBytes)
+	fm, _, _ := ParseFrontmatter(content)
+	if fm != nil && fm.Description != "" {
+		return fm.Description
+	}
+	return extractFirstLine(content)
+}
 
-	scanner := bufio.NewScanner(f)
-	if scanner.Scan() {
+// ParseFrontmatter extracts YAML frontmatter from content.
+// Returns the parsed frontmatter, the remaining content after frontmatter, and any error.
+func ParseFrontmatter(content string) (*Frontmatter, string, error) {
+	// Check for frontmatter delimiter
+	if !strings.HasPrefix(content, "---\n") && !strings.HasPrefix(content, "---\r\n") {
+		return nil, content, nil
+	}
+
+	// Find the closing delimiter
+	rest := content[4:] // Skip opening "---\n"
+	endIndex := strings.Index(rest, "\n---\n")
+	if endIndex == -1 {
+		// Try with \r\n
+		endIndex = strings.Index(rest, "\r\n---\r\n")
+		if endIndex == -1 {
+			// Also check for end-of-content case
+			if strings.HasSuffix(rest, "\n---") {
+				endIndex = len(rest) - 4
+			} else {
+				return nil, content, nil
+			}
+		}
+	}
+
+	frontmatterYAML := rest[:endIndex]
+	remaining := strings.TrimPrefix(rest[endIndex:], "\n---\n")
+	remaining = strings.TrimPrefix(remaining, "\r\n---\r\n")
+	remaining = strings.TrimPrefix(remaining, "\n---")
+
+	var fm Frontmatter
+	if err := yaml.Unmarshal([]byte(frontmatterYAML), &fm); err != nil {
+		return nil, content, fmt.Errorf("invalid frontmatter YAML: %w", err)
+	}
+
+	return &fm, strings.TrimPrefix(remaining, "\n"), nil
+}
+
+// ReadNoteWithMeta reads a single note with full metadata including labels
+func (s *Service) ReadNoteWithMeta(filename string) (*Note, error) {
+	path := s.GetNotePath(filename)
+	contentBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	content := string(contentBytes)
+	fm, _, err := ParseFrontmatter(content)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := os.Stat(path)
+	var modTime time.Time
+	if err == nil {
+		modTime = info.ModTime()
+	}
+
+	var labels []string
+	var description string
+	if fm != nil {
+		labels = fm.Labels
+		description = fm.Description
+	}
+	if description == "" {
+		description = extractFirstLine(content)
+	}
+
+	return &Note{
+		Filename:    filepath.Base(path),
+		Path:        path,
+		Content:     content,
+		Description: description,
+		ModTime:     modTime,
+		Labels:      labels,
+	}, nil
+}
+
+// ReadAllNotes reads all notes with full content and metadata
+func (s *Service) ReadAllNotes() ([]Note, error) {
+	entries, err := os.ReadDir(s.notesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var notes []Note
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+			note, err := s.ReadNoteWithMeta(e.Name())
+			if err != nil {
+				continue // Skip notes that can't be read
+			}
+			notes = append(notes, *note)
+		}
+	}
+	return notes, nil
+}
+
+// ListNotesWithMeta lists notes with optional content inclusion and label metadata
+func (s *Service) ListNotesWithMeta(includeContent bool) ([]Note, error) {
+	entries, err := os.ReadDir(s.notesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var notes []Note
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+			path := filepath.Join(s.notesDir, e.Name())
+			contentBytes, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+
+			content := string(contentBytes)
+			fm, _, err := ParseFrontmatter(content)
+			if err != nil {
+				fm = nil
+			}
+
+			info, err := e.Info()
+			var modTime time.Time
+			if err == nil {
+				modTime = info.ModTime()
+			}
+
+			var labels []string
+			var description string
+			if fm != nil {
+				labels = fm.Labels
+				description = fm.Description
+			}
+			if description == "" {
+				description = extractFirstLine(content)
+			}
+
+			note := Note{
+				Filename:    e.Name(),
+				Path:        path,
+				Description: description,
+				ModTime:     modTime,
+				Labels:      labels,
+			}
+
+			if includeContent {
+				note.Content = content
+			}
+
+			notes = append(notes, note)
+		}
+	}
+	return notes, nil
+}
+
+// MergeNotes combines multiple notes into a single output note.
+// Labels from all source notes are deduplicated and combined.
+// Content is concatenated with --- separators.
+func (s *Service) MergeNotes(filenames []string, outputFilename string) (*Note, error) {
+	if len(filenames) < 2 {
+		return nil, fmt.Errorf("at least 2 notes required for merge")
+	}
+
+	var allLabels []string
+	labelSet := make(map[string]bool)
+	var contentParts []string
+
+	for _, filename := range filenames {
+		note, err := s.ReadNoteWithMeta(filename)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read note %s: %w", filename, err)
+		}
+
+		// Collect unique labels
+		for _, label := range note.Labels {
+			if !labelSet[label] {
+				labelSet[label] = true
+				allLabels = append(allLabels, label)
+			}
+		}
+
+		// Strip frontmatter from content for merging
+		_, bodyContent, _ := ParseFrontmatter(note.Content)
+		contentParts = append(contentParts, strings.TrimSpace(bodyContent))
+	}
+
+	// Build merged content
+	var mergedContent strings.Builder
+
+	// Add frontmatter if there are labels
+	if len(allLabels) > 0 {
+		mergedContent.WriteString("---\nlabels:\n")
+		for _, label := range allLabels {
+			mergedContent.WriteString("  - ")
+			mergedContent.WriteString(label)
+			mergedContent.WriteString("\n")
+		}
+		mergedContent.WriteString("---\n\n")
+	}
+
+	// Add content with separators
+	mergedContent.WriteString(strings.Join(contentParts, "\n\n---\n\n"))
+
+	// Write the merged note
+	if err := s.WriteNote(outputFilename, mergedContent.String()); err != nil {
+		return nil, fmt.Errorf("failed to write merged note: %w", err)
+	}
+
+	return s.ReadNoteWithMeta(outputFilename)
+}
+
+// extractFirstLine extracts the first meaningful line from content, skipping frontmatter
+func extractFirstLine(content string) string {
+	_, body, _ := ParseFrontmatter(content)
+	scanner := bufio.NewScanner(strings.NewReader(body))
+	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		line = strings.TrimLeft(line, "# ")
-		return line
+		if line != "" {
+			return strings.TrimLeft(line, "# ")
+		}
 	}
 	return ""
 }

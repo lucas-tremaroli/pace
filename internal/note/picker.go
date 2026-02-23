@@ -1,7 +1,6 @@
 package note
 
 import (
-	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,12 +15,12 @@ import (
 var listStyle = lipgloss.NewStyle().Padding(1, 2).MarginTop(1)
 
 type noteItem struct {
-	filename  string
-	firstLine string
+	filename    string
+	description string
 }
 
 func (n noteItem) Title() string       { return n.filename }
-func (n noteItem) Description() string { return n.firstLine }
+func (n noteItem) Description() string { return n.description }
 func (n noteItem) FilterValue() string { return n.filename }
 
 type Picker struct {
@@ -75,28 +74,11 @@ func loadNotes(dir string) []list.Item {
 	var items []list.Item
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
-			firstLine := readFirstLine(filepath.Join(dir, e.Name()))
-			items = append(items, noteItem{filename: e.Name(), firstLine: firstLine})
+			description := getDescriptionFromPath(filepath.Join(dir, e.Name()))
+			items = append(items, noteItem{filename: e.Name(), description: description})
 		}
 	}
 	return items
-}
-
-func readFirstLine(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	if scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		// Strip leading markdown heading markers
-		line = strings.TrimLeft(line, "# ")
-		return line
-	}
-	return ""
 }
 
 func (p Picker) Init() tea.Cmd {
