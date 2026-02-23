@@ -18,7 +18,7 @@
    -----------------------------------------------------
 ```
 
-A CLI productivity tool designed for developers **and** AI coding assistants. Manage tasks with a Kanban board, take markdown notes, and more.
+A CLI productivity tool designed for developers **and** AI agents. Manage tasks with a Kanban board, take markdown notes, and more.
 
 ## Why Pace?
 
