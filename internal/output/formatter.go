@@ -13,10 +13,9 @@ type Response struct {
 	Data    any    `json:"data,omitempty"`
 }
 
-// JSON prints any value as formatted JSON to stdout
+// JSON prints any value as compact JSON to stdout
 func JSON(v any) {
 	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
 	encoder.Encode(v)
 }
 
