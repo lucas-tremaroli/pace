@@ -1,6 +1,9 @@
 package main
 
-import "github.com/lucas-tremaroli/pace/cmd"
+import (
+	"github.com/lucas-tremaroli/pace/cmd"
+	"github.com/lucas-tremaroli/pace/cmd/mcp"
+)
 
 var (
 	version = "dev"
@@ -10,5 +13,6 @@ var (
 
 func main() {
 	cmd.SetVersionInfo(version, commit, date)
+	mcp.SetVersion(version)
 	cmd.Execute()
 }
