@@ -66,7 +66,7 @@ var listCmd = &cobra.Command{
 		if listFilterStatus != "" {
 			status, err := task.ParseStatus(listFilterStatus)
 			if err != nil {
-				output.Error(err)
+				output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 				return nil
 			}
 			filter.Status = &status
@@ -74,7 +74,11 @@ var listCmd = &cobra.Command{
 		for _, p := range listFilterPriority {
 			var pri int
 			if _, err := fmt.Sscanf(p, "%d", &pri); err != nil || pri < 1 || pri > 4 {
-				output.ErrorMsg(fmt.Sprintf("invalid priority %q: must be 1-4", p))
+				output.ErrorMsgWithCode(
+					fmt.Sprintf("invalid priority %q: must be 1-4", p),
+					output.ErrCodeInvalidPriority,
+					"Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
+				)
 				return nil
 			}
 			filter.Priorities = append(filter.Priorities, pri)

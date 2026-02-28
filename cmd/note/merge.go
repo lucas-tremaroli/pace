@@ -1,7 +1,9 @@
 package note
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
@@ -19,7 +21,7 @@ Content is concatenated with --- separators.`,
 	Args: cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if mergeOutputFile == "" {
-			output.ErrorMsg("output filename required (use -o flag)")
+			output.ErrorMsgWithCode("output filename required (use -o flag)", output.ErrCodeMissingField, "")
 		}
 
 		svc, err := note.NewService()
@@ -29,7 +31,10 @@ Content is concatenated with --- separators.`,
 
 		mergedNote, err := svc.MergeNotes(args, mergeOutputFile)
 		if err != nil {
-			output.Error(err)
+			if errors.Is(err, os.ErrNotExist) {
+				output.ErrorWithCode(err, output.ErrCodeNoteNotFound, "Use pace note list to see available notes")
+			}
+			output.ErrorWithCode(err, output.ErrCodeStorageError, "")
 		}
 
 		output.Success(fmt.Sprintf("Merged %d notes into %s", len(args), mergedNote.Filename), mergedNote)

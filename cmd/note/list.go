@@ -46,7 +46,7 @@ var listCmd = &cobra.Command{
 			for _, filterStr := range listFilters {
 				f, err := note.ParseFilter(filterStr)
 				if err != nil {
-					output.Error(err)
+					output.ErrorWithCode(err, output.ErrCodeInvalidParams, "Filter format: key=value (e.g. label=design)")
 					return nil
 				}
 				filters = append(filters, f)
@@ -72,7 +72,7 @@ var listCmd = &cobra.Command{
 		if listFields != "" {
 			maps, err := output.ToMapSlice(notes)
 			if err != nil {
-				output.ErrorMsg(fmt.Sprintf("failed to filter fields: %v", err))
+				output.ErrorMsgWithCode(fmt.Sprintf("failed to filter fields: %v", err), output.ErrCodeInvalidParams, "")
 				return nil
 			}
 			fields := strings.Split(listFields, ",")

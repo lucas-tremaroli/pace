@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -196,7 +197,7 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 	if statusStr, ok := args["status"].(string); ok && statusStr != "" {
 		status, err := task.ParseStatus(statusStr)
 		if err != nil {
-			return errorResult(err.Error())
+			return codedError(output.ErrCodeInvalidStatus, err.Error(), "Valid values: todo, in-progress, done")
 		}
 		filter.Status = &status
 	}
@@ -204,14 +205,14 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 		for _, p := range priorities {
 			v, ok := p.(float64)
 			if !ok {
-				return errorResult("invalid params: priority values must be numbers")
+				return codedError(output.ErrCodeInvalidPriority, "priority values must be numbers", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
 			}
 			priority := int(v)
 			if float64(priority) != v {
-				return errorResult("invalid params: priority values must be integers")
+				return codedError(output.ErrCodeInvalidPriority, "priority values must be integers", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
 			}
 			if priority < 1 || priority > 4 {
-				return errorResult("invalid params: priority values must be between 1 and 4")
+				return codedError(output.ErrCodeInvalidPriority, "priority values must be between 1 and 4", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
 			}
 			filter.Priorities = append(filter.Priorities, priority)
 		}
@@ -251,7 +252,7 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	title, ok := args["title"].(string)
 	if !ok || title == "" {
-		return errorResult("title is required")
+		return codedError(output.ErrCodeMissingField, "title is required", "Provide a title string when creating a task")
 	}
 
 	description, _ := args["description"].(string)
@@ -263,7 +264,7 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 		var err error
 		status, err = task.ParseStatus(statusStr)
 		if err != nil {
-			return errorResult(err.Error())
+			return codedError(output.ErrCodeInvalidStatus, err.Error(), "Valid values: todo, in-progress, done")
 		}
 	}
 
@@ -273,7 +274,7 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 		var err error
 		taskType, err = task.ParseTaskType(typeStr)
 		if err != nil {
-			return errorResult(err.Error())
+			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, chore, docs")
 		}
 	}
 
@@ -281,11 +282,11 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	priority := 3
 	if p, ok := args["priority"].(float64); ok {
 		if p != float64(int(p)) {
-			return errorResult("priority must be an integer")
+			return codedError(output.ErrCodeInvalidPriority, "priority must be an integer", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
 		}
 		pi := int(p)
 		if pi < 1 || pi > 4 {
-			return errorResult("priority must be between 1 and 4")
+			return codedError(output.ErrCodeInvalidPriority, "priority must be between 1 and 4", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
 		}
 		priority = pi
 	}
@@ -327,16 +328,16 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	id, ok := args["id"].(string)
 	if !ok || id == "" {
-		return errorResult("id is required")
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the task ID to update")
 	}
 
 	// Load existing task
 	existingTask, err := h.taskService.GetTaskByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return errorResult(fmt.Sprintf("task not found: %s", id))
+			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
-		return errorResult(fmt.Sprintf("failed to load task %s: %v", id, err))
+		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to load task %s: %v", id, err), "")
 	}
 
 	// Build updated task with existing values as defaults
@@ -359,7 +360,7 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	if s, ok := args["status"].(string); ok && s != "" {
 		status, err = task.ParseStatus(s)
 		if err != nil {
-			return errorResult(err.Error())
+			return codedError(output.ErrCodeInvalidStatus, err.Error(), "Valid values: todo, in-progress, done")
 		}
 	}
 
@@ -367,18 +368,18 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	if t, ok := args["type"].(string); ok && t != "" {
 		taskType, err = task.ParseTaskType(t)
 		if err != nil {
-			return errorResult(err.Error())
+			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, chore, docs")
 		}
 	}
 
 	priority := existingTask.Priority()
 	if p, ok := args["priority"].(float64); ok {
 		if p != float64(int(p)) {
-			return errorResult("priority must be an integer")
+			return codedError(output.ErrCodeInvalidPriority, "priority must be an integer", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
 		}
 		pi := int(p)
 		if pi < 1 || pi > 4 {
-			return errorResult("priority must be between 1 and 4")
+			return codedError(output.ErrCodeInvalidPriority, "priority must be between 1 and 4", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
 		}
 		priority = pi
 	}
@@ -404,11 +405,14 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 func (h *Handler) toolTaskDelete(args map[string]any) ToolCallResult {
 	id, ok := args["id"].(string)
 	if !ok || id == "" {
-		return errorResult("id is required")
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the task ID to delete")
 	}
 
 	if err := h.taskService.DeleteTask(id); err != nil {
-		return errorResult(fmt.Sprintf("failed to delete task: %v", err))
+		if errors.Is(err, sql.ErrNoRows) {
+			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
+		}
+		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to delete task: %v", err), "")
 	}
 
 	return jsonResult(map[string]any{
@@ -434,12 +438,12 @@ func (h *Handler) toolTaskReady() ToolCallResult {
 func (h *Handler) toolTaskDepAdd(args map[string]any) ToolCallResult {
 	blockerID, ok := args["blocker_id"].(string)
 	if !ok || blockerID == "" {
-		return errorResult("blocker_id is required")
+		return codedError(output.ErrCodeMissingField, "blocker_id is required", "Provide the ID of the task that should block another")
 	}
 
 	blockedID, ok := args["blocked_id"].(string)
 	if !ok || blockedID == "" {
-		return errorResult("blocked_id is required")
+		return codedError(output.ErrCodeMissingField, "blocked_id is required", "Provide the ID of the task that should be blocked")
 	}
 
 	if err := h.taskService.AddDependency(blockerID, blockedID); err != nil {
@@ -455,12 +459,12 @@ func (h *Handler) toolTaskDepAdd(args map[string]any) ToolCallResult {
 func (h *Handler) toolTaskDepRemove(args map[string]any) ToolCallResult {
 	blockerID, ok := args["blocker_id"].(string)
 	if !ok || blockerID == "" {
-		return errorResult("blocker_id is required")
+		return codedError(output.ErrCodeMissingField, "blocker_id is required", "Provide the ID of the blocking task")
 	}
 
 	blockedID, ok := args["blocked_id"].(string)
 	if !ok || blockedID == "" {
-		return errorResult("blocked_id is required")
+		return codedError(output.ErrCodeMissingField, "blocked_id is required", "Provide the ID of the blocked task")
 	}
 
 	if err := h.taskService.RemoveDependency(blockerID, blockedID); err != nil {
@@ -506,19 +510,19 @@ func (h *Handler) toolNoteList(args map[string]any) ToolCallResult {
 func (h *Handler) toolNoteCreate(args map[string]any) ToolCallResult {
 	filename, ok := args["filename"].(string)
 	if !ok || filename == "" {
-		return errorResult("filename is required")
+		return codedError(output.ErrCodeMissingField, "filename is required", "Provide a filename without the .md extension")
 	}
 	if err := validateFilename(filename); err != nil {
-		return errorResult(err.Error())
+		return codedError(output.ErrCodeInvalidFilename, err.Error(), "Use a simple filename without path separators (e.g. my-note)")
 	}
 
 	content, ok := args["content"].(string)
 	if !ok {
-		return errorResult("content is required")
+		return codedError(output.ErrCodeMissingField, "content is required", "Provide the note content as a markdown string")
 	}
 
 	if err := h.noteService.WriteNote(filename, content); err != nil {
-		return errorResult(fmt.Sprintf("failed to create note: %v", err))
+		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to create note: %v", err), "")
 	}
 
 	// Ensure filename has .md extension for display
@@ -537,15 +541,18 @@ func (h *Handler) toolNoteCreate(args map[string]any) ToolCallResult {
 func (h *Handler) toolNoteRead(args map[string]any) ToolCallResult {
 	filename, ok := args["filename"].(string)
 	if !ok || filename == "" {
-		return errorResult("filename is required")
+		return codedError(output.ErrCodeMissingField, "filename is required", "Provide the note filename (with or without .md extension)")
 	}
 	if err := validateFilename(filename); err != nil {
-		return errorResult(err.Error())
+		return codedError(output.ErrCodeInvalidFilename, err.Error(), "Use a simple filename without path separators (e.g. my-note)")
 	}
 
 	noteData, err := h.noteService.ReadNoteWithMeta(filename)
 	if err != nil {
-		return errorResult(fmt.Sprintf("failed to read note: %v", err))
+		if errors.Is(err, os.ErrNotExist) {
+			return codedError(output.ErrCodeNoteNotFound, fmt.Sprintf("note not found: %s", filename), "Use pace_note_list to see available notes")
+		}
+		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to read note: %v", err), "")
 	}
 
 	return jsonResult(map[string]any{
@@ -560,10 +567,10 @@ func (h *Handler) toolNoteRead(args map[string]any) ToolCallResult {
 func (h *Handler) toolNoteDelete(args map[string]any) ToolCallResult {
 	filename, ok := args["filename"].(string)
 	if !ok || filename == "" {
-		return errorResult("filename is required")
+		return codedError(output.ErrCodeMissingField, "filename is required", "Provide the note filename to delete")
 	}
 	if err := validateFilename(filename); err != nil {
-		return errorResult(err.Error())
+		return codedError(output.ErrCodeInvalidFilename, err.Error(), "Use a simple filename without path separators (e.g. my-note)")
 	}
 
 	// Ensure filename has .md extension
@@ -572,7 +579,10 @@ func (h *Handler) toolNoteDelete(args map[string]any) ToolCallResult {
 	}
 
 	if err := h.noteService.DeleteNote(filename); err != nil {
-		return errorResult(fmt.Sprintf("failed to delete note: %v", err))
+		if errors.Is(err, os.ErrNotExist) {
+			return codedError(output.ErrCodeNoteNotFound, fmt.Sprintf("note not found: %s", filename), "Use pace_note_list to see available notes")
+		}
+		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to delete note: %v", err), "")
 	}
 
 	return jsonResult(map[string]any{
@@ -596,6 +606,18 @@ func jsonResult(data any) ToolCallResult {
 func errorResult(message string) ToolCallResult {
 	return ToolCallResult{
 		Content: []ContentBlock{NewTextContent(message)},
+		IsError: true,
+	}
+}
+
+func codedError(code, message, suggestion string) ToolCallResult {
+	data, _ := json.Marshal(map[string]any{
+		"error":      message,
+		"error_code": code,
+		"suggestion": suggestion,
+	})
+	return ToolCallResult{
+		Content: []ContentBlock{NewTextContent(string(data))},
 		IsError: true,
 	}
 }

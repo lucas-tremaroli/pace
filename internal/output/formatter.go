@@ -42,12 +42,27 @@ func ToMapSlice(v any) ([]map[string]any, error) {
 	return result, nil
 }
 
+// Error code constants for machine-readable error identification
+const (
+	ErrCodeTaskNotFound       = "TASK_NOT_FOUND"
+	ErrCodeNoteNotFound       = "NOTE_NOT_FOUND"
+	ErrCodeMissingField       = "MISSING_REQUIRED_FIELD"
+	ErrCodeInvalidStatus      = "INVALID_STATUS"
+	ErrCodeInvalidType        = "INVALID_TYPE"
+	ErrCodeInvalidPriority    = "INVALID_PRIORITY"
+	ErrCodeInvalidFilename    = "INVALID_FILENAME"
+	ErrCodeInvalidParams      = "INVALID_PARAMS"
+	ErrCodeStorageError       = "STORAGE_ERROR"
+)
+
 // Response represents a standard JSON response
 type Response struct {
-	Success bool   `json:"success"`
-	Message string `json:"message,omitempty"`
-	Error   string `json:"error,omitempty"`
-	Data    any    `json:"data,omitempty"`
+	Success    bool   `json:"success"`
+	Message    string `json:"message,omitempty"`
+	Error      string `json:"error,omitempty"`
+	ErrorCode  string `json:"error_code,omitempty"`
+	Suggestion string `json:"suggestion,omitempty"`
+	Data       any    `json:"data,omitempty"`
 }
 
 // JSON prints any value as compact JSON to stdout
@@ -79,6 +94,28 @@ func ErrorMsg(message string) {
 	JSON(Response{
 		Success: false,
 		Error:   message,
+	})
+	os.Exit(1)
+}
+
+// ErrorWithCode prints an error response with a machine-readable code and exits with code 1
+func ErrorWithCode(err error, code, suggestion string) {
+	JSON(Response{
+		Success:    false,
+		Error:      err.Error(),
+		ErrorCode:  code,
+		Suggestion: suggestion,
+	})
+	os.Exit(1)
+}
+
+// ErrorMsgWithCode prints an error message response with a machine-readable code and exits with code 1
+func ErrorMsgWithCode(message, code, suggestion string) {
+	JSON(Response{
+		Success:    false,
+		Error:      message,
+		ErrorCode:  code,
+		Suggestion: suggestion,
 	})
 	os.Exit(1)
 }
