@@ -227,7 +227,14 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	// Parse priority
 	priority := 3
 	if p, ok := args["priority"].(float64); ok {
-		priority = int(p)
+		if p != float64(int(p)) {
+			return errorResult("priority must be an integer")
+		}
+		pi := int(p)
+		if pi < 1 || pi > 4 {
+			return errorResult("priority must be between 1 and 4")
+		}
+		priority = pi
 	}
 
 	// Generate ID and create task
