@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/cmd/config"
 	"github.com/lucas-tremaroli/pace/cmd/joke"
+	"github.com/lucas-tremaroli/pace/cmd/mcp"
 	"github.com/lucas-tremaroli/pace/cmd/note"
 	"github.com/lucas-tremaroli/pace/cmd/task"
 	"github.com/lucas-tremaroli/pace/cmd/tick"
@@ -109,6 +110,7 @@ func init() {
 	rootCmd.AddCommand(tick.TickCmd)
 	rootCmd.AddCommand(joke.JokeCmd)
 	rootCmd.AddCommand(config.ConfigCmd)
+	rootCmd.AddCommand(mcp.McpCmd)
 
 	rootCmd.SetHelpFunc(styledHelp)
 }
