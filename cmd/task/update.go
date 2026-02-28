@@ -1,6 +1,8 @@
 package task
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/lucas-tremaroli/pace/internal/output"
@@ -34,7 +36,7 @@ For batch updates, use --filter with update flags:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check for conflicting options
 		if len(updateFilters) > 0 && len(args) > 0 {
-			output.ErrorMsg("cannot use both task ID and --filter (use one or the other)")
+			output.ErrorMsgWithCode("cannot use both task ID and --filter (use one or the other)", output.ErrCodeInvalidParams, "")
 		}
 
 		// Check if batch update mode
@@ -44,7 +46,7 @@ For batch updates, use --filter with update flags:
 
 		// Single task update requires an ID
 		if len(args) == 0 {
-			output.ErrorMsg("task ID required (or use --filter for batch updates)")
+			output.ErrorMsgWithCode("task ID required (or use --filter for batch updates)", output.ErrCodeMissingField, "")
 		}
 
 		taskID := args[0]
@@ -58,6 +60,9 @@ For batch updates, use --filter with update flags:
 		// Get existing task
 		existingTask, err := svc.GetTaskByID(taskID)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
+			}
 			output.Error(err)
 		}
 
@@ -78,14 +83,14 @@ For batch updates, use --filter with update flags:
 		if cmd.Flags().Changed("status") {
 			parsedStatus, err := task.ParseStatus(updateStatus)
 			if err != nil {
-				output.Error(err)
+				output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 			}
 			status = parsedStatus
 		}
 		if cmd.Flags().Changed("type") {
 			parsedType, err := task.ParseTaskType(updateType)
 			if err != nil {
-				output.Error(err)
+				output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, chore, docs")
 			}
 			taskType = parsedType
 		}
@@ -130,7 +135,7 @@ For batch updates, use --filter with update flags:
 func handleBatchUpdate(cmd *cobra.Command) error {
 	// Reject flags that don't make sense in batch mode
 	if cmd.Flags().Changed("title") || cmd.Flags().Changed("description") || cmd.Flags().Changed("url") {
-		output.ErrorMsg("--title, --description, and --url cannot be used with --filter (would set same value for all matched tasks)")
+		output.ErrorMsgWithCode("--title, --description, and --url cannot be used with --filter (would set same value for all matched tasks)", output.ErrCodeInvalidParams, "")
 	}
 
 	// Parse filters
@@ -155,14 +160,14 @@ func handleBatchUpdate(cmd *cobra.Command) error {
 	if cmd.Flags().Changed("status") {
 		parsedStatus, err := task.ParseStatus(updateStatus)
 		if err != nil {
-			output.Error(err)
+			output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 		}
 		batchStatus = &parsedStatus
 	}
 	if cmd.Flags().Changed("type") {
 		parsedType, err := task.ParseTaskType(updateType)
 		if err != nil {
-			output.Error(err)
+			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, chore, docs")
 		}
 		batchType = &parsedType
 	}
@@ -173,7 +178,7 @@ func handleBatchUpdate(cmd *cobra.Command) error {
 	// Validate we have something to update
 	if batchStatus == nil && batchType == nil && batchPriority == nil &&
 		len(updateAddLabels) == 0 && len(updateRemoveLabels) == 0 {
-		output.ErrorMsg("no updates specified (use --status, --type, --priority, --label, or --remove-label)")
+		output.ErrorMsgWithCode("no updates specified (use --status, --type, --priority, --label, or --remove-label)", output.ErrCodeInvalidParams, "")
 	}
 
 	svc, err := task.NewService()

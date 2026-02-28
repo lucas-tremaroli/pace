@@ -37,17 +37,17 @@ For bulk creation, use --bulk with a JSON array or '-' for stdin:
 
 		// Single task creation (existing behavior)
 		if createTitle == "" {
-			output.ErrorMsg("title is required")
+			output.ErrorMsgWithCode("title is required", output.ErrCodeMissingField, "Provide a --title flag")
 		}
 
 		status, err := task.ParseStatus(createStatus)
 		if err != nil {
-			output.Error(err)
+			output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 		}
 
 		taskType, err := task.ParseTaskType(createType)
 		if err != nil {
-			output.Error(err)
+			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, chore, docs")
 		}
 
 		svc, err := task.NewService()

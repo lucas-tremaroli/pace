@@ -1,6 +1,7 @@
 package note
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -13,6 +14,8 @@ var (
 	listSort           string
 	listIncludeContent bool
 	listFilters        []string
+	listFields         string
+	listHead           int
 )
 
 type noteListResponse struct {
@@ -43,7 +46,7 @@ var listCmd = &cobra.Command{
 			for _, filterStr := range listFilters {
 				f, err := note.ParseFilter(filterStr)
 				if err != nil {
-					output.Error(err)
+					output.ErrorWithCode(err, output.ErrCodeInvalidParams, "Filter format: key=value (e.g. label=design)")
 					return nil
 				}
 				filters = append(filters, f)
@@ -60,6 +63,26 @@ var listCmd = &cobra.Command{
 		}
 
 		sortNotesWithMeta(notes, listSort)
+
+		// Apply head truncation
+		if listHead > 0 && listHead < len(notes) {
+			notes = notes[:listHead]
+		}
+
+		if listFields != "" {
+			maps, err := output.ToMapSlice(notes)
+			if err != nil {
+				output.ErrorMsgWithCode(fmt.Sprintf("failed to filter fields: %v", err), output.ErrCodeInvalidParams, "")
+				return nil
+			}
+			fields := strings.Split(listFields, ",")
+			output.JSON(map[string]any{
+				"notes": output.FilterFields(maps, fields),
+				"count": len(notes),
+			})
+			return nil
+		}
+
 		output.JSON(noteListResponse{
 			Notes: notes,
 			Count: len(notes),
@@ -72,6 +95,8 @@ func init() {
 	listCmd.Flags().StringVar(&listSort, "sort", "name", "Sort by: name, modified, created")
 	listCmd.Flags().BoolVar(&listIncludeContent, "include-content", false, "Include full note content in output")
 	listCmd.Flags().StringArrayVar(&listFilters, "filter", nil, "Filter notes (e.g., label=design). Can be repeated for AND semantics")
+	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: filename, description, labels, modTime")
+	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N notes")
 }
 
 func sortNotesWithMeta(notes []note.Note, sortBy string) {

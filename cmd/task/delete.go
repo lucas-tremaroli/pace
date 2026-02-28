@@ -28,7 +28,7 @@ Delete by filter:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check for conflicting options
 		if len(deleteFilters) > 0 && len(args) > 0 {
-			output.ErrorMsg("cannot use both task IDs and --filter (use one or the other)")
+			output.ErrorMsgWithCode("cannot use both task IDs and --filter (use one or the other)", output.ErrCodeInvalidParams, "")
 		}
 
 		// Check if filter-based deletion
@@ -38,7 +38,7 @@ Delete by filter:
 
 		// ID-based deletion requires at least one ID
 		if len(args) == 0 {
-			output.ErrorMsg("task ID required (or use --filter for filter-based deletion)")
+			output.ErrorMsgWithCode("task ID required (or use --filter for filter-based deletion)", output.ErrCodeMissingField, "")
 		}
 
 		svc, err := task.NewService()

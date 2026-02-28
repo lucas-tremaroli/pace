@@ -1,6 +1,8 @@
 package task
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -86,6 +88,9 @@ var depListCmd = &cobra.Command{
 
 		t, err := svc.GetTaskByID(taskID)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
+			}
 			output.Error(err)
 		}
 
@@ -126,7 +131,11 @@ Examples:
 
 		// Validate direction flag
 		if treeDirection != "down" && treeDirection != "up" && treeDirection != "both" {
-			output.Error(fmt.Errorf("invalid direction: %s (valid: down, up, both)", treeDirection))
+			output.ErrorMsgWithCode(
+				fmt.Sprintf("invalid direction: %s (valid: down, up, both)", treeDirection),
+				output.ErrCodeInvalidParams,
+				"Valid values: up, down, both",
+			)
 		}
 
 		// Validate status flag if provided
@@ -134,7 +143,7 @@ Examples:
 		if treeStatus != "" {
 			s, err := task.ParseStatus(treeStatus)
 			if err != nil {
-				output.Error(err)
+				output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 			}
 			filterStatus = &s
 		}
@@ -160,7 +169,7 @@ Examples:
 		// Verify the target task exists
 		rootTask, exists := taskMap[taskID]
 		if !exists {
-			output.Error(fmt.Errorf("task not found: %s", taskID))
+			output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
 		}
 
 		opts := treeOptions{

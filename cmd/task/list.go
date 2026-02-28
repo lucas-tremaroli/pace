@@ -36,6 +36,8 @@ var (
 	listFilterStatus   string
 	listFilterPriority []string
 	listFilterLabel    []string
+	listFields         string
+	listHead           int
 )
 
 type taskListResponse struct {
@@ -64,7 +66,7 @@ var listCmd = &cobra.Command{
 		if listFilterStatus != "" {
 			status, err := task.ParseStatus(listFilterStatus)
 			if err != nil {
-				output.Error(err)
+				output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 				return nil
 			}
 			filter.Status = &status
@@ -72,7 +74,11 @@ var listCmd = &cobra.Command{
 		for _, p := range listFilterPriority {
 			var pri int
 			if _, err := fmt.Sscanf(p, "%d", &pri); err != nil || pri < 1 || pri > 4 {
-				output.ErrorMsg(fmt.Sprintf("invalid priority %q: must be 1-4", p))
+				output.ErrorMsgWithCode(
+					fmt.Sprintf("invalid priority %q: must be 1-4", p),
+					output.ErrCodeInvalidPriority,
+					"Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
+				)
 				return nil
 			}
 			filter.Priorities = append(filter.Priorities, pri)
@@ -84,6 +90,11 @@ var listCmd = &cobra.Command{
 			return a.Priority() - b.Priority()
 		})
 
+		// Apply head truncation
+		if listHead > 0 && listHead < len(tasks) {
+			tasks = tasks[:listHead]
+		}
+
 		if listPretty {
 			printTasksPretty(tasks)
 			return nil
@@ -92,6 +103,20 @@ var listCmd = &cobra.Command{
 		taskJSONs := make([]task.TaskJSON, len(tasks))
 		for i, t := range tasks {
 			taskJSONs[i] = t.ToJSON()
+		}
+
+		if listFields != "" {
+			maps, err := output.ToMapSlice(taskJSONs)
+			if err != nil {
+				output.ErrorMsg(fmt.Sprintf("failed to filter fields: %v", err))
+				return nil
+			}
+			fields := strings.Split(listFields, ",")
+			output.JSON(map[string]any{
+				"tasks": output.FilterFields(maps, fields),
+				"count": len(taskJSONs),
+			})
+			return nil
 		}
 
 		output.JSON(taskListResponse{
@@ -107,6 +132,8 @@ func init() {
 	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (todo, in-progress, done)")
 	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (1-4, repeatable)")
 	listCmd.Flags().StringArrayVar(&listFilterLabel, "label", nil, "Filter by label (repeatable)")
+	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, link")
+	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")
 }
 
 // printTasksPretty prints tasks in a human-readable format

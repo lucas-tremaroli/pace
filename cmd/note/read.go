@@ -1,7 +1,9 @@
 package note
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
@@ -58,12 +60,15 @@ var readCmd = &cobra.Command{
 
 		// Single note read (requires filename)
 		if len(args) == 0 {
-			output.ErrorMsg("filename required (or use --all to read all notes)")
+			output.ErrorMsgWithCode("filename required (or use --all to read all notes)", output.ErrCodeMissingField, "")
 		}
 
 		filename := args[0]
 		n, err := svc.ReadNoteWithMeta(filename)
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				output.ErrorMsgWithCode("note not found: "+filename, output.ErrCodeNoteNotFound, "Use pace note list to see available notes")
+			}
 			output.Error(err)
 		}
 

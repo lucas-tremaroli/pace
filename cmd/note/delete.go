@@ -1,6 +1,9 @@
 package note
 
 import (
+	"errors"
+	"os"
+
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/spf13/cobra"
@@ -20,6 +23,13 @@ var deleteCmd = &cobra.Command{
 		}
 
 		if err := svc.DeleteNote(filename); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				output.ErrorMsgWithCode(
+					"note not found: "+filename,
+					output.ErrCodeNoteNotFound,
+					"Use pace note list to see available notes",
+				)
+			}
 			output.Error(err)
 		}
 

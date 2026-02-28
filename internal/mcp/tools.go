@@ -36,6 +36,17 @@ func GetToolDefinitions() []Tool {
 							Type: "string",
 						},
 					},
+					"fields": {
+						Type:        "array",
+						Description: "Limit response to specific fields. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, link",
+						Items: &Property{
+							Type: "string",
+						},
+					},
+					"head": {
+						Type:        "integer",
+						Description: "Limit output to first N tasks",
+					},
 				},
 			},
 		},
@@ -187,8 +198,20 @@ func GetToolDefinitions() []Tool {
 			Name:        "pace_note_list",
 			Description: "List all notes with their filenames, descriptions, and labels",
 			InputSchema: ToolInputSchema{
-				Type:       "object",
-				Properties: map[string]Property{},
+				Type: "object",
+				Properties: map[string]Property{
+					"fields": {
+						Type:        "array",
+						Description: "Limit response to specific fields. Available: filename, description, labels, modTime",
+						Items: &Property{
+							Type: "string",
+						},
+					},
+					"head": {
+						Type:        "integer",
+						Description: "Limit output to first N notes",
+					},
+				},
 			},
 		},
 		{

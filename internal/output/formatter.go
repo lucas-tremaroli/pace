@@ -3,14 +3,66 @@ package output
 import (
 	"encoding/json"
 	"os"
+	"strings"
+)
+
+// FilterFields filters a slice of maps to only include the specified fields.
+// If fields is nil or empty, all fields are returned unchanged.
+func FilterFields(items []map[string]any, fields []string) []map[string]any {
+	if len(fields) == 0 {
+		return items
+	}
+	fieldSet := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		fieldSet[strings.TrimSpace(f)] = true
+	}
+	result := make([]map[string]any, len(items))
+	for i, item := range items {
+		filtered := make(map[string]any, len(fields))
+		for k, v := range item {
+			if fieldSet[k] {
+				filtered[k] = v
+			}
+		}
+		result[i] = filtered
+	}
+	return result
+}
+
+// ToMapSlice marshals a slice of structs to []map[string]any using JSON field names.
+func ToMapSlice(v any) ([]map[string]any, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var result []map[string]any
+	if err := json.Unmarshal(b, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// Error code constants for machine-readable error identification
+const (
+	ErrCodeTaskNotFound       = "TASK_NOT_FOUND"
+	ErrCodeNoteNotFound       = "NOTE_NOT_FOUND"
+	ErrCodeMissingField       = "MISSING_REQUIRED_FIELD"
+	ErrCodeInvalidStatus      = "INVALID_STATUS"
+	ErrCodeInvalidType        = "INVALID_TYPE"
+	ErrCodeInvalidPriority    = "INVALID_PRIORITY"
+	ErrCodeInvalidFilename    = "INVALID_FILENAME"
+	ErrCodeInvalidParams      = "INVALID_PARAMS"
+	ErrCodeStorageError       = "STORAGE_ERROR"
 )
 
 // Response represents a standard JSON response
 type Response struct {
-	Success bool   `json:"success"`
-	Message string `json:"message,omitempty"`
-	Error   string `json:"error,omitempty"`
-	Data    any    `json:"data,omitempty"`
+	Success    bool   `json:"success"`
+	Message    string `json:"message,omitempty"`
+	Error      string `json:"error,omitempty"`
+	ErrorCode  string `json:"error_code,omitempty"`
+	Suggestion string `json:"suggestion,omitempty"`
+	Data       any    `json:"data,omitempty"`
 }
 
 // JSON prints any value as compact JSON to stdout
@@ -42,6 +94,28 @@ func ErrorMsg(message string) {
 	JSON(Response{
 		Success: false,
 		Error:   message,
+	})
+	os.Exit(1)
+}
+
+// ErrorWithCode prints an error response with a machine-readable code and exits with code 1
+func ErrorWithCode(err error, code, suggestion string) {
+	JSON(Response{
+		Success:    false,
+		Error:      err.Error(),
+		ErrorCode:  code,
+		Suggestion: suggestion,
+	})
+	os.Exit(1)
+}
+
+// ErrorMsgWithCode prints an error message response with a machine-readable code and exits with code 1
+func ErrorMsgWithCode(message, code, suggestion string) {
+	JSON(Response{
+		Success:    false,
+		Error:      message,
+		ErrorCode:  code,
+		Suggestion: suggestion,
 	})
 	os.Exit(1)
 }
