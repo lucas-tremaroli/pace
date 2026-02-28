@@ -53,6 +53,9 @@ func GetToolDefinitions() []Tool {
 					"labels": {
 						Type:        "array",
 						Description: "List of label strings to attach to the task",
+						Items: &Property{
+							Type: "string",
+						},
 					},
 					"link": {
 						Type:        "string",
