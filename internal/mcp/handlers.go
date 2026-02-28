@@ -250,7 +250,9 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 		if labels, ok := labelsRaw.([]any); ok {
 			for _, l := range labels {
 				if label, ok := l.(string); ok && label != "" {
-					h.taskService.AddLabel(id, label)
+					if err := h.taskService.AddLabel(id, label); err != nil {
+						return errorResult(fmt.Sprintf("task %s created but failed to add label %q: %v", id, label, err))
+					}
 				}
 			}
 		}
