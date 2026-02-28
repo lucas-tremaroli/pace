@@ -41,23 +41,15 @@ func (s *Server) Close() error {
 func (s *Server) Run() error {
 	defer s.Close()
 
+	dec := json.NewDecoder(s.reader)
+
 	for {
-		line, err := s.reader.ReadBytes('\n')
-		if err != nil {
+		var req JSONRPCRequest
+		if err := dec.Decode(&req); err != nil {
 			if err == io.EOF {
 				return nil
 			}
-			return fmt.Errorf("read error: %w", err)
-		}
-
-		// Skip empty lines
-		if len(line) == 0 || (len(line) == 1 && line[0] == '\n') {
-			continue
-		}
-
-		var req JSONRPCRequest
-		if err := json.Unmarshal(line, &req); err != nil {
-			// Send parse error response
+			// Send parse error response and continue on decode errors
 			resp := NewErrorResponse(nil, ParseError, "parse error")
 			s.writeResponse(resp)
 			continue
