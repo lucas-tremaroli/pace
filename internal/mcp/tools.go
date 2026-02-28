@@ -13,10 +13,30 @@ func GetToolDefinitions() []Tool {
 		},
 		{
 			Name:        "pace_task_list",
-			Description: "List all tasks with their status, type, priority, dependencies, and labels",
+			Description: "List all tasks with their status, type, priority, dependencies, and labels. Supports optional filtering by status, priority, and label.",
 			InputSchema: ToolInputSchema{
-				Type:       "object",
-				Properties: map[string]Property{},
+				Type: "object",
+				Properties: map[string]Property{
+					"status": {
+						Type:        "string",
+						Description: "Filter by status",
+						Enum:        []string{"todo", "in-progress", "done"},
+					},
+					"priority": {
+						Type:        "array",
+						Description: "Filter by one or more priority levels: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
+						Items: &Property{
+							Type: "integer",
+						},
+					},
+					"label": {
+						Type:        "array",
+						Description: "Filter by one or more labels (tasks matching any label are included)",
+						Items: &Property{
+							Type: "string",
+						},
+					},
+				},
 			},
 		},
 		{

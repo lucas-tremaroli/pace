@@ -107,7 +107,7 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 	case "pace_info":
 		return h.toolInfo()
 	case "pace_task_list":
-		return h.toolTaskList()
+		return h.toolTaskList(args)
 	case "pace_task_create":
 		return h.toolTaskCreate(args)
 	case "pace_task_update":
@@ -184,18 +184,43 @@ func (h *Handler) toolInfo() ToolCallResult {
 	return jsonResult(info)
 }
 
-func (h *Handler) toolTaskList() ToolCallResult {
+func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 	tasks, err := h.taskService.LoadAllTasks()
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to load tasks: %v", err))
 	}
+
+	// Build and apply filter
+	filter := task.TaskFilter{}
+	if statusStr, ok := args["status"].(string); ok && statusStr != "" {
+		status, err := task.ParseStatus(statusStr)
+		if err != nil {
+			return errorResult(err.Error())
+		}
+		filter.Status = &status
+	}
+	if priorities, ok := args["priority"].([]any); ok {
+		for _, p := range priorities {
+			if v, ok := p.(float64); ok {
+				filter.Priorities = append(filter.Priorities, int(v))
+			}
+		}
+	}
+	if labels, ok := args["label"].([]any); ok {
+		for _, l := range labels {
+			if s, ok := l.(string); ok && s != "" {
+				filter.AnyLabels = append(filter.AnyLabels, s)
+			}
+		}
+	}
+	tasks = filter.Apply(tasks)
 
 	taskList := make([]task.TaskJSON, 0, len(tasks))
 	for _, t := range tasks {
 		taskList = append(taskList, t.ToJSON())
 	}
 
-	return jsonResult(map[string]any{"tasks": taskList})
+	return jsonResult(map[string]any{"tasks": taskList, "count": len(taskList)})
 }
 
 func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {

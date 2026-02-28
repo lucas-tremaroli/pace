@@ -31,7 +31,12 @@ var (
 	p4Style = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 )
 
-var listPretty bool
+var (
+	listPretty         bool
+	listFilterStatus   string
+	listFilterPriority []string
+	listFilterLabel    []string
+)
 
 type taskListResponse struct {
 	Tasks []task.TaskJSON `json:"tasks"`
@@ -53,6 +58,26 @@ var listCmd = &cobra.Command{
 		if err != nil {
 			output.Error(err)
 		}
+
+		// Build and apply filter
+		filter := task.TaskFilter{AnyLabels: listFilterLabel}
+		if listFilterStatus != "" {
+			status, err := task.ParseStatus(listFilterStatus)
+			if err != nil {
+				output.Error(err)
+				return nil
+			}
+			filter.Status = &status
+		}
+		for _, p := range listFilterPriority {
+			var pri int
+			if _, err := fmt.Sscanf(p, "%d", &pri); err != nil || pri < 1 || pri > 4 {
+				output.ErrorMsg(fmt.Sprintf("invalid priority %q: must be 1-4", p))
+				return nil
+			}
+			filter.Priorities = append(filter.Priorities, pri)
+		}
+		tasks = filter.Apply(tasks)
 
 		// Sort by priority (P1 first, P4 last)
 		slices.SortFunc(tasks, func(a, b task.Task) int {
@@ -79,6 +104,9 @@ var listCmd = &cobra.Command{
 
 func init() {
 	listCmd.Flags().BoolVar(&listPretty, "pretty", false, "Human-readable formatted output")
+	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (todo, in-progress, done)")
+	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (1-4, repeatable)")
+	listCmd.Flags().StringArrayVar(&listFilterLabel, "label", nil, "Filter by label (repeatable)")
 }
 
 // printTasksPretty prints tasks in a human-readable format
