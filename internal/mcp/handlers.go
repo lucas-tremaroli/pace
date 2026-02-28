@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/lucas-tremaroli/pace/internal/note"
+	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/lucas-tremaroli/pace/internal/task"
 )
@@ -121,7 +122,7 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 	case "pace_task_dep_remove":
 		return h.toolTaskDepRemove(args)
 	case "pace_note_list":
-		return h.toolNoteList()
+		return h.toolNoteList(args)
 	case "pace_note_create":
 		return h.toolNoteCreate(args)
 	case "pace_note_read":
@@ -224,9 +225,24 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 	}
 	tasks = filter.Apply(tasks)
 
+	// Apply head truncation
+	if head := parseHead(args); head > 0 && head < len(tasks) {
+		tasks = tasks[:head]
+	}
+
 	taskList := make([]task.TaskJSON, 0, len(tasks))
 	for _, t := range tasks {
 		taskList = append(taskList, t.ToJSON())
+	}
+
+	// Apply field filtering
+	if fields := parseFields(args); len(fields) > 0 {
+		maps, err := output.ToMapSlice(taskList)
+		if err != nil {
+			return errorResult(fmt.Sprintf("failed to filter fields: %v", err))
+		}
+		filtered := output.FilterFields(maps, fields)
+		return jsonResult(map[string]any{"tasks": filtered, "count": len(filtered)})
 	}
 
 	return jsonResult(map[string]any{"tasks": taskList, "count": len(taskList)})
@@ -457,10 +473,15 @@ func (h *Handler) toolTaskDepRemove(args map[string]any) ToolCallResult {
 	})
 }
 
-func (h *Handler) toolNoteList() ToolCallResult {
+func (h *Handler) toolNoteList(args map[string]any) ToolCallResult {
 	notes, err := h.noteService.ListNotesWithMeta(false)
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to list notes: %v", err))
+	}
+
+	// Apply head truncation
+	if head := parseHead(args); head > 0 && head < len(notes) {
+		notes = notes[:head]
 	}
 
 	noteList := make([]map[string]any, 0, len(notes))
@@ -473,7 +494,13 @@ func (h *Handler) toolNoteList() ToolCallResult {
 		})
 	}
 
-	return jsonResult(map[string]any{"notes": noteList})
+	// Apply field filtering
+	if fields := parseFields(args); len(fields) > 0 {
+		filtered := output.FilterFields(noteList, fields)
+		return jsonResult(map[string]any{"notes": filtered, "count": len(filtered)})
+	}
+
+	return jsonResult(map[string]any{"notes": noteList, "count": len(noteList)})
 }
 
 func (h *Handler) toolNoteCreate(args map[string]any) ToolCallResult {
@@ -571,6 +598,29 @@ func errorResult(message string) ToolCallResult {
 		Content: []ContentBlock{NewTextContent(message)},
 		IsError: true,
 	}
+}
+
+// parseFields extracts the "fields" array from MCP args.
+func parseFields(args map[string]any) []string {
+	fieldsRaw, ok := args["fields"].([]any)
+	if !ok {
+		return nil
+	}
+	fields := make([]string, 0, len(fieldsRaw))
+	for _, f := range fieldsRaw {
+		if s, ok := f.(string); ok && s != "" {
+			fields = append(fields, strings.TrimSpace(s))
+		}
+	}
+	return fields
+}
+
+// parseHead extracts the "head" integer from MCP args.
+func parseHead(args map[string]any) int {
+	if head, ok := args["head"].(float64); ok && head > 0 {
+		return int(head)
+	}
+	return 0
 }
 
 // validateFilename rejects filenames that could escape the notes directory.

@@ -3,7 +3,44 @@ package output
 import (
 	"encoding/json"
 	"os"
+	"strings"
 )
+
+// FilterFields filters a slice of maps to only include the specified fields.
+// If fields is nil or empty, all fields are returned unchanged.
+func FilterFields(items []map[string]any, fields []string) []map[string]any {
+	if len(fields) == 0 {
+		return items
+	}
+	fieldSet := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		fieldSet[strings.TrimSpace(f)] = true
+	}
+	result := make([]map[string]any, len(items))
+	for i, item := range items {
+		filtered := make(map[string]any, len(fields))
+		for k, v := range item {
+			if fieldSet[k] {
+				filtered[k] = v
+			}
+		}
+		result[i] = filtered
+	}
+	return result
+}
+
+// ToMapSlice marshals a slice of structs to []map[string]any using JSON field names.
+func ToMapSlice(v any) ([]map[string]any, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var result []map[string]any
+	if err := json.Unmarshal(b, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
 
 // Response represents a standard JSON response
 type Response struct {
