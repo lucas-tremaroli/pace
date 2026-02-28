@@ -132,7 +132,7 @@ func init() {
 	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (todo, in-progress, done)")
 	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (1-4, repeatable)")
 	listCmd.Flags().StringArrayVar(&listFilterLabel, "label", nil, "Filter by label (repeatable)")
-	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated list of fields to include (e.g. id,title,status)")
+	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, link")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")
 }
 

@@ -494,7 +494,7 @@ func (h *Handler) toolNoteList(args map[string]any) ToolCallResult {
 			"filename":    n.Filename,
 			"description": n.Description,
 			"labels":      n.Labels,
-			"mod_time":    n.ModTime,
+			"modTime":    n.ModTime,
 		})
 	}
 
@@ -560,7 +560,7 @@ func (h *Handler) toolNoteRead(args map[string]any) ToolCallResult {
 		"content":     noteData.Content,
 		"description": noteData.Description,
 		"labels":      noteData.Labels,
-		"mod_time":    noteData.ModTime,
+		"modTime":    noteData.ModTime,
 	})
 }
 

@@ -38,7 +38,7 @@ func GetToolDefinitions() []Tool {
 					},
 					"fields": {
 						Type:        "array",
-						Description: "Limit response to specific fields (e.g. [\"id\",\"title\",\"status\"]). Available: id, title, description, status, type, priority, blocked_by, blocks, labels, link",
+						Description: "Limit response to specific fields. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, link",
 						Items: &Property{
 							Type: "string",
 						},
@@ -202,7 +202,7 @@ func GetToolDefinitions() []Tool {
 				Properties: map[string]Property{
 					"fields": {
 						Type:        "array",
-						Description: "Limit response to specific fields (e.g. [\"filename\",\"description\"]). Available: filename, description, labels, mod_time",
+						Description: "Limit response to specific fields. Available: filename, description, labels, modTime",
 						Items: &Property{
 							Type: "string",
 						},

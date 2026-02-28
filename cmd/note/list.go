@@ -95,7 +95,7 @@ func init() {
 	listCmd.Flags().StringVar(&listSort, "sort", "name", "Sort by: name, modified, created")
 	listCmd.Flags().BoolVar(&listIncludeContent, "include-content", false, "Include full note content in output")
 	listCmd.Flags().StringArrayVar(&listFilters, "filter", nil, "Filter notes (e.g., label=design). Can be repeated for AND semantics")
-	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated list of fields to include (e.g. filename,description)")
+	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: filename, description, labels, modTime")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N notes")
 }
 
