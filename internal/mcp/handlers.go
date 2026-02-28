@@ -1,8 +1,11 @@
 package mcp
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/lucas-tremaroli/pace/internal/note"
@@ -280,7 +283,10 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	// Load existing task
 	existingTask, err := h.taskService.GetTaskByID(id)
 	if err != nil {
-		return errorResult(fmt.Sprintf("task not found: %s", id))
+		if errors.Is(err, sql.ErrNoRows) {
+			return errorResult(fmt.Sprintf("task not found: %s", id))
+		}
+		return errorResult(fmt.Sprintf("failed to load task %s: %v", id, err))
 	}
 
 	// Build updated task with existing values as defaults
@@ -317,7 +323,14 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 
 	priority := existingTask.Priority()
 	if p, ok := args["priority"].(float64); ok {
-		priority = int(p)
+		if p != float64(int(p)) {
+			return errorResult("priority must be an integer")
+		}
+		pi := int(p)
+		if pi < 1 || pi > 4 {
+			return errorResult("priority must be between 1 and 4")
+		}
+		priority = pi
 	}
 
 	updatedTask := task.NewTaskComplete(id, status, taskType, title, description, priority, link)
@@ -434,6 +447,9 @@ func (h *Handler) toolNoteCreate(args map[string]any) ToolCallResult {
 	if !ok || filename == "" {
 		return errorResult("filename is required")
 	}
+	if err := validateFilename(filename); err != nil {
+		return errorResult(err.Error())
+	}
 
 	content, ok := args["content"].(string)
 	if !ok {
@@ -462,6 +478,9 @@ func (h *Handler) toolNoteRead(args map[string]any) ToolCallResult {
 	if !ok || filename == "" {
 		return errorResult("filename is required")
 	}
+	if err := validateFilename(filename); err != nil {
+		return errorResult(err.Error())
+	}
 
 	noteData, err := h.noteService.ReadNoteWithMeta(filename)
 	if err != nil {
@@ -481,6 +500,9 @@ func (h *Handler) toolNoteDelete(args map[string]any) ToolCallResult {
 	filename, ok := args["filename"].(string)
 	if !ok || filename == "" {
 		return errorResult("filename is required")
+	}
+	if err := validateFilename(filename); err != nil {
+		return errorResult(err.Error())
 	}
 
 	// Ensure filename has .md extension
@@ -515,4 +537,15 @@ func errorResult(message string) ToolCallResult {
 		Content: []ContentBlock{NewTextContent(message)},
 		IsError: true,
 	}
+}
+
+// validateFilename rejects filenames that could escape the notes directory.
+func validateFilename(filename string) error {
+	if filepath.IsAbs(filename) {
+		return fmt.Errorf("filename must not be an absolute path")
+	}
+	if filepath.Base(filename) != filename {
+		return fmt.Errorf("filename must not contain path separators")
+	}
+	return nil
 }

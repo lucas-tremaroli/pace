@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/lucas-tremaroli/pace/internal/mcp"
 	"github.com/lucas-tremaroli/pace/internal/output"
@@ -102,8 +103,8 @@ func runInstall() {
 
 	// Use claude mcp add to register the server
 	cmd := exec.Command(claudePath, "mcp", "add", "pace", "--", pacePath, "mcp")
-	if err := cmd.Run(); err != nil {
-		output.ErrorMsg("failed to register MCP server with Claude Code")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		output.ErrorMsg(fmt.Sprintf("failed to register MCP server with Claude Code: %s", strings.TrimSpace(string(out))))
 		return
 	}
 
@@ -136,7 +137,7 @@ func runUninstall() {
 	}
 
 	cmd := exec.Command(claudePath, "mcp", "remove", "pace")
-	cmdErr := cmd.Run()
+	out, cmdErr := cmd.CombinedOutput()
 
 	if cmdErr != nil {
 		// Check if it's just "not found" - that's okay
@@ -144,7 +145,7 @@ func runUninstall() {
 			output.Success("Pace MCP server is not currently installed", nil)
 			return
 		}
-		output.ErrorMsg("failed to remove MCP server from Claude Code")
+		output.ErrorMsg(fmt.Sprintf("failed to remove MCP server from Claude Code: %s", strings.TrimSpace(string(out))))
 		return
 	}
 
