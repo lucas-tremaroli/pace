@@ -334,6 +334,116 @@ func TestMergeFilters_MultipleLabelsAllowed(t *testing.T) {
 	}
 }
 
+func TestTaskFilter_Matches_Priorities(t *testing.T) {
+	task1 := NewTaskComplete("t1", Todo, TypeTask, "Task 1", "", 1, "")
+	task2 := NewTaskComplete("t2", Todo, TypeTask, "Task 2", "", 2, "")
+	task3 := NewTaskComplete("t3", Todo, TypeTask, "Task 3", "", 3, "")
+
+	tests := []struct {
+		name       string
+		priorities []int
+		task       Task
+		want       bool
+	}{
+		{"matches first priority", []int{1, 2}, task1, true},
+		{"matches second priority", []int{1, 2}, task2, true},
+		{"no match", []int{1, 2}, task3, false},
+		{"empty priorities matches all", []int{}, task3, true},
+		{"single match", []int{3}, task3, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &TaskFilter{Priorities: tt.priorities}
+			got := f.Matches(tt.task)
+			if got != tt.want {
+				t.Errorf("Matches() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTaskFilter_Matches_AnyLabels(t *testing.T) {
+	task1 := NewTaskComplete("t1", Todo, TypeTask, "Task 1", "", 1, "")
+	task1.AddLabel("backend")
+	task1.AddLabel("sprint-1")
+
+	task2 := NewTaskComplete("t2", Todo, TypeTask, "Task 2", "", 1, "")
+	task2.AddLabel("frontend")
+
+	task3 := NewTaskComplete("t3", Todo, TypeTask, "Task 3", "", 1, "")
+
+	tests := []struct {
+		name      string
+		anyLabels []string
+		task      Task
+		want      bool
+	}{
+		{"matches first label", []string{"backend", "frontend"}, task1, true},
+		{"matches second label", []string{"backend", "frontend"}, task2, true},
+		{"no label match", []string{"backend", "frontend"}, task3, false},
+		{"empty anyLabels matches all", []string{}, task3, true},
+		{"single match", []string{"sprint-1"}, task1, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &TaskFilter{AnyLabels: tt.anyLabels}
+			got := f.Matches(tt.task)
+			if got != tt.want {
+				t.Errorf("Matches() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTaskFilter_Apply(t *testing.T) {
+	task1 := NewTaskComplete("t1", Todo, TypeTask, "Task 1", "", 1, "")
+	task2 := NewTaskComplete("t2", Todo, TypeTask, "Task 2", "", 2, "")
+	task3 := NewTaskComplete("t3", Done, TypeTask, "Task 3", "", 3, "")
+	all := []Task{task1, task2, task3}
+
+	t.Run("nil filter returns all", func(t *testing.T) {
+		var f *TaskFilter
+		got := f.Apply(all)
+		if len(got) != 3 {
+			t.Errorf("Apply() len = %d, want 3", len(got))
+		}
+	})
+
+	t.Run("empty filter returns all", func(t *testing.T) {
+		f := &TaskFilter{}
+		got := f.Apply(all)
+		if len(got) != 3 {
+			t.Errorf("Apply() len = %d, want 3", len(got))
+		}
+	})
+
+	t.Run("status filter", func(t *testing.T) {
+		f := &TaskFilter{Status: ptr(Todo)}
+		got := f.Apply(all)
+		if len(got) != 2 {
+			t.Errorf("Apply() len = %d, want 2", len(got))
+		}
+	})
+
+	t.Run("priorities filter OR semantics", func(t *testing.T) {
+		f := &TaskFilter{Priorities: []int{1, 3}}
+		got := f.Apply(all)
+		if len(got) != 2 {
+			t.Errorf("Apply() len = %d, want 2", len(got))
+		}
+	})
+
+	t.Run("no matches returns empty slice", func(t *testing.T) {
+		f := &TaskFilter{Status: ptr(InProgress)}
+		got := f.Apply(all)
+		if len(got) != 0 {
+			t.Errorf("Apply() len = %d, want 0", len(got))
+		}
+	})
+}
+
 // Helper functions for creating pointers
 func ptr(s Status) *Status {
 	return &s
