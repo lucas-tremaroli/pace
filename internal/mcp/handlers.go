@@ -640,7 +640,9 @@ func parseFields(args map[string]any) []string {
 // parseHead extracts the "head" integer from MCP args.
 func parseHead(args map[string]any) int {
 	if head, ok := args["head"].(float64); ok && head > 0 {
-		return int(head)
+		if float64(int(head)) == head {
+			return int(head)
+		}
 	}
 	return 0
 }
