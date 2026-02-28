@@ -8,10 +8,12 @@ import (
 
 // TaskFilter represents criteria for filtering tasks
 type TaskFilter struct {
-	Status   *Status
-	Type     *TaskType
-	Priority *int
-	Labels   []string // Multiple labels use AND semantics (task must have all)
+	Status     *Status
+	Type       *TaskType
+	Priority   *int     // Single priority, AND semantics (used by bulk ops)
+	Priorities []int    // Multiple priorities, OR semantics (used by list)
+	Labels     []string // Multiple labels, AND semantics (task must have all, used by bulk ops)
+	AnyLabels  []string // Multiple labels, OR semantics (task must have at least one, used by list)
 }
 
 // ParseFilter parses a filter string in the format "key=value"
@@ -68,13 +70,52 @@ func (f *TaskFilter) Matches(t Task) bool {
 	if f.Priority != nil && t.Priority() != *f.Priority {
 		return false
 	}
+	if len(f.Priorities) > 0 {
+		found := false
+		for _, p := range f.Priorities {
+			if t.Priority() == p {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
 	// All specified labels must be present (AND semantics)
 	for _, label := range f.Labels {
 		if !t.HasLabel(label) {
 			return false
 		}
 	}
+	// At least one label must be present (OR semantics)
+	if len(f.AnyLabels) > 0 {
+		found := false
+		for _, label := range f.AnyLabels {
+			if t.HasLabel(label) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
 	return true
+}
+
+// Apply returns a filtered copy of tasks, keeping only those that match the filter.
+func (f *TaskFilter) Apply(tasks []Task) []Task {
+	if f == nil {
+		return tasks
+	}
+	var result []Task
+	for _, t := range tasks {
+		if f.Matches(t) {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 // MergeFilters combines multiple filters into one that requires all conditions.

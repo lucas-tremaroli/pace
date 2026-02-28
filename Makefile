@@ -23,6 +23,7 @@ test:
 install: build
 	@echo "Installing to $(INSTALL_PATH)..."
 	@mkdir -p $(INSTALL_PATH)
+	rm -f $(INSTALL_PATH)/$(BINARY_NAME)
 	cp bin/$(BINARY_NAME) $(INSTALL_PATH)/$(BINARY_NAME)
 	@echo "Installation completed."
 

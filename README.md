@@ -195,7 +195,7 @@ Pace supports per-project storage, keeping tasks and notes isolated to each repo
 pace init
 
 # Check which storage you're using
-pace status
+pace info
 
 # Migrate between global and project storage
 pace migrate --from global --to project
@@ -220,8 +220,7 @@ pace migrate --from global --to project
 | `pace note tui` | Launch note picker TUI |
 | `pace note create <name> -c "content"` | Create note |
 | `pace note read <name>` | Read note content |
-| `pace info` | Project overview |
-| `pace status` | Storage location |
+| `pace info` | Project overview and storage location |
 
 ### Task Flags
 
