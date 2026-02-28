@@ -201,9 +201,18 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 	}
 	if priorities, ok := args["priority"].([]any); ok {
 		for _, p := range priorities {
-			if v, ok := p.(float64); ok {
-				filter.Priorities = append(filter.Priorities, int(v))
+			v, ok := p.(float64)
+			if !ok {
+				return errorResult("invalid params: priority values must be numbers")
 			}
+			priority := int(v)
+			if float64(priority) != v {
+				return errorResult("invalid params: priority values must be integers")
+			}
+			if priority < 1 || priority > 4 {
+				return errorResult("invalid params: priority values must be between 1 and 4")
+			}
+			filter.Priorities = append(filter.Priorities, priority)
 		}
 	}
 	if labels, ok := args["label"].([]any); ok {
