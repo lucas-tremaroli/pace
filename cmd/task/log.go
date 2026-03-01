@@ -7,7 +7,8 @@ import (
 )
 
 var logCmd = &cobra.Command{
-	Use:   "log <id> <message>",
+	Use:     "log <id> <message>",
+	GroupID: "logging",
 	Short: "Add a progress log entry to a task",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

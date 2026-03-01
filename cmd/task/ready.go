@@ -12,7 +12,8 @@ import (
 var readyPretty bool
 
 var readyCmd = &cobra.Command{
-	Use:   "ready",
+	Use:     "ready",
+	GroupID: "workflow",
 	Short: "Show tasks ready to work on",
 	Long:  `Lists tasks that have no blockers (or all blockers are done). Use --pretty for human-readable format.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

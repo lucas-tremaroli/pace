@@ -24,7 +24,8 @@ var (
 )
 
 var updateCmd = &cobra.Command{
-	Use:   "update [id]",
+	Use:     "update [id]",
+	GroupID: "manage",
 	Short: "Update an existing task or batch update tasks",
 	Long: `Updates a task and outputs the result in JSON format. Only specified fields are updated.
 

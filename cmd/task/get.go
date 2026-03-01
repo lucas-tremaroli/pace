@@ -10,7 +10,8 @@ import (
 )
 
 var getCmd = &cobra.Command{
-	Use:   "get <id>",
+	Use:     "get <id>",
+	GroupID: "manage",
 	Short: "Get a single task by ID",
 	Long:  `Outputs a single task in JSON format.`,
 	Args:  cobra.ExactArgs(1),

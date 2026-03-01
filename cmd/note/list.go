@@ -24,7 +24,8 @@ type noteListResponse struct {
 }
 
 var listCmd = &cobra.Command{
-	Use:   "list",
+	Use:     "list",
+	GroupID: "manage",
 	Short: "List all notes",
 	Long:  `List all notes in JSON format. Use --sort to change the order, --include-content to include full content, and --filter to filter by label.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

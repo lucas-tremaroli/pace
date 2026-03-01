@@ -13,7 +13,8 @@ import (
 )
 
 var depCmd = &cobra.Command{
-	Use:   "dep",
+	Use:     "dep",
+	GroupID: "workflow",
 	Short: "Manage task dependencies",
 	Long:  `Manage blocking relationships between tasks.`,
 }

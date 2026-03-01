@@ -14,7 +14,8 @@ var content string
 var editor string
 
 var createCmd = &cobra.Command{
-	Use:   "create [filename]",
+	Use:     "create [filename]",
+	GroupID: "manage",
 	Short: "Create a new note",
 	Long:  `Creates a new markdown note with the specified filename and content.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

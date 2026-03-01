@@ -10,7 +10,8 @@ import (
 )
 
 var deleteCmd = &cobra.Command{
-	Use:   "delete <filename>",
+	Use:     "delete <filename>",
+	GroupID: "manage",
 	Short: "Delete a note",
 	Long:  `Deletes a note without confirmation and outputs the result in JSON format.`,
 	Args:  cobra.ExactArgs(1),
