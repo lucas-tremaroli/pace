@@ -22,4 +22,7 @@ func init() {
 	TaskCmd.AddCommand(depCmd)
 	TaskCmd.AddCommand(readyCmd)
 	TaskCmd.AddCommand(searchCmd)
+	TaskCmd.AddCommand(logCmd)
+	TaskCmd.AddCommand(closeCmd)
+	TaskCmd.AddCommand(logsCmd)
 }
