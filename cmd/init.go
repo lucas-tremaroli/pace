@@ -22,7 +22,7 @@ const paceSectionContent = `## Pace
 
 Pace gives you persistent memory across sessions. Your context resets each conversation, but pace preserves what matters.
 
-**Session start:** Run ` + "`pace info`" + ` to recall state, ` + "`pace task ready`" + ` to see what's unblocked.
+**Session start:** Run ` + "`pace context`" + ` to recall state, ` + "`pace task ready`" + ` to see what's unblocked.
 
 **While working:**
 - ` + "`pace task create --title \"...\"`" + ` - track work items that survive session end

@@ -4,8 +4,8 @@ package mcp
 func GetToolDefinitions() []Tool {
 	return []Tool{
 		{
-			Name:        "pace_info",
-			Description: "Get project overview including storage location, task counts by status, and notes count",
+			Name:        "pace_context",
+			Description: "Get storage location, active tasks (todo/in-progress), and notes for session context",
 			InputSchema: ToolInputSchema{
 				Type:       "object",
 				Properties: map[string]Property{},

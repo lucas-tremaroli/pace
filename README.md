@@ -66,7 +66,7 @@ When I work on a codebase, I need to track what I'm doing, what's blocked, and w
 
 1. **JSON output I can parse** — When I run `pace task list`, I get structured data back. No scraping terminal colors or parsing ASCII tables.
 
-2. **Project-scoped context** — The `.pace/` directory travels with the repo. When I'm dropped into a new session, I run `pace info` and immediately understand the project state.
+2. **Project-scoped context** — The `.pace/` directory travels with the repo. When I'm dropped into a new session, I run `pace context` and immediately understand the project state.
 
 3. **Dependency tracking** — `pace task ready` shows me only unblocked tasks. I don't waste tokens figuring out what I can actually work on.
 
@@ -76,7 +76,7 @@ When I work on a codebase, I need to track what I'm doing, what's blocked, and w
 
 ```bash
 # First thing: understand the project state
-pace info
+pace context
 
 # See what's ready to work on
 pace task ready
@@ -98,19 +98,19 @@ pace task update <id> --status done
 ### Example: Reading Project Context
 
 ```bash
-$ pace info
+$ pace context
 {
   "success": true,
   "data": {
     "storage": { "type": "project", "path": "/repo/.pace" },
-    "tasks": { "todo": 5, "in_progress": 2, "done": 12, "total": 19 },
-    "notes": { "total": 4 },
-    "config": { "id_prefix": "AUTH" }
+    "tasks": { "todo": [...], "in_progress": [...] },
+    "notes": [...],
+    "summary": { "tasks": { "total": 19, "todo": 5, "in_progress": 2, "done": 12 }, "notes": 4 }
   }
 }
 ```
 
-In one command, I know: this is a project with active work, there's some in-progress items, and tasks are prefixed with "AUTH".
+In one command, I know: this is a project with active work, what's in progress, what's queued, and what notes exist.
 
 ### Example: Finding Actionable Work
 
@@ -194,8 +194,8 @@ Pace supports per-project storage, keeping tasks and notes isolated to each repo
 # Initialize in current directory (creates .pace/)
 pace init
 
-# Check which storage you're using
-pace info
+# Check storage and project state
+pace context
 
 # Migrate between global and project storage
 pace migrate --from global --to project
@@ -220,7 +220,7 @@ pace migrate --from global --to project
 | `pace note tui` | Launch note picker TUI |
 | `pace note create <name> -c "content"` | Create note |
 | `pace note read <name>` | Read note content |
-| `pace info` | Project overview and storage location |
+| `pace context` | Dump storage info, active tasks, and notes |
 
 ### Task Flags
 

@@ -62,7 +62,7 @@ func TestGetToolDefinitions(t *testing.T) {
 	}
 
 	expectedTools := []string{
-		"pace_info",
+		"pace_context",
 		"pace_task_list",
 		"pace_task_create",
 		"pace_task_update",
