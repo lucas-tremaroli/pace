@@ -106,8 +106,8 @@ func (h *Handler) handleToolsCall(req JSONRPCRequest) *JSONRPCResponse {
 
 func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 	switch name {
-	case "pace_info":
-		return h.toolInfo()
+	case "pace_context":
+		return h.toolContext(args)
 	case "pace_task_list":
 		return h.toolTaskList(args)
 	case "pace_task_create":
@@ -144,52 +144,105 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 	}
 }
 
-func (h *Handler) toolInfo() ToolCallResult {
-	resolved, err := storage.ResolvePaceDir()
-	if err != nil {
-		return errorResult(fmt.Sprintf("failed to resolve storage: %v", err))
-	}
-
+func (h *Handler) toolContext(args map[string]any) ToolCallResult {
 	tasks, err := h.taskService.LoadAllTasks()
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to load tasks: %v", err))
 	}
 
-	notes, err := h.noteService.ListNotes()
+	// Summary mode: just counts and stats
+	if summary, ok := args["summary"].(bool); ok && summary {
+		var todoCount, inProgressCount, doneCount int
+		for _, t := range tasks {
+			switch t.Status() {
+			case task.Todo:
+				todoCount++
+			case task.InProgress:
+				inProgressCount++
+			case task.Done:
+				doneCount++
+			}
+		}
+
+		notes, err := h.noteService.ListNotes()
+		if err != nil {
+			return errorResult(fmt.Sprintf("failed to list notes: %v", err))
+		}
+
+		resolved, err := storage.ResolvePaceDir()
+		if err != nil {
+			return errorResult(fmt.Sprintf("failed to resolve storage: %v", err))
+		}
+
+		return jsonResult(map[string]any{
+			"storage": map[string]any{
+				"path": resolved.Path,
+				"type": string(resolved.Type),
+			},
+			"tasks": map[string]any{
+				"total":       len(tasks),
+				"todo":        todoCount,
+				"in_progress": inProgressCount,
+				"done":        doneCount,
+			},
+			"notes": map[string]any{
+				"total": len(notes),
+			},
+		})
+	}
+
+	// Full context: active tasks + notes
+	todoStatus := task.Todo
+	inProgressStatus := task.InProgress
+	todoFilter := task.TaskFilter{Status: &todoStatus}
+	inProgressFilter := task.TaskFilter{Status: &inProgressStatus}
+
+	todoTasks := todoFilter.Apply(tasks)
+	inProgressTasks := inProgressFilter.Apply(tasks)
+
+	todoList := make([]task.TaskJSON, 0, len(todoTasks))
+	for _, t := range todoTasks {
+		todoList = append(todoList, t.ToJSON())
+	}
+
+	inProgressList := make([]task.TaskJSON, 0, len(inProgressTasks))
+	for _, t := range inProgressTasks {
+		inProgressList = append(inProgressList, t.ToJSON())
+	}
+
+	notes, err := h.noteService.ListNotesWithMeta(false)
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to list notes: %v", err))
 	}
 
-	// Count tasks by status
-	var todoCount, inProgressCount, doneCount int
-	for _, t := range tasks {
-		switch t.Status() {
-		case task.Todo:
-			todoCount++
-		case task.InProgress:
-			inProgressCount++
-		case task.Done:
-			doneCount++
-		}
+	noteList := make([]map[string]any, 0, len(notes))
+	for _, n := range notes {
+		noteList = append(noteList, map[string]any{
+			"filename":    n.Filename,
+			"description": n.Description,
+			"labels":      n.Labels,
+		})
 	}
 
-	info := map[string]any{
+	resolved, err := storage.ResolvePaceDir()
+	if err != nil {
+		return errorResult(fmt.Sprintf("failed to resolve storage: %v", err))
+	}
+
+	return jsonResult(map[string]any{
 		"storage": map[string]any{
 			"path": resolved.Path,
 			"type": string(resolved.Type),
 		},
-		"tasks": map[string]any{
-			"total":       len(tasks),
-			"todo":        todoCount,
-			"in_progress": inProgressCount,
-			"done":        doneCount,
+		"in_progress": inProgressList,
+		"todo":        todoList,
+		"notes":       noteList,
+		"summary": map[string]any{
+			"in_progress": len(inProgressList),
+			"todo":        len(todoList),
+			"notes":       len(noteList),
 		},
-		"notes": map[string]any{
-			"total": len(notes),
-		},
-	}
-
-	return jsonResult(info)
+	})
 }
 
 func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
