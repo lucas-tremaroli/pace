@@ -63,7 +63,7 @@ func (s *Service) UpdateTask(task Task) error {
 	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), int(task.Type()), task.Priority(), task.Link())
 }
 
-// DeleteTask removes a task from the database and cleans up dependencies and labels
+// DeleteTask removes a task from the database and cleans up dependencies, labels, and logs
 func (s *Service) DeleteTask(taskID string) error {
 	// Remove all dependencies involving this task first
 	if err := s.db.RemoveAllDependencies(taskID); err != nil {
@@ -71,6 +71,10 @@ func (s *Service) DeleteTask(taskID string) error {
 	}
 	// Remove all labels for this task
 	if err := s.db.RemoveAllLabels(taskID); err != nil {
+		return err
+	}
+	// Remove all logs for this task
+	if err := s.db.DeleteLogsByTaskID(taskID); err != nil {
 		return err
 	}
 	return s.db.DeleteTask(taskID)
@@ -204,4 +208,47 @@ func (s *Service) GetReadyTasks() ([]Task, error) {
 	}
 
 	return ready, nil
+}
+
+// LogEntry adds a log entry to a task
+func (s *Service) LogEntry(taskID, message string) error {
+	if _, err := s.db.GetTaskByID(taskID); err != nil {
+		return err
+	}
+	return s.db.CreateLog(taskID, message, "log")
+}
+
+// CloseTask marks a task as done and optionally records an outcome
+func (s *Service) CloseTask(taskID, outcome string) error {
+	existing, err := s.db.GetTaskByID(taskID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.db.UpdateTask(existing.ID, existing.Title, existing.Description, int(Done), existing.TaskType, existing.Priority, existing.Link); err != nil {
+		return err
+	}
+
+	// A completed task can't block anything — clean up outbound deps
+	if err := s.db.RemoveBlockingDeps(taskID); err != nil {
+		return err
+	}
+
+	if outcome != "" {
+		return s.db.CreateLog(taskID, outcome, "outcome")
+	}
+	return nil
+}
+
+// GetTaskLogs returns all logs for a task
+func (s *Service) GetTaskLogs(taskID string) ([]storage.LogRecord, error) {
+	if _, err := s.db.GetTaskByID(taskID); err != nil {
+		return nil, err
+	}
+	return s.db.GetLogsByTaskID(taskID)
+}
+
+// SearchLogs performs full-text search across all logs
+func (s *Service) SearchLogs(query string, limit int) ([]storage.LogRecord, error) {
+	return s.db.SearchLogs(query, limit)
 }

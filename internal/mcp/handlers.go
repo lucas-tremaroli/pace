@@ -130,6 +130,12 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 		return h.toolNoteRead(args)
 	case "pace_note_delete":
 		return h.toolNoteDelete(args)
+	case "pace_task_log":
+		return h.toolTaskLog(args)
+	case "pace_task_close":
+		return h.toolTaskClose(args)
+	case "pace_task_logs":
+		return h.toolTaskLogs(args)
 	default:
 		return ToolCallResult{
 			Content: []ContentBlock{NewTextContent(fmt.Sprintf("unknown tool: %s", name))},
@@ -588,6 +594,72 @@ func (h *Handler) toolNoteDelete(args map[string]any) ToolCallResult {
 	return jsonResult(map[string]any{
 		"success": true,
 		"message": fmt.Sprintf("deleted note %s", filename),
+	})
+}
+
+func (h *Handler) toolTaskLog(args map[string]any) ToolCallResult {
+	id, ok := args["id"].(string)
+	if !ok || id == "" {
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the task ID")
+	}
+
+	message, ok := args["message"].(string)
+	if !ok || message == "" {
+		return codedError(output.ErrCodeMissingField, "message is required", "Provide a log message")
+	}
+
+	if err := h.taskService.LogEntry(id, message); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
+		}
+		return errorResult(fmt.Sprintf("failed to add log: %v", err))
+	}
+
+	return jsonResult(map[string]any{
+		"success": true,
+		"message": fmt.Sprintf("log entry added to %s", id),
+	})
+}
+
+func (h *Handler) toolTaskClose(args map[string]any) ToolCallResult {
+	id, ok := args["id"].(string)
+	if !ok || id == "" {
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the task ID to close")
+	}
+
+	outcome, _ := args["outcome"].(string)
+
+	if err := h.taskService.CloseTask(id, outcome); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
+		}
+		return errorResult(fmt.Sprintf("failed to close task: %v", err))
+	}
+
+	return jsonResult(map[string]any{
+		"success": true,
+		"message": fmt.Sprintf("closed task %s", id),
+	})
+}
+
+func (h *Handler) toolTaskLogs(args map[string]any) ToolCallResult {
+	id, ok := args["id"].(string)
+	if !ok || id == "" {
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the task ID")
+	}
+
+	logs, err := h.taskService.GetTaskLogs(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
+		}
+		return errorResult(fmt.Sprintf("failed to get logs: %v", err))
+	}
+
+	return jsonResult(map[string]any{
+		"task_id": id,
+		"logs":    logs,
+		"count":   len(logs),
 	})
 }
 

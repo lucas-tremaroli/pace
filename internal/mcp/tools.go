@@ -260,5 +260,55 @@ func GetToolDefinitions() []Tool {
 				Required: []string{"filename"},
 			},
 		},
+		{
+			Name:        "pace_task_log",
+			Description: "Add a progress log entry to a task",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Task ID (required)",
+					},
+					"message": {
+						Type:        "string",
+						Description: "Log message to record (required)",
+					},
+				},
+				Required: []string{"id", "message"},
+			},
+		},
+		{
+			Name:        "pace_task_close",
+			Description: "Close a task (mark as done) with an optional outcome message",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Task ID (required)",
+					},
+					"outcome": {
+						Type:        "string",
+						Description: "Outcome message to record",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
+			Name:        "pace_task_logs",
+			Description: "View log entries for a task",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Task ID (required)",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
 	}
 }
