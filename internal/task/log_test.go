@@ -194,6 +194,40 @@ func TestDeleteTaskCleansUpLogs(t *testing.T) {
 	}
 }
 
+func TestCloseTaskRemovesBlockingDeps(t *testing.T) {
+	svc := setupTestService(t)
+	defer svc.Close()
+
+	blocker := NewTaskComplete(svc.GenerateTaskID(), InProgress, TypeTask, "Blocker", "", 3, "")
+	blocked := NewTaskComplete(svc.GenerateTaskID(), Todo, TypeTask, "Blocked", "", 3, "")
+	if err := svc.CreateTask(blocker); err != nil {
+		t.Fatalf("failed to create blocker: %v", err)
+	}
+	if err := svc.CreateTask(blocked); err != nil {
+		t.Fatalf("failed to create blocked: %v", err)
+	}
+	if err := svc.AddDependency(blocker.ID(), blocked.ID()); err != nil {
+		t.Fatalf("failed to add dep: %v", err)
+	}
+
+	// Verify blocked task has a blocker
+	task, _ := svc.GetTaskByID(blocked.ID())
+	if len(task.BlockedBy()) != 1 {
+		t.Fatalf("expected 1 blocker, got %d", len(task.BlockedBy()))
+	}
+
+	// Close the blocker
+	if err := svc.CloseTask(blocker.ID(), "done"); err != nil {
+		t.Fatalf("CloseTask failed: %v", err)
+	}
+
+	// Blocked task should no longer have blockers
+	task, _ = svc.GetTaskByID(blocked.ID())
+	if len(task.BlockedBy()) != 0 {
+		t.Errorf("expected 0 blockers after close, got %d", len(task.BlockedBy()))
+	}
+}
+
 func TestSearchLogs(t *testing.T) {
 	svc := setupTestService(t)
 	defer svc.Close()

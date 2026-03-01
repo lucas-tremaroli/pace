@@ -229,6 +229,11 @@ func (s *Service) CloseTask(taskID, outcome string) error {
 		return err
 	}
 
+	// A completed task can't block anything — clean up outbound deps
+	if err := s.db.RemoveBlockingDeps(taskID); err != nil {
+		return err
+	}
+
 	if outcome != "" {
 		return s.db.CreateLog(taskID, outcome, "outcome")
 	}

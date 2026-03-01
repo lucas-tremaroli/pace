@@ -359,6 +359,13 @@ func (db *DB) GetAllDependencies() (map[string][]string, map[string][]string, er
 	return blockedBy, blocks, rows.Err()
 }
 
+// RemoveBlockingDeps removes dependencies where the given task is the blocker
+func (db *DB) RemoveBlockingDeps(taskID string) error {
+	query := `DELETE FROM task_dependencies WHERE blocker_id = ?`
+	_, err := db.conn.Exec(query, taskID)
+	return err
+}
+
 // RemoveAllDependencies removes all dependencies for a task (both directions)
 func (db *DB) RemoveAllDependencies(taskID string) error {
 	query := `DELETE FROM task_dependencies WHERE blocker_id = ? OR blocked_id = ?`
