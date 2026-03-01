@@ -9,7 +9,8 @@ import (
 )
 
 var searchCmd = &cobra.Command{
-	Use:   "search <query>",
+	Use:     "search <query>",
+	GroupID: "workflow",
 	Short: "Search tasks by text query",
 	Long:  `Full-text search across task titles and descriptions.`,
 	Args:  cobra.ExactArgs(1),

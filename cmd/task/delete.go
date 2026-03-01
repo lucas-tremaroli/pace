@@ -12,7 +12,8 @@ var (
 )
 
 var deleteCmd = &cobra.Command{
-	Use:   "delete [id] [id2] [id3] ...",
+	Use:     "delete [id] [id2] [id3] ...",
+	GroupID: "manage",
 	Short: "Delete one or more tasks by ID or filter",
 	Long: `Deletes one or more tasks without confirmation and outputs the result in JSON format.
 

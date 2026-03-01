@@ -9,7 +9,8 @@ import (
 var closeOutcome string
 
 var closeCmd = &cobra.Command{
-	Use:   "close <id>",
+	Use:     "close <id>",
+	GroupID: "workflow",
 	Short: "Close a task (mark as done) with an optional outcome",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -17,6 +17,7 @@ var NoteCmd = &cobra.Command{
 func init() {
 	NoteCmd.GroupID = "core"
 	NoteCmd.AddGroup(&cobra.Group{ID: "interactive", Title: "Interactive"})
+	NoteCmd.AddGroup(&cobra.Group{ID: "manage", Title: "Manage"})
 	NoteCmd.AddCommand(tuiCmd)
 	NoteCmd.AddCommand(listCmd)
 	NoteCmd.AddCommand(createCmd)

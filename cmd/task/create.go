@@ -22,7 +22,8 @@ var (
 )
 
 var createCmd = &cobra.Command{
-	Use:   "create",
+	Use:     "create",
+	GroupID: "manage",
 	Short: "Create a new task",
 	Long: `Creates a new task and outputs the result in JSON format.
 

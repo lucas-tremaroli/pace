@@ -46,7 +46,8 @@ type taskListResponse struct {
 }
 
 var listCmd = &cobra.Command{
-	Use:   "list",
+	Use:     "list",
+	GroupID: "manage",
 	Short: "List all tasks",
 	Long:  `Outputs all tasks. Use --pretty for human-readable format.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

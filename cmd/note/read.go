@@ -22,6 +22,7 @@ type readAllResponse struct {
 
 var readCmd = &cobra.Command{
 	Use:     "read [filename]",
+	GroupID: "manage",
 	Aliases: []string{"cat"},
 	Short:   "Read a note's content (alias: cat)",
 	Long:    `Reads and outputs a note's content. Use --raw for raw markdown output. Use --all to read all notes. Alias: 'pace note cat'`,

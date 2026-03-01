@@ -7,7 +7,8 @@ import (
 )
 
 var logsCmd = &cobra.Command{
-	Use:   "logs <id>",
+	Use:     "logs <id>",
+	GroupID: "logging",
 	Short: "View log entries for a task",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -13,6 +13,9 @@ var TaskCmd = &cobra.Command{
 func init() {
 	TaskCmd.GroupID = "core"
 	TaskCmd.AddGroup(&cobra.Group{ID: "interactive", Title: "Interactive"})
+	TaskCmd.AddGroup(&cobra.Group{ID: "manage", Title: "Manage"})
+	TaskCmd.AddGroup(&cobra.Group{ID: "workflow", Title: "Workflow"})
+	TaskCmd.AddGroup(&cobra.Group{ID: "logging", Title: "Logging"})
 	TaskCmd.AddCommand(tuiCmd)
 	TaskCmd.AddCommand(listCmd)
 	TaskCmd.AddCommand(getCmd)
