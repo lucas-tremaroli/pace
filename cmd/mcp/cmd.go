@@ -121,6 +121,10 @@ func runInstall() {
 		"pace_note_create",
 		"pace_note_read",
 		"pace_note_delete",
+		"pace_task_log",
+		"pace_task_close",
+		"pace_task_logs",
+		"pace_observe",
 	}
 
 	output.Success("Pace MCP server installed", map[string]any{
