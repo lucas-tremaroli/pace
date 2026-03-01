@@ -477,7 +477,7 @@ func (db *DB) SearchLogs(query string, limit int) ([]LogRecord, error) {
 		FROM task_logs_fts fts
 		JOIN task_logs tl ON tl.id = fts.rowid
 		WHERE task_logs_fts MATCH ?
-		ORDER BY fts.rank
+		ORDER BY bm25(task_logs_fts)
 		LIMIT ?
 	`
 	rows, err := db.conn.Query(sqlQuery, query, limit)
