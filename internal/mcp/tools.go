@@ -5,15 +5,10 @@ func GetToolDefinitions() []Tool {
 	return []Tool{
 		{
 			Name:        "pace_context",
-			Description: "Get storage location, active tasks (todo/in-progress), and notes for session context. Use summary=true for just counts and stats.",
+			Description: "Get storage location, active tasks (todo/in-progress), and notes for session context",
 			InputSchema: ToolInputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"summary": {
-						Type:        "boolean",
-						Description: "If true, return only counts and stats instead of full task/note data",
-					},
-				},
+				Type:       "object",
+				Properties: map[string]Property{},
 			},
 		},
 		{

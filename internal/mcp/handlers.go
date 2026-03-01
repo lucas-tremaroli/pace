@@ -107,7 +107,7 @@ func (h *Handler) handleToolsCall(req JSONRPCRequest) *JSONRPCResponse {
 func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 	switch name {
 	case "pace_context":
-		return h.toolContext(args)
+		return h.toolContext()
 	case "pace_task_list":
 		return h.toolTaskList(args)
 	case "pace_task_create":
@@ -144,54 +144,12 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 	}
 }
 
-func (h *Handler) toolContext(args map[string]any) ToolCallResult {
+func (h *Handler) toolContext() ToolCallResult {
 	tasks, err := h.taskService.LoadAllTasks()
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to load tasks: %v", err))
 	}
 
-	// Summary mode: just counts and stats
-	if summary, ok := args["summary"].(bool); ok && summary {
-		var todoCount, inProgressCount, doneCount int
-		for _, t := range tasks {
-			switch t.Status() {
-			case task.Todo:
-				todoCount++
-			case task.InProgress:
-				inProgressCount++
-			case task.Done:
-				doneCount++
-			}
-		}
-
-		notes, err := h.noteService.ListNotes()
-		if err != nil {
-			return errorResult(fmt.Sprintf("failed to list notes: %v", err))
-		}
-
-		resolved, err := storage.ResolvePaceDir()
-		if err != nil {
-			return errorResult(fmt.Sprintf("failed to resolve storage: %v", err))
-		}
-
-		return jsonResult(map[string]any{
-			"storage": map[string]any{
-				"path": resolved.Path,
-				"type": string(resolved.Type),
-			},
-			"tasks": map[string]any{
-				"total":       len(tasks),
-				"todo":        todoCount,
-				"in_progress": inProgressCount,
-				"done":        doneCount,
-			},
-			"notes": map[string]any{
-				"total": len(notes),
-			},
-		})
-	}
-
-	// Full context: active tasks + notes
 	todoStatus := task.Todo
 	inProgressStatus := task.InProgress
 	todoFilter := task.TaskFilter{Status: &todoStatus}
@@ -234,13 +192,19 @@ func (h *Handler) toolContext(args map[string]any) ToolCallResult {
 			"path": resolved.Path,
 			"type": string(resolved.Type),
 		},
-		"in_progress": inProgressList,
-		"todo":        todoList,
-		"notes":       noteList,
+		"tasks": map[string]any{
+			"in_progress": inProgressList,
+			"todo":        todoList,
+		},
+		"notes": noteList,
 		"summary": map[string]any{
-			"in_progress": len(inProgressList),
-			"todo":        len(todoList),
-			"notes":       len(noteList),
+			"tasks": map[string]any{
+				"total":       len(tasks),
+				"todo":        len(todoList),
+				"in_progress": len(inProgressList),
+				"done":        len(tasks) - len(todoList) - len(inProgressList),
+			},
+			"notes": len(noteList),
 		},
 	})
 }

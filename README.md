@@ -98,18 +98,19 @@ pace task update <id> --status done
 ### Example: Reading Project Context
 
 ```bash
-$ pace context --summary
+$ pace context
 {
   "success": true,
   "data": {
     "storage": { "type": "project", "path": "/repo/.pace" },
-    "tasks": { "todo": 5, "in_progress": 2, "done": 12, "total": 19 },
-    "notes": { "total": 4 }
+    "tasks": { "todo": [...], "in_progress": [...] },
+    "notes": [...],
+    "summary": { "tasks": { "total": 19, "todo": 5, "in_progress": 2, "done": 12 }, "notes": 4 }
   }
 }
 ```
 
-In one command, I know: this is a project with active work, there's some in-progress items, and tasks are prefixed with "AUTH".
+In one command, I know: this is a project with active work, what's in progress, what's queued, and what notes exist.
 
 ### Example: Finding Actionable Work
 
@@ -194,7 +195,7 @@ Pace supports per-project storage, keeping tasks and notes isolated to each repo
 pace init
 
 # Check storage and project state
-pace context --summary
+pace context
 
 # Migrate between global and project storage
 pace migrate --from global --to project
@@ -219,8 +220,7 @@ pace migrate --from global --to project
 | `pace note tui` | Launch note picker TUI |
 | `pace note create <name> -c "content"` | Create note |
 | `pace note read <name>` | Read note content |
-| `pace context` | Dump active tasks and notes for agent consumption |
-| `pace context --summary` | Project overview and storage location |
+| `pace context` | Dump storage info, active tasks, and notes |
 
 ### Task Flags
 
