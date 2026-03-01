@@ -235,11 +235,6 @@ func (s *Service) CloseTask(taskID, outcome string) error {
 	return nil
 }
 
-// Observe records a standalone observation not tied to a task
-func (s *Service) Observe(message string) error {
-	return s.db.CreateLog("", message, "observe")
-}
-
 // GetTaskLogs returns all logs for a task
 func (s *Service) GetTaskLogs(taskID string) ([]storage.LogRecord, error) {
 	if _, err := s.db.GetTaskByID(taskID); err != nil {

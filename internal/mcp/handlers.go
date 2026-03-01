@@ -136,8 +136,6 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 		return h.toolTaskClose(args)
 	case "pace_task_logs":
 		return h.toolTaskLogs(args)
-	case "pace_observe":
-		return h.toolObserve(args)
 	default:
 		return ToolCallResult{
 			Content: []ContentBlock{NewTextContent(fmt.Sprintf("unknown tool: %s", name))},
@@ -662,22 +660,6 @@ func (h *Handler) toolTaskLogs(args map[string]any) ToolCallResult {
 		"task_id": id,
 		"logs":    logs,
 		"count":   len(logs),
-	})
-}
-
-func (h *Handler) toolObserve(args map[string]any) ToolCallResult {
-	message, ok := args["message"].(string)
-	if !ok || message == "" {
-		return codedError(output.ErrCodeMissingField, "message is required", "Provide an observation message")
-	}
-
-	if err := h.taskService.Observe(message); err != nil {
-		return errorResult(fmt.Sprintf("failed to record observation: %v", err))
-	}
-
-	return jsonResult(map[string]any{
-		"success": true,
-		"message": "observation recorded",
 	})
 }
 

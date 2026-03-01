@@ -111,7 +111,6 @@ func init() {
 	rootCmd.AddCommand(joke.JokeCmd)
 	rootCmd.AddCommand(config.ConfigCmd)
 	rootCmd.AddCommand(mcp.McpCmd)
-	rootCmd.AddCommand(observeCmd)
 
 	rootCmd.SetHelpFunc(styledHelp)
 }

@@ -310,19 +310,5 @@ func GetToolDefinitions() []Tool {
 				Required: []string{"id"},
 			},
 		},
-		{
-			Name:        "pace_observe",
-			Description: "Record a standalone observation not tied to a specific task",
-			InputSchema: ToolInputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"message": {
-						Type:        "string",
-						Description: "Observation message to record (required)",
-					},
-				},
-				Required: []string{"message"},
-			},
-		},
 	}
 }
