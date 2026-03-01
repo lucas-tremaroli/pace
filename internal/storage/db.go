@@ -23,6 +23,14 @@ type TaskRecord struct {
 	Link        string `json:"link"`
 }
 
+type LogRecord struct {
+	ID        int    `json:"id"`
+	TaskID    string `json:"task_id,omitempty"`
+	Message   string `json:"message"`
+	Type      string `json:"type"`
+	CreatedAt string `json:"created_at"`
+}
+
 func NewDB() (*DB, error) {
 	dbPath, err := getDBPath()
 	if err != nil {
@@ -139,6 +147,30 @@ func (db *DB) createTables() error {
 		);
 	`
 	if _, err := db.conn.Exec(labelsQuery); err != nil {
+		return err
+	}
+
+	// Create task_logs table for progress/outcome logging
+	logsQuery := `
+		CREATE TABLE IF NOT EXISTS task_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			task_id VARCHAR,
+			message TEXT NOT NULL,
+			type VARCHAR NOT NULL DEFAULT 'log',
+			created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+		);
+	`
+	if _, err := db.conn.Exec(logsQuery); err != nil {
+		return err
+	}
+
+	// Create FTS5 virtual table for full-text search on logs
+	ftsQuery := `
+		CREATE VIRTUAL TABLE IF NOT EXISTS task_logs_fts USING fts5(
+			message, content='task_logs', content_rowid='id'
+		);
+	`
+	if _, err := db.conn.Exec(ftsQuery); err != nil {
 		return err
 	}
 
@@ -392,5 +424,116 @@ func (db *DB) GetAllLabels() (map[string][]string, error) {
 func (db *DB) RemoveAllLabels(taskID string) error {
 	query := `DELETE FROM task_labels WHERE task_id = ?`
 	_, err := db.conn.Exec(query, taskID)
+	return err
+}
+
+// CreateLog inserts a log entry and syncs it to the FTS5 index
+func (db *DB) CreateLog(taskID, message, logType string) error {
+	result, err := db.conn.Exec(
+		`INSERT INTO task_logs (task_id, message, type) VALUES (?, ?, ?)`,
+		taskID, message, logType,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	// Manual FTS5 sync (triggers may not work with modernc.org/sqlite)
+	_, err = db.conn.Exec(
+		`INSERT INTO task_logs_fts(rowid, message) VALUES (?, ?)`,
+		rowID, message,
+	)
+	return err
+}
+
+// GetLogsByTaskID returns all logs for a task ordered chronologically
+func (db *DB) GetLogsByTaskID(taskID string) ([]LogRecord, error) {
+	query := `SELECT id, task_id, message, type, created_at FROM task_logs WHERE task_id = ? ORDER BY created_at ASC`
+	rows, err := db.conn.Query(query, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []LogRecord
+	for rows.Next() {
+		var l LogRecord
+		if err := rows.Scan(&l.ID, &l.TaskID, &l.Message, &l.Type, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, rows.Err()
+}
+
+// SearchLogs performs a full-text search across log messages
+func (db *DB) SearchLogs(query string, limit int) ([]LogRecord, error) {
+	sqlQuery := `
+		SELECT tl.id, tl.task_id, tl.message, tl.type, tl.created_at
+		FROM task_logs_fts fts
+		JOIN task_logs tl ON tl.id = fts.rowid
+		WHERE task_logs_fts MATCH ?
+		ORDER BY fts.rank
+		LIMIT ?
+	`
+	rows, err := db.conn.Query(sqlQuery, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []LogRecord
+	for rows.Next() {
+		var l LogRecord
+		if err := rows.Scan(&l.ID, &l.TaskID, &l.Message, &l.Type, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, rows.Err()
+}
+
+// DeleteLogsByTaskID removes all logs for a task and cleans up FTS5
+func (db *DB) DeleteLogsByTaskID(taskID string) error {
+	// Get IDs for FTS cleanup
+	rows, err := db.conn.Query(`SELECT id, message FROM task_logs WHERE task_id = ?`, taskID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type logEntry struct {
+		id      int
+		message string
+	}
+	var entries []logEntry
+	for rows.Next() {
+		var e logEntry
+		if err := rows.Scan(&e.id, &e.message); err != nil {
+			return err
+		}
+		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	// Remove from FTS5 index
+	for _, e := range entries {
+		_, err := db.conn.Exec(
+			`INSERT INTO task_logs_fts(task_logs_fts, rowid, message) VALUES('delete', ?, ?)`,
+			e.id, e.message,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Delete from main table
+	_, err = db.conn.Exec(`DELETE FROM task_logs WHERE task_id = ?`, taskID)
 	return err
 }
