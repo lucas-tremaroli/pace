@@ -51,6 +51,20 @@ func GetToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "pace_task_get",
+			Description: "Get a single task by ID with its dependencies and labels",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Task ID (required)",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
 			Name:        "pace_task_create",
 			Description: "Create a new task",
 			InputSchema: ToolInputSchema{

@@ -111,6 +111,7 @@ func runInstall() {
 	tools := []string{
 		"pace_context",
 		"pace_task_list",
+		"pace_task_get",
 		"pace_task_create",
 		"pace_task_update",
 		"pace_task_delete",

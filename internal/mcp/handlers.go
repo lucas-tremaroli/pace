@@ -110,6 +110,8 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 		return h.toolContext()
 	case "pace_task_list":
 		return h.toolTaskList(args)
+	case "pace_task_get":
+		return h.toolTaskGet(args)
 	case "pace_task_create":
 		return h.toolTaskCreate(args)
 	case "pace_task_update":
@@ -270,6 +272,26 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 	}
 
 	return jsonResult(map[string]any{"tasks": taskList, "count": len(taskList)})
+}
+
+func (h *Handler) toolTaskGet(args map[string]any) ToolCallResult {
+	id, ok := args["id"].(string)
+	if !ok || id == "" {
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the task ID to retrieve")
+	}
+
+	t, err := h.taskService.GetTaskByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
+		}
+		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to get task: %v", err), "")
+	}
+
+	return jsonResult(map[string]any{
+		"success": true,
+		"task":    t.ToJSON(),
+	})
 }
 
 func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
