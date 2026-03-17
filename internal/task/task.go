@@ -395,7 +395,7 @@ func ParseTaskType(s string) (TaskType, error) {
 	}
 }
 
-// ValidLabel returns the label strings that are valid task labels
+// ValidLabels returns the label strings that are valid task labels
 var ValidLabels = []string{"task", "bug", "feature", "chore", "docs"}
 
 // ValidateLabel checks if a label string is valid
