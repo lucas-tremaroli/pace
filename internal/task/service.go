@@ -51,7 +51,7 @@ func (s *Service) CreateTask(task Task) error {
 		return err
 	}
 
-	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), int(task.Type()), task.Priority(), task.Link())
+	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority(), task.Link())
 }
 
 // UpdateTask updates an existing task in the database
@@ -60,7 +60,7 @@ func (s *Service) UpdateTask(task Task) error {
 		return err
 	}
 
-	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), int(task.Type()), task.Priority(), task.Link())
+	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority(), task.Link())
 }
 
 // DeleteTask removes a task from the database and cleans up dependencies, labels, and logs
@@ -111,7 +111,7 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 
 	var tasks []Task
 	for _, record := range taskRecords {
-		task := NewTaskComplete(record.ID, Status(record.Status), TaskType(record.TaskType), record.Title, record.Description, record.Priority, record.Link)
+		task := NewTaskComplete(record.ID, Status(record.Status), record.Title, record.Description, record.Priority, record.Link)
 		task.SetBlockedBy(blockedByMap[record.ID])
 		task.SetBlocks(blocksMap[record.ID])
 		task.SetLabels(labelsMap[record.ID])
@@ -129,7 +129,7 @@ func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 		return nil, err
 	}
 
-	task := NewTaskComplete(record.ID, Status(record.Status), TaskType(record.TaskType), record.Title, record.Description, record.Priority, record.Link)
+	task := NewTaskComplete(record.ID, Status(record.Status), record.Title, record.Description, record.Priority, record.Link)
 
 	// Load dependencies for this task
 	blockedBy, err := s.db.GetBlockers(taskID)
@@ -264,7 +264,7 @@ func (s *Service) CloseTask(taskID, outcome string) error {
 		return err
 	}
 
-	if err := s.db.UpdateTask(existing.ID, existing.Title, existing.Description, int(Done), existing.TaskType, existing.Priority, existing.Link); err != nil {
+	if err := s.db.UpdateTask(existing.ID, existing.Title, existing.Description, int(Done), existing.Priority, existing.Link); err != nil {
 		return err
 	}
 

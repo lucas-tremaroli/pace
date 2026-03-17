@@ -9,9 +9,8 @@ import (
 // TaskFilter represents criteria for filtering tasks
 type TaskFilter struct {
 	Status     *Status
-	Type       *TaskType
-	Priority   *int   // Single priority, AND semantics (used by bulk ops)
-	Priorities []int  // Multiple priorities, OR semantics (used by list)
+	Priority   *int    // Single priority, AND semantics (used by bulk ops)
+	Priorities []int   // Multiple priorities, OR semantics (used by list)
 	Label      *string // Filter by label
 }
 
@@ -34,12 +33,6 @@ func ParseFilter(s string) (*TaskFilter, error) {
 			return nil, err
 		}
 		filter.Status = &status
-	case "type":
-		taskType, err := ParseTaskType(value)
-		if err != nil {
-			return nil, err
-		}
-		filter.Type = &taskType
 	case "priority":
 		priority, err := strconv.Atoi(value)
 		if err != nil {
@@ -52,7 +45,7 @@ func ParseFilter(s string) (*TaskFilter, error) {
 	case "label":
 		filter.Label = &value
 	default:
-		return nil, fmt.Errorf("unknown filter key: %s (valid: status, type, priority, label)", key)
+		return nil, fmt.Errorf("unknown filter key: %s (valid: status, priority, label)", key)
 	}
 
 	return filter, nil
@@ -61,9 +54,6 @@ func ParseFilter(s string) (*TaskFilter, error) {
 // Matches returns true if the task matches all filter criteria
 func (f *TaskFilter) Matches(t Task) bool {
 	if f.Status != nil && t.Status() != *f.Status {
-		return false
-	}
-	if f.Type != nil && t.Type() != *f.Type {
 		return false
 	}
 	if f.Priority != nil && t.Priority() != *f.Priority {
@@ -111,12 +101,6 @@ func MergeFilters(filters []*TaskFilter) (*TaskFilter, error) {
 				return nil, fmt.Errorf("duplicate filter: status specified multiple times")
 			}
 			merged.Status = f.Status
-		}
-		if f.Type != nil {
-			if merged.Type != nil {
-				return nil, fmt.Errorf("duplicate filter: type specified multiple times")
-			}
-			merged.Type = f.Type
 		}
 		if f.Priority != nil {
 			if merged.Priority != nil {

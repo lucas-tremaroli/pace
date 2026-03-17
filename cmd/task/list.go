@@ -16,9 +16,9 @@ var (
 	typeStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	priorityStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("202")).Bold(true)
 	titleStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
-	labelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
 	noteStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("183"))
 	depStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	labelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
 	todoStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	progressStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
 	doneStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
@@ -137,7 +137,7 @@ func init() {
 	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (todo, in-progress, done)")
 	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (1-4, repeatable)")
 	listCmd.Flags().StringVar(&listFilterLabel, "label", "", "Filter by label")
-	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, type, priority, blocked_by, blocks, label, notes, link")
+	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")
 }
 
@@ -195,9 +195,6 @@ func formatTaskPretty(t task.Task) string {
 
 	// ID
 	parts = append(parts, idStyle.Render(t.ID()))
-
-	// Type symbol
-	parts = append(parts, typeStyle.Render(fmt.Sprintf("[%s]", t.Type().Symbol())))
 
 	// Priority with color coding
 	if p := t.Priority(); p > 0 {

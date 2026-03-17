@@ -18,7 +18,7 @@ const (
 	fieldTitle formField = iota
 	fieldDescription
 	fieldLink
-	fieldType
+	fieldLabel
 	fieldPriority
 )
 
@@ -27,7 +27,7 @@ type Form struct {
 	title       textinput.Model
 	description textarea.Model
 	link        textinput.Model
-	taskType    TaskType
+	label       TaskType
 	priority    int
 	col         column
 	index       int
@@ -42,7 +42,7 @@ func NewForm(title, description string, board *Board) *Form {
 		title:       textinput.New(),
 		description: textarea.New(),
 		link:        textinput.New(),
-		taskType:    TypeTask,
+		label:       TypeTask,
 		priority:    3,
 		board:       board,
 		focused:     fieldTitle,
@@ -66,7 +66,11 @@ func NewForm(title, description string, board *Board) *Form {
 // NewFormWithTask creates a form pre-populated with an existing task's values
 func NewFormWithTask(t Task, board *Board) *Form {
 	form := NewForm(t.Title(), t.Description(), board)
-	form.taskType = t.Type()
+	lt, err := ParseTaskType(t.Label())
+	if err != nil {
+		lt = TypeTask
+	}
+	form.label = lt
 	form.priority = t.Priority()
 	form.link.SetValue(t.Link())
 	form.isEdit = true
@@ -78,7 +82,9 @@ func (f Form) CreateTask() Task {
 	if f.board != nil && f.board.service != nil {
 		id = f.board.service.GenerateTaskID()
 	}
-	return NewTaskComplete(id, f.col.status, f.taskType, f.title.Value(), f.description.Value(), f.priority, f.link.Value())
+	t := NewTaskComplete(id, f.col.status, f.title.Value(), f.description.Value(), f.priority, f.link.Value())
+	t.SetLabel(f.label.String())
+	return t
 }
 
 func (f Form) Init() tea.Cmd {
@@ -109,16 +115,16 @@ func (f Form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.cycleField()
 			return f, f.focusCurrentField()
 		case msg.String() == "left" || msg.String() == "h":
-			if f.focused == fieldType {
-				f.taskType = f.prevType()
+			if f.focused == fieldLabel {
+				f.label = f.prevLabel()
 				return f, nil
 			} else if f.focused == fieldPriority {
 				f.priority = f.prevPriority()
 				return f, nil
 			}
 		case msg.String() == "right" || msg.String() == "l":
-			if f.focused == fieldType {
-				f.taskType = f.nextType()
+			if f.focused == fieldLabel {
+				f.label = f.nextLabel()
 				return f, nil
 			} else if f.focused == fieldPriority {
 				f.priority = f.nextPriority()
@@ -169,15 +175,15 @@ func (f *Form) focusCurrentField() tea.Cmd {
 	return nil
 }
 
-func (f Form) nextType() TaskType {
-	return (f.taskType + 1) % 5
+func (f Form) nextLabel() TaskType {
+	return (f.label + 1) % 5
 }
 
-func (f Form) prevType() TaskType {
-	if f.taskType == 0 {
+func (f Form) prevLabel() TaskType {
+	if f.label == 0 {
 		return 4
 	}
-	return f.taskType - 1
+	return f.label - 1
 }
 
 func (f Form) nextPriority() int {
@@ -260,16 +266,16 @@ func (f Form) View() string {
 		f.link.View(),
 	)
 
-	// Type selector
-	typeLabel := labelStyle
-	if f.focused == fieldType {
-		typeLabel = selectedLabelStyle
+	// Label selector
+	lblLabel := labelStyle
+	if f.focused == fieldLabel {
+		lblLabel = selectedLabelStyle
 	}
-	typeOptions := f.renderTypeOptions(selectorStyle, selectedStyle)
-	typeSection := lipgloss.JoinVertical(
+	lblOptions := f.renderLabelOptions(selectorStyle, selectedStyle)
+	lblSection := lipgloss.JoinVertical(
 		lipgloss.Left,
-		typeLabel.Render("Type:"),
-		typeOptions,
+		lblLabel.Render("Label:"),
+		lblOptions,
 	)
 
 	// Priority selector
@@ -284,10 +290,10 @@ func (f Form) View() string {
 		priorityOptions,
 	)
 
-	// Row for type and priority
+	// Row for label and priority
 	optionsRow := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		typeSection,
+		lblSection,
 		"    ",
 		prioritySection,
 	)
@@ -316,8 +322,8 @@ func (f Form) View() string {
 	)
 }
 
-func (f Form) renderTypeOptions(normalStyle, selectedStyle lipgloss.Style) string {
-	types := []struct {
+func (f Form) renderLabelOptions(normalStyle, selectedStyle lipgloss.Style) string {
+	labels := []struct {
 		t    TaskType
 		name string
 	}{
@@ -329,16 +335,16 @@ func (f Form) renderTypeOptions(normalStyle, selectedStyle lipgloss.Style) strin
 	}
 
 	var parts []string
-	for _, opt := range types {
+	for _, opt := range labels {
 		style := normalStyle
-		if opt.t == f.taskType {
+		if opt.t == f.label {
 			style = selectedStyle
 		}
 		parts = append(parts, style.Render(opt.name))
 	}
 
 	arrows := ""
-	if f.focused == fieldType {
+	if f.focused == fieldLabel {
 		arrows = " ← → "
 	} else {
 		arrows = "     "

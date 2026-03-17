@@ -23,8 +23,8 @@ Delete by ID:
 
 Delete by filter:
   pace task delete --filter status=done
-  pace task delete --filter type=bug --filter priority=4
-  pace task delete --filter label=sprint-1 --dry-run`,
+  pace task delete --filter label=bug --filter priority=4
+  pace task delete --filter label=feature --dry-run`,
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check for conflicting options
@@ -133,7 +133,7 @@ func handleFilterDelete() error {
 				"id":     t.ID(),
 				"title":  t.Title(),
 				"status": t.Status().String(),
-				"type":   t.Type().String(),
+				"label":  t.Label(),
 			})
 		}
 		output.Success("dry run - no tasks deleted", map[string]any{
@@ -168,6 +168,6 @@ func handleFilterDelete() error {
 }
 
 func init() {
-	deleteCmd.Flags().StringArrayVar(&deleteFilters, "filter", nil, "Filter tasks to delete (status=X, type=X, priority=X, label=X)")
+	deleteCmd.Flags().StringArrayVar(&deleteFilters, "filter", nil, "Filter tasks to delete (status=X, priority=X, label=X)")
 	deleteCmd.Flags().BoolVar(&deleteDryRun, "dry-run", false, "Preview deletions without applying them")
 }

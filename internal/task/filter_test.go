@@ -41,45 +41,6 @@ func TestParseFilter_Status(t *testing.T) {
 	}
 }
 
-func TestParseFilter_Type(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		want    TaskType
-		wantErr bool
-	}{
-		{"task", "type=task", TypeTask, false},
-		{"bug", "type=bug", TypeBug, false},
-		{"feature", "type=feature", TypeFeature, false},
-		{"chore", "type=chore", TypeChore, false},
-		{"docs", "type=docs", TypeDocs, false},
-		{"invalid type", "type=invalid", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			f, err := ParseFilter(tt.input)
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("ParseFilter(%q) expected error, got nil", tt.input)
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("ParseFilter(%q) unexpected error: %v", tt.input, err)
-				return
-			}
-			if f.Type == nil {
-				t.Errorf("ParseFilter(%q) Type is nil", tt.input)
-				return
-			}
-			if *f.Type != tt.want {
-				t.Errorf("ParseFilter(%q) Type = %v, want %v", tt.input, *f.Type, tt.want)
-			}
-		})
-	}
-}
-
 func TestParseFilter_Priority(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -153,11 +114,11 @@ func TestParseFilter_InvalidFormat(t *testing.T) {
 
 func TestTaskFilter_Matches(t *testing.T) {
 	// Create test tasks
-	todoTask := NewTaskComplete("t1", Todo, TypeFeature, "Todo Feature", "", 1, "")
-	todoTask.SetLabel("sprint-1")
+	todoTask := NewTaskComplete("t1", Todo, "Todo Feature", "", 1, "")
+	todoTask.SetLabel("feature")
 
-	doneTask := NewTaskComplete("t2", Done, TypeBug, "Done Bug", "", 2, "")
-	doneTask.SetLabel("sprint-1")
+	doneTask := NewTaskComplete("t2", Done, "Done Bug", "", 2, "")
+	doneTask.SetLabel("bug")
 
 	tests := []struct {
 		name   string
@@ -178,18 +139,6 @@ func TestTaskFilter_Matches(t *testing.T) {
 			want:   false,
 		},
 		{
-			name:   "type match",
-			filter: &TaskFilter{Type: ptrType(TypeFeature)},
-			task:   todoTask,
-			want:   true,
-		},
-		{
-			name:   "type no match",
-			filter: &TaskFilter{Type: ptrType(TypeBug)},
-			task:   todoTask,
-			want:   false,
-		},
-		{
 			name:   "priority match",
 			filter: &TaskFilter{Priority: ptrInt(1)},
 			task:   todoTask,
@@ -203,25 +152,25 @@ func TestTaskFilter_Matches(t *testing.T) {
 		},
 		{
 			name:   "label match",
-			filter: &TaskFilter{Label: ptrStr("sprint-1")},
+			filter: &TaskFilter{Label: ptrStr("feature")},
 			task:   todoTask,
 			want:   true,
 		},
 		{
 			name:   "label no match",
-			filter: &TaskFilter{Label: ptrStr("sprint-2")},
+			filter: &TaskFilter{Label: ptrStr("bug")},
 			task:   todoTask,
 			want:   false,
 		},
 		{
 			name:   "combined filters match",
-			filter: &TaskFilter{Status: ptr(Todo), Type: ptrType(TypeFeature), Priority: ptrInt(1)},
+			filter: &TaskFilter{Status: ptr(Todo), Label: ptrStr("feature"), Priority: ptrInt(1)},
 			task:   todoTask,
 			want:   true,
 		},
 		{
 			name:   "combined filters partial match",
-			filter: &TaskFilter{Status: ptr(Todo), Type: ptrType(TypeBug)},
+			filter: &TaskFilter{Status: ptr(Todo), Label: ptrStr("bug")},
 			task:   todoTask,
 			want:   false,
 		},
@@ -245,11 +194,10 @@ func TestTaskFilter_Matches(t *testing.T) {
 
 func TestMergeFilters_Success(t *testing.T) {
 	statusFilter, _ := ParseFilter("status=todo")
-	typeFilter, _ := ParseFilter("type=bug")
 	priorityFilter, _ := ParseFilter("priority=1")
-	labelFilter, _ := ParseFilter("label=sprint-1")
+	labelFilter, _ := ParseFilter("label=bug")
 
-	merged, err := MergeFilters([]*TaskFilter{statusFilter, typeFilter, priorityFilter, labelFilter})
+	merged, err := MergeFilters([]*TaskFilter{statusFilter, priorityFilter, labelFilter})
 	if err != nil {
 		t.Fatalf("MergeFilters() unexpected error: %v", err)
 	}
@@ -257,14 +205,11 @@ func TestMergeFilters_Success(t *testing.T) {
 	if merged.Status == nil || *merged.Status != Todo {
 		t.Errorf("MergeFilters() Status = %v, want Todo", merged.Status)
 	}
-	if merged.Type == nil || *merged.Type != TypeBug {
-		t.Errorf("MergeFilters() Type = %v, want TypeBug", merged.Type)
-	}
 	if merged.Priority == nil || *merged.Priority != 1 {
 		t.Errorf("MergeFilters() Priority = %v, want 1", merged.Priority)
 	}
-	if merged.Label == nil || *merged.Label != "sprint-1" {
-		t.Errorf("MergeFilters() Label = %v, want sprint-1", merged.Label)
+	if merged.Label == nil || *merged.Label != "bug" {
+		t.Errorf("MergeFilters() Label = %v, want bug", merged.Label)
 	}
 }
 
@@ -275,16 +220,6 @@ func TestMergeFilters_DuplicateStatus(t *testing.T) {
 	_, err := MergeFilters([]*TaskFilter{filter1, filter2})
 	if err == nil {
 		t.Error("MergeFilters() expected error for duplicate status, got nil")
-	}
-}
-
-func TestMergeFilters_DuplicateType(t *testing.T) {
-	filter1, _ := ParseFilter("type=bug")
-	filter2, _ := ParseFilter("type=feature")
-
-	_, err := MergeFilters([]*TaskFilter{filter1, filter2})
-	if err == nil {
-		t.Error("MergeFilters() expected error for duplicate type, got nil")
 	}
 }
 
@@ -309,9 +244,9 @@ func TestMergeFilters_DuplicateLabel(t *testing.T) {
 }
 
 func TestTaskFilter_Matches_Priorities(t *testing.T) {
-	task1 := NewTaskComplete("t1", Todo, TypeTask, "Task 1", "", 1, "")
-	task2 := NewTaskComplete("t2", Todo, TypeTask, "Task 2", "", 2, "")
-	task3 := NewTaskComplete("t3", Todo, TypeTask, "Task 3", "", 3, "")
+	task1 := NewTaskComplete("t1", Todo, "Task 1", "", 1, "")
+	task2 := NewTaskComplete("t2", Todo, "Task 2", "", 2, "")
+	task3 := NewTaskComplete("t3", Todo, "Task 3", "", 3, "")
 
 	tests := []struct {
 		name       string
@@ -338,13 +273,13 @@ func TestTaskFilter_Matches_Priorities(t *testing.T) {
 }
 
 func TestTaskFilter_Matches_Label(t *testing.T) {
-	task1 := NewTaskComplete("t1", Todo, TypeTask, "Task 1", "", 1, "")
+	task1 := NewTaskComplete("t1", Todo, "Task 1", "", 1, "")
 	task1.SetLabel("backend")
 
-	task2 := NewTaskComplete("t2", Todo, TypeTask, "Task 2", "", 1, "")
+	task2 := NewTaskComplete("t2", Todo, "Task 2", "", 1, "")
 	task2.SetLabel("frontend")
 
-	task3 := NewTaskComplete("t3", Todo, TypeTask, "Task 3", "", 1, "")
+	task3 := NewTaskComplete("t3", Todo, "Task 3", "", 1, "")
 
 	tests := []struct {
 		name  string
@@ -369,9 +304,9 @@ func TestTaskFilter_Matches_Label(t *testing.T) {
 }
 
 func TestTaskFilter_Apply(t *testing.T) {
-	task1 := NewTaskComplete("t1", Todo, TypeTask, "Task 1", "", 1, "")
-	task2 := NewTaskComplete("t2", Todo, TypeTask, "Task 2", "", 2, "")
-	task3 := NewTaskComplete("t3", Done, TypeTask, "Task 3", "", 3, "")
+	task1 := NewTaskComplete("t1", Todo, "Task 1", "", 1, "")
+	task2 := NewTaskComplete("t2", Todo, "Task 2", "", 2, "")
+	task3 := NewTaskComplete("t3", Done, "Task 3", "", 3, "")
 	all := []Task{task1, task2, task3}
 
 	t.Run("nil filter returns all", func(t *testing.T) {
@@ -418,10 +353,6 @@ func TestTaskFilter_Apply(t *testing.T) {
 // Helper functions for creating pointers
 func ptr(s Status) *Status {
 	return &s
-}
-
-func ptrType(t TaskType) *TaskType {
-	return &t
 }
 
 func ptrInt(i int) *int {

@@ -13,7 +13,7 @@ func GetToolDefinitions() []Tool {
 		},
 		{
 			Name:        "pace_task_list",
-			Description: "List all tasks with their status, type, priority, dependencies, and label. Supports optional filtering by status, priority, and label.",
+			Description: "List all tasks with their status, priority, dependencies, and label. Supports optional filtering by status, priority, and label.",
 			InputSchema: ToolInputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -35,7 +35,7 @@ func GetToolDefinitions() []Tool {
 					},
 					"fields": {
 						Type:        "array",
-						Description: "Limit response to specific fields. Available: id, title, description, status, type, priority, blocked_by, blocks, label, notes, link",
+						Description: "Limit response to specific fields. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link",
 						Items: &Property{
 							Type: "string",
 						},
@@ -81,12 +81,6 @@ func GetToolDefinitions() []Tool {
 						Enum:        []string{"todo", "in-progress", "done"},
 						Default:     "todo",
 					},
-					"type": {
-						Type:        "string",
-						Description: "Task type",
-						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
-						Default:     "task",
-					},
 					"priority": {
 						Type:        "integer",
 						Description: "Priority level: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
@@ -94,7 +88,9 @@ func GetToolDefinitions() []Tool {
 					},
 					"label": {
 						Type:        "string",
-						Description: "Label to attach to the task",
+						Description: "Task label",
+						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
+						Default:     "task",
 					},
 					"link": {
 						Type:        "string",
@@ -127,18 +123,14 @@ func GetToolDefinitions() []Tool {
 						Description: "New task status",
 						Enum:        []string{"todo", "in-progress", "done"},
 					},
-					"type": {
-						Type:        "string",
-						Description: "New task type",
-						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
-					},
 					"priority": {
 						Type:        "integer",
 						Description: "New priority level: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
 					},
 					"label": {
 						Type:        "string",
-						Description: "Set task label (use empty string to clear)",
+						Description: "New task label",
+						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
 					},
 					"link": {
 						Type:        "string",

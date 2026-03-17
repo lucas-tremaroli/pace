@@ -313,14 +313,13 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 		}
 	}
 
-	// Parse type
-	taskType := task.TypeTask
-	if typeStr, ok := args["type"].(string); ok && typeStr != "" {
-		var err error
-		taskType, err = task.ParseTaskType(typeStr)
-		if err != nil {
+	// Parse label
+	label := "task"
+	if l, ok := args["label"].(string); ok && l != "" {
+		if err := task.ValidateLabel(l); err != nil {
 			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, chore, docs")
 		}
+		label = l
 	}
 
 	// Parse priority
@@ -338,17 +337,15 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 
 	// Generate ID and create task
 	id := h.taskService.GenerateTaskID()
-	newTask := task.NewTaskComplete(id, status, taskType, title, description, priority, link)
+	newTask := task.NewTaskComplete(id, status, title, description, priority, link)
 
 	if err := h.taskService.CreateTask(newTask); err != nil {
 		return errorResult(fmt.Sprintf("failed to create task: %v", err))
 	}
 
-	// Set label if provided
-	if label, ok := args["label"].(string); ok && label != "" {
-		if err := h.taskService.SetLabel(id, label); err != nil {
-			return errorResult(fmt.Sprintf("task %s created but failed to set label %q: %v", id, label, err))
-		}
+	// Set label
+	if err := h.taskService.SetLabel(id, label); err != nil {
+		return errorResult(fmt.Sprintf("task %s created but failed to set label %q: %v", id, label, err))
 	}
 
 	// Reload task to get full data
@@ -403,14 +400,6 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 		}
 	}
 
-	taskType := existingTask.Type()
-	if t, ok := args["type"].(string); ok && t != "" {
-		taskType, err = task.ParseTaskType(t)
-		if err != nil {
-			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, chore, docs")
-		}
-	}
-
 	priority := existingTask.Priority()
 	if p, ok := args["priority"].(float64); ok {
 		if p != float64(int(p)) {
@@ -423,14 +412,17 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 		priority = pi
 	}
 
-	updatedTask := task.NewTaskComplete(id, status, taskType, title, description, priority, link)
+	updatedTask := task.NewTaskComplete(id, status, title, description, priority, link)
 	if err := h.taskService.UpdateTask(updatedTask); err != nil {
 		return errorResult(fmt.Sprintf("failed to update task: %v", err))
 	}
 
 	// Set label if provided
-	if label, ok := args["label"].(string); ok {
-		if err := h.taskService.SetLabel(id, label); err != nil {
+	if l, ok := args["label"].(string); ok {
+		if err := task.ValidateLabel(l); err != nil {
+			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, chore, docs")
+		}
+		if err := h.taskService.SetLabel(id, l); err != nil {
 			return errorResult(fmt.Sprintf("task updated but failed to set label: %v", err))
 		}
 	}

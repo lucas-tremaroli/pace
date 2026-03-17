@@ -10,7 +10,6 @@ import (
 type Task struct {
 	id          string
 	status      Status
-	taskType    TaskType
 	title       string
 	description string
 	priority    int
@@ -27,7 +26,6 @@ type TaskJSON struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Status      string   `json:"status"`
-	Type        string   `json:"type"`
 	Priority    int      `json:"priority"`
 	BlockedBy   []string `json:"blocked_by,omitempty"`
 	Blocks      []string `json:"blocks,omitempty"`
@@ -41,7 +39,6 @@ type TaskInput struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      string `json:"status"`
-	Type        string `json:"type"`
 	Priority    int    `json:"priority"`
 	Label       string `json:"label"`
 	Link        string `json:"link"`
@@ -63,13 +60,12 @@ func NewTaskWithID(id string, status Status, title, description string) Task {
 	return NewTask(id, status, title, description)
 }
 
-// NewTaskComplete creates a new task with all fields including type
-func NewTaskComplete(id string, status Status, taskType TaskType, title, description string, priority int, link string) Task {
+// NewTaskComplete creates a new task with all fields
+func NewTaskComplete(id string, status Status, title, description string, priority int, link string) Task {
 	link = NormalizeLink(link)
 	return Task{
 		id:          id,
 		status:      status,
-		taskType:    taskType,
 		title:       title,
 		description: description,
 		priority:    priority,
@@ -99,10 +95,6 @@ func (t Task) Status() Status {
 
 func (t Task) Priority() int {
 	return t.priority
-}
-
-func (t Task) Type() TaskType {
-	return t.taskType
 }
 
 func (t Task) Link() string {
@@ -207,6 +199,15 @@ func (t Task) HasLabel(label string) bool {
 	return t.Label() == label
 }
 
+// LabelSymbol returns a short symbol for the task's label (for TUI display)
+func (t Task) LabelSymbol() string {
+	lt, err := ParseTaskType(t.Label())
+	if err != nil {
+		return "T"
+	}
+	return lt.Symbol()
+}
+
 // IsBlocked returns true if this task has any unresolved blockers
 func (t Task) IsBlocked() bool {
 	return len(t.blockedBy) > 0
@@ -219,7 +220,6 @@ func (t Task) ToJSON() TaskJSON {
 		Title:       t.title,
 		Description: t.description,
 		Status:      t.status.String(),
-		Type:        t.taskType.String(),
 		Priority:    t.priority,
 		BlockedBy:   t.blockedBy,
 		Blocks:      t.blocks,
@@ -391,6 +391,15 @@ func ParseTaskType(s string) (TaskType, error) {
 	case "docs":
 		return TypeDocs, nil
 	default:
-		return TypeTask, fmt.Errorf("invalid type: %s (valid: task, bug, feature, chore, docs)", s)
+		return TypeTask, fmt.Errorf("invalid label: %s (valid: task, bug, feature, chore, docs)", s)
 	}
+}
+
+// ValidLabel returns the label strings that are valid task labels
+var ValidLabels = []string{"task", "bug", "feature", "chore", "docs"}
+
+// ValidateLabel checks if a label string is valid
+func ValidateLabel(s string) error {
+	_, err := ParseTaskType(s)
+	return err
 }
