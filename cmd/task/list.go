@@ -13,7 +13,6 @@ import (
 
 var (
 	idStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	typeStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	priorityStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("202")).Bold(true)
 	titleStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
 	noteStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))

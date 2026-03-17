@@ -179,9 +179,14 @@ func (t *Task) SetLabel(label string) {
 	}
 }
 
-// SetLabels sets the task's labels (used by storage layer loading)
+// SetLabels sets the task's labels (used by storage layer loading).
+// Enforces single-label invariant by keeping only the first label.
 func (t *Task) SetLabels(labels []string) {
-	t.labels = labels
+	if len(labels) > 1 {
+		t.labels = labels[:1]
+	} else {
+		t.labels = labels
+	}
 }
 
 // Notes returns the task's linked note filenames
@@ -395,7 +400,7 @@ func ParseTaskType(s string) (TaskType, error) {
 	}
 }
 
-// ValidLabels returns the label strings that are valid task labels
+// ValidLabels lists the label strings that are valid task labels
 var ValidLabels = []string{"task", "bug", "feature", "chore", "docs"}
 
 // ValidateLabel checks if a label string is valid

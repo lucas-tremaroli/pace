@@ -176,12 +176,12 @@ func (f *Form) focusCurrentField() tea.Cmd {
 }
 
 func (f Form) nextLabel() TaskType {
-	return (f.label + 1) % 5
+	return (f.label + 1) % TaskType(len(ValidLabels))
 }
 
 func (f Form) prevLabel() TaskType {
 	if f.label == 0 {
-		return 4
+		return TaskType(len(ValidLabels) - 1)
 	}
 	return f.label - 1
 }

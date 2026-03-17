@@ -441,6 +441,26 @@ func (db *DB) RemoveAllLabels(taskID string) error {
 	return err
 }
 
+// SetLabel atomically replaces all labels for a task with a single label.
+// Pass an empty string to clear all labels.
+func (db *DB) SetLabel(taskID, label string) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM task_labels WHERE task_id = ?`, taskID); err != nil {
+		return err
+	}
+	if label != "" {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)`, taskID, label); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // CreateLog inserts a log entry and syncs it to the FTS5 index
 func (db *DB) CreateLog(taskID, message, logType string) error {
 	result, err := db.conn.Exec(

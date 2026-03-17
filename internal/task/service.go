@@ -184,14 +184,7 @@ func (s *Service) SetLabel(taskID, label string) error {
 	if _, err := s.db.GetTaskByID(taskID); err != nil {
 		return err
 	}
-	// Remove existing labels first
-	if err := s.db.RemoveAllLabels(taskID); err != nil {
-		return err
-	}
-	if label != "" {
-		return s.db.AddLabel(taskID, label)
-	}
-	return nil
+	return s.db.SetLabel(taskID, label)
 }
 
 // LinkNote links a note to a task
