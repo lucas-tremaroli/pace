@@ -174,6 +174,19 @@ func (db *DB) createTables() error {
 		return err
 	}
 
+	// Create task_notes join table for note-task associations
+	taskNotesQuery := `
+		CREATE TABLE IF NOT EXISTS task_notes (
+			task_id VARCHAR NOT NULL,
+			note_filename VARCHAR NOT NULL,
+			PRIMARY KEY (task_id, note_filename),
+			FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+		);
+	`
+	if _, err := db.conn.Exec(taskNotesQuery); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -502,6 +515,94 @@ func (db *DB) SearchLogs(query string, limit int) ([]LogRecord, error) {
 		logs = append(logs, l)
 	}
 	return logs, rows.Err()
+}
+
+// AddTaskNote links a note to a task
+func (db *DB) AddTaskNote(taskID, noteFilename string) error {
+	query := `INSERT OR IGNORE INTO task_notes (task_id, note_filename) VALUES (?, ?)`
+	_, err := db.conn.Exec(query, taskID, noteFilename)
+	return err
+}
+
+// RemoveTaskNote unlinks a note from a task
+func (db *DB) RemoveTaskNote(taskID, noteFilename string) error {
+	query := `DELETE FROM task_notes WHERE task_id = ? AND note_filename = ?`
+	_, err := db.conn.Exec(query, taskID, noteFilename)
+	return err
+}
+
+// GetNotesForTask returns all note filenames linked to a task
+func (db *DB) GetNotesForTask(taskID string) ([]string, error) {
+	query := `SELECT note_filename FROM task_notes WHERE task_id = ? ORDER BY note_filename`
+	rows, err := db.conn.Query(query, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var notes []string
+	for rows.Next() {
+		var filename string
+		if err := rows.Scan(&filename); err != nil {
+			return nil, err
+		}
+		notes = append(notes, filename)
+	}
+	return notes, rows.Err()
+}
+
+// GetTasksForNote returns all task IDs linked to a note
+func (db *DB) GetTasksForNote(noteFilename string) ([]string, error) {
+	query := `SELECT task_id FROM task_notes WHERE note_filename = ? ORDER BY task_id`
+	rows, err := db.conn.Query(query, noteFilename)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tasks []string
+	for rows.Next() {
+		var taskID string
+		if err := rows.Scan(&taskID); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, taskID)
+	}
+	return tasks, rows.Err()
+}
+
+// GetAllTaskNotes returns a map of task ID to linked note filenames
+func (db *DB) GetAllTaskNotes() (map[string][]string, error) {
+	query := `SELECT task_id, note_filename FROM task_notes ORDER BY task_id, note_filename`
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	notes := make(map[string][]string)
+	for rows.Next() {
+		var taskID, filename string
+		if err := rows.Scan(&taskID, &filename); err != nil {
+			return nil, err
+		}
+		notes[taskID] = append(notes[taskID], filename)
+	}
+	return notes, rows.Err()
+}
+
+// RemoveAllTaskNotes removes all note links for a task
+func (db *DB) RemoveAllTaskNotes(taskID string) error {
+	query := `DELETE FROM task_notes WHERE task_id = ?`
+	_, err := db.conn.Exec(query, taskID)
+	return err
+}
+
+// RemoveAllNoteLinks removes all task links for a note
+func (db *DB) RemoveAllNoteLinks(noteFilename string) error {
+	query := `DELETE FROM task_notes WHERE note_filename = ?`
+	_, err := db.conn.Exec(query, noteFilename)
+	return err
 }
 
 // DeleteLogsByTaskID removes all logs for a task and cleans up FTS5

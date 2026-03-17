@@ -15,6 +15,7 @@ import (
 
 type Service struct {
 	notesDir string
+	db       *storage.DB
 }
 
 func NewService() (*Service, error) {
@@ -26,12 +27,24 @@ func NewService() (*Service, error) {
 	if err := os.MkdirAll(notesDir, 0755); err != nil {
 		return nil, err
 	}
-	return &Service{notesDir: notesDir}, nil
+	db, err := storage.NewDB()
+	if err != nil {
+		return nil, err
+	}
+	return &Service{notesDir: notesDir, db: db}, nil
 }
 
 // NewServiceWithDir creates a service with a custom notes directory (for testing)
 func NewServiceWithDir(notesDir string) *Service {
 	return &Service{notesDir: notesDir}
+}
+
+// Close closes the database connection
+func (s *Service) Close() error {
+	if s.db != nil {
+		return s.db.Close()
+	}
+	return nil
 }
 
 func (s *Service) GetNotePath(filename string) string {
@@ -63,6 +76,12 @@ func (s *Service) GetNotesDir() string {
 }
 
 func (s *Service) DeleteNote(filename string) error {
+	// Clean up task links before deleting
+	if s.db != nil {
+		if err := s.db.RemoveAllNoteLinks(filename); err != nil {
+			return err
+		}
+	}
 	path := filepath.Join(s.notesDir, filename)
 	return os.Remove(path)
 }
@@ -191,14 +210,24 @@ func (s *Service) ReadNoteWithMeta(filename string) (*Note, error) {
 		description = extractFirstLine(content)
 	}
 
-	return &Note{
+	n := &Note{
 		Filename:    filepath.Base(path),
 		Path:        path,
 		Content:     content,
 		Description: description,
 		ModTime:     modTime,
 		Labels:      labels,
-	}, nil
+	}
+
+	// Populate linked tasks if DB is available
+	if s.db != nil {
+		tasks, err := s.db.GetTasksForNote(n.Filename)
+		if err == nil {
+			n.Tasks = tasks
+		}
+	}
+
+	return n, nil
 }
 
 // ReadAllNotes reads all notes with full content and metadata
