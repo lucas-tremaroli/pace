@@ -13,12 +13,11 @@ import (
 
 var (
 	idStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	typeStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	priorityStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("202")).Bold(true)
 	titleStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
-	labelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
-	noteStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("183"))
-	depStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	noteStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	depStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	labelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	todoStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	progressStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
 	doneStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
@@ -36,7 +35,7 @@ var (
 	listPretty         bool
 	listFilterStatus   string
 	listFilterPriority []string
-	listFilterLabel    []string
+	listFilterLabel    string
 	listFields         string
 	listHead           int
 )
@@ -64,7 +63,10 @@ var listCmd = &cobra.Command{
 		}
 
 		// Build and apply filter
-		filter := task.TaskFilter{AnyLabels: listFilterLabel}
+		filter := task.TaskFilter{}
+		if listFilterLabel != "" {
+			filter.Label = &listFilterLabel
+		}
 		if listFilterStatus != "" {
 			status, err := task.ParseStatus(listFilterStatus)
 			if err != nil {
@@ -133,8 +135,8 @@ func init() {
 	listCmd.Flags().BoolVar(&listPretty, "pretty", false, "Human-readable formatted output")
 	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (todo, in-progress, done)")
 	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (1-4, repeatable)")
-	listCmd.Flags().StringArrayVar(&listFilterLabel, "label", nil, "Filter by label (repeatable)")
-	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, notes, link")
+	listCmd.Flags().StringVar(&listFilterLabel, "label", "", "Filter by label")
+	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")
 }
 
@@ -193,9 +195,6 @@ func formatTaskPretty(t task.Task) string {
 	// ID
 	parts = append(parts, idStyle.Render(t.ID()))
 
-	// Type symbol
-	parts = append(parts, typeStyle.Render(fmt.Sprintf("[%s]", t.Type().Symbol())))
-
 	// Priority with color coding
 	if p := t.Priority(); p > 0 {
 		var pStyle lipgloss.Style
@@ -217,8 +216,8 @@ func formatTaskPretty(t task.Task) string {
 	// Title
 	parts = append(parts, titleStyle.Render(t.Title()))
 
-	// Labels
-	for _, label := range t.Labels() {
+	// Label
+	if label := t.Label(); label != "" {
 		parts = append(parts, labelStyle.Render(fmt.Sprintf("[%s]", label)))
 	}
 

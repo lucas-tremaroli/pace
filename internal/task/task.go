@@ -10,7 +10,6 @@ import (
 type Task struct {
 	id          string
 	status      Status
-	taskType    TaskType
 	title       string
 	description string
 	priority    int
@@ -27,24 +26,22 @@ type TaskJSON struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Status      string   `json:"status"`
-	Type        string   `json:"type"`
 	Priority    int      `json:"priority"`
 	BlockedBy   []string `json:"blocked_by,omitempty"`
 	Blocks      []string `json:"blocks,omitempty"`
-	Labels      []string `json:"labels,omitempty"`
+	Label       string   `json:"label,omitempty"`
 	Notes       []string `json:"notes,omitempty"`
 	Link        string   `json:"link,omitempty"`
 }
 
 // TaskInput is used for parsing bulk task creation input
 type TaskInput struct {
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Status      string   `json:"status"`
-	Type        string   `json:"type"`
-	Priority    int      `json:"priority"`
-	Labels      []string `json:"labels"`
-	Link        string   `json:"link"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	Priority    int    `json:"priority"`
+	Label       string `json:"label"`
+	Link        string `json:"link"`
 }
 
 // NewTask creates a new task with the given ID
@@ -63,13 +60,12 @@ func NewTaskWithID(id string, status Status, title, description string) Task {
 	return NewTask(id, status, title, description)
 }
 
-// NewTaskComplete creates a new task with all fields including type
-func NewTaskComplete(id string, status Status, taskType TaskType, title, description string, priority int, link string) Task {
+// NewTaskComplete creates a new task with all fields
+func NewTaskComplete(id string, status Status, title, description string, priority int, link string) Task {
 	link = NormalizeLink(link)
 	return Task{
 		id:          id,
 		status:      status,
-		taskType:    taskType,
 		title:       title,
 		description: description,
 		priority:    priority,
@@ -99,10 +95,6 @@ func (t Task) Status() Status {
 
 func (t Task) Priority() int {
 	return t.priority
-}
-
-func (t Task) Type() TaskType {
-	return t.taskType
 }
 
 func (t Task) Link() string {
@@ -165,33 +157,35 @@ func (t *Task) RemoveBlocks(id string) {
 	}
 }
 
-// Labels returns the task's labels
+// Label returns the task's label (empty string if none)
+func (t Task) Label() string {
+	if len(t.labels) > 0 {
+		return t.labels[0]
+	}
+	return ""
+}
+
+// Labels returns the task's labels (for internal/storage compatibility)
 func (t Task) Labels() []string {
 	return t.labels
 }
 
-// SetLabels sets the task's labels
-func (t *Task) SetLabels(labels []string) {
-	t.labels = labels
-}
-
-// AddLabel adds a label to the task
-func (t *Task) AddLabel(label string) {
-	for _, existing := range t.labels {
-		if existing == label {
-			return // Already exists
-		}
+// SetLabel sets the task's label (replaces any existing label)
+func (t *Task) SetLabel(label string) {
+	if label == "" {
+		t.labels = nil
+	} else {
+		t.labels = []string{label}
 	}
-	t.labels = append(t.labels, label)
 }
 
-// RemoveLabel removes a label from the task
-func (t *Task) RemoveLabel(label string) {
-	for i, existing := range t.labels {
-		if existing == label {
-			t.labels = append(t.labels[:i], t.labels[i+1:]...)
-			return
-		}
+// SetLabels sets the task's labels (used by storage layer loading).
+// Enforces single-label invariant by keeping only the first label.
+func (t *Task) SetLabels(labels []string) {
+	if len(labels) > 1 {
+		t.labels = labels[:1]
+	} else {
+		t.labels = labels
 	}
 }
 
@@ -207,12 +201,16 @@ func (t *Task) SetNotes(notes []string) {
 
 // HasLabel returns true if the task has the given label
 func (t Task) HasLabel(label string) bool {
-	for _, l := range t.labels {
-		if l == label {
-			return true
-		}
+	return t.Label() == label
+}
+
+// LabelSymbol returns a short symbol for the task's label (for TUI display)
+func (t Task) LabelSymbol() string {
+	lt, err := ParseTaskType(t.Label())
+	if err != nil {
+		return "T"
 	}
-	return false
+	return lt.Symbol()
 }
 
 // IsBlocked returns true if this task has any unresolved blockers
@@ -227,11 +225,10 @@ func (t Task) ToJSON() TaskJSON {
 		Title:       t.title,
 		Description: t.description,
 		Status:      t.status.String(),
-		Type:        t.taskType.String(),
 		Priority:    t.priority,
 		BlockedBy:   t.blockedBy,
 		Blocks:      t.blocks,
-		Labels:      t.labels,
+		Label:       t.Label(),
 		Notes:       t.notes,
 		Link:        t.link,
 	}
@@ -399,6 +396,15 @@ func ParseTaskType(s string) (TaskType, error) {
 	case "docs":
 		return TypeDocs, nil
 	default:
-		return TypeTask, fmt.Errorf("invalid type: %s (valid: task, bug, feature, chore, docs)", s)
+		return TypeTask, fmt.Errorf("invalid label: %s (valid: task, bug, feature, chore, docs)", s)
 	}
+}
+
+// ValidLabels lists the label strings that are valid task labels
+var ValidLabels = []string{"task", "bug", "feature", "chore", "docs"}
+
+// ValidateLabel checks if a label string is valid
+func ValidateLabel(s string) error {
+	_, err := ParseTaskType(s)
+	return err
 }

@@ -14,9 +14,8 @@ var (
 	createTitle       string
 	createDescription string
 	createStatus      string
-	createType        string
 	createPriority    int
-	createLabels      []string
+	createLabel       string
 	createLink        string
 	createBulk        string
 )
@@ -46,8 +45,7 @@ For bulk creation, use --bulk with a JSON array or '-' for stdin:
 			output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 		}
 
-		taskType, err := task.ParseTaskType(createType)
-		if err != nil {
+		if err := task.ValidateLabel(createLabel); err != nil {
 			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, chore, docs")
 		}
 
@@ -57,17 +55,14 @@ For bulk creation, use --bulk with a JSON array or '-' for stdin:
 		}
 		defer svc.Close()
 
-		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, taskType, createTitle, createDescription, createPriority, createLink)
+		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, createTitle, createDescription, createPriority, createLink)
 
 		if err := svc.CreateTask(newTask); err != nil {
 			output.Error(err)
 		}
 
-		// Add labels if specified
-		for _, label := range createLabels {
-			if err := svc.AddLabel(newTask.ID(), label); err != nil {
-				output.Error(err)
-			}
+		if err := svc.SetLabel(newTask.ID(), createLabel); err != nil {
+			output.Error(err)
 		}
 
 		output.Success("task created", map[string]any{
@@ -133,13 +128,12 @@ func handleBulkCreate(bulkInput string) error {
 			continue
 		}
 
-		// Parse type (default to task)
-		typeStr := input.Type
-		if typeStr == "" {
-			typeStr = "task"
+		// Default label to "task" if not specified, validate
+		label := input.Label
+		if label == "" {
+			label = "task"
 		}
-		taskType, err := task.ParseTaskType(typeStr)
-		if err != nil {
+		if err := task.ValidateLabel(label); err != nil {
 			result.Failed = append(result.Failed, output.BulkItem{
 				Title: input.Title,
 				Error: err.Error(),
@@ -153,7 +147,7 @@ func handleBulkCreate(bulkInput string) error {
 			priority = 3
 		}
 
-		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, taskType, input.Title, input.Description, priority, input.Link)
+		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, input.Title, input.Description, priority, input.Link)
 
 		if err := svc.CreateTask(newTask); err != nil {
 			result.Failed = append(result.Failed, output.BulkItem{
@@ -163,12 +157,10 @@ func handleBulkCreate(bulkInput string) error {
 			continue
 		}
 
-		// Add labels if specified, track warnings for failures
+		// Set label
 		var warnings []string
-		for _, label := range input.Labels {
-			if err := svc.AddLabel(newTask.ID(), label); err != nil {
-				warnings = append(warnings, "add label '"+label+"': "+err.Error())
-			}
+		if err := svc.SetLabel(newTask.ID(), label); err != nil {
+			warnings = append(warnings, "set label '"+label+"': "+err.Error())
 		}
 
 		result.Succeeded = append(result.Succeeded, output.BulkItem{
@@ -186,9 +178,8 @@ func init() {
 	createCmd.Flags().StringVar(&createTitle, "title", "", "Task title (required for single task creation)")
 	createCmd.Flags().StringVar(&createDescription, "description", "", "Task description")
 	createCmd.Flags().StringVar(&createStatus, "status", "todo", "Task status (todo, in-progress, done)")
-	createCmd.Flags().StringVar(&createType, "type", "task", "Task type (task, bug, feature, chore, docs)")
 	createCmd.Flags().IntVar(&createPriority, "priority", 3, "Task priority (1=urgent, 2=high, 3=normal, 4=low)")
-	createCmd.Flags().StringSliceVar(&createLabels, "label", nil, "Task labels (can be specified multiple times)")
+	createCmd.Flags().StringVar(&createLabel, "label", "task", "Task label (task, bug, feature, chore, docs)")
 	createCmd.Flags().StringVar(&createLink, "url", "", "URL associated with the task (e.g., google.com)")
 	createCmd.Flags().StringVar(&createBulk, "bulk", "", "JSON array of tasks to create, or '-' for stdin")
 }

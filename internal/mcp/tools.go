@@ -13,7 +13,7 @@ func GetToolDefinitions() []Tool {
 		},
 		{
 			Name:        "pace_task_list",
-			Description: "List all tasks with their status, type, priority, dependencies, and labels. Supports optional filtering by status, priority, and label.",
+			Description: "List all tasks with their status, priority, dependencies, and label. Supports optional filtering by status, priority, and label.",
 			InputSchema: ToolInputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -30,15 +30,12 @@ func GetToolDefinitions() []Tool {
 						},
 					},
 					"label": {
-						Type:        "array",
-						Description: "Filter by one or more labels (tasks matching any label are included)",
-						Items: &Property{
-							Type: "string",
-						},
+						Type:        "string",
+						Description: "Filter by label",
 					},
 					"fields": {
 						Type:        "array",
-						Description: "Limit response to specific fields. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, notes, link",
+						Description: "Limit response to specific fields. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link",
 						Items: &Property{
 							Type: "string",
 						},
@@ -52,7 +49,7 @@ func GetToolDefinitions() []Tool {
 		},
 		{
 			Name:        "pace_task_get",
-			Description: "Get a single task by ID with its dependencies and labels",
+			Description: "Get a single task by ID with its dependencies and label",
 			InputSchema: ToolInputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -84,23 +81,16 @@ func GetToolDefinitions() []Tool {
 						Enum:        []string{"todo", "in-progress", "done"},
 						Default:     "todo",
 					},
-					"type": {
-						Type:        "string",
-						Description: "Task type",
-						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
-						Default:     "task",
-					},
 					"priority": {
 						Type:        "integer",
 						Description: "Priority level: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
 						Default:     3,
 					},
-					"labels": {
-						Type:        "array",
-						Description: "List of label strings to attach to the task",
-						Items: &Property{
-							Type: "string",
-						},
+					"label": {
+						Type:        "string",
+						Description: "Task label",
+						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
+						Default:     "task",
 					},
 					"link": {
 						Type:        "string",
@@ -133,14 +123,14 @@ func GetToolDefinitions() []Tool {
 						Description: "New task status",
 						Enum:        []string{"todo", "in-progress", "done"},
 					},
-					"type": {
-						Type:        "string",
-						Description: "New task type",
-						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
-					},
 					"priority": {
 						Type:        "integer",
 						Description: "New priority level: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
+					},
+					"label": {
+						Type:        "string",
+						Description: "New task label",
+						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
 					},
 					"link": {
 						Type:        "string",

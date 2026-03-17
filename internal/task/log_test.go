@@ -34,7 +34,7 @@ func TestLogEntry(t *testing.T) {
 	svc := setupTestService(t)
 	defer svc.Close()
 
-	task := NewTaskComplete(svc.GenerateTaskID(), Todo, TypeTask, "Test task", "", 3, "")
+	task := NewTaskComplete(svc.GenerateTaskID(), Todo, "Test task", "", 3, "")
 	if err := svc.CreateTask(task); err != nil {
 		t.Fatalf("failed to create task: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestCloseTask(t *testing.T) {
 	svc := setupTestService(t)
 	defer svc.Close()
 
-	task := NewTaskComplete(svc.GenerateTaskID(), InProgress, TypeTask, "Test task", "", 3, "")
+	task := NewTaskComplete(svc.GenerateTaskID(), InProgress, "Test task", "", 3, "")
 	if err := svc.CreateTask(task); err != nil {
 		t.Fatalf("failed to create task: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestCloseTaskWithOutcome(t *testing.T) {
 	svc := setupTestService(t)
 	defer svc.Close()
 
-	task := NewTaskComplete(svc.GenerateTaskID(), Todo, TypeTask, "Test task", "", 3, "")
+	task := NewTaskComplete(svc.GenerateTaskID(), Todo, "Test task", "", 3, "")
 	if err := svc.CreateTask(task); err != nil {
 		t.Fatalf("failed to create task: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestGetTaskLogsChronological(t *testing.T) {
 	svc := setupTestService(t)
 	defer svc.Close()
 
-	task := NewTaskComplete(svc.GenerateTaskID(), Todo, TypeTask, "Test task", "", 3, "")
+	task := NewTaskComplete(svc.GenerateTaskID(), Todo, "Test task", "", 3, "")
 	if err := svc.CreateTask(task); err != nil {
 		t.Fatalf("failed to create task: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestDeleteTaskCleansUpLogs(t *testing.T) {
 	svc := setupTestService(t)
 	defer svc.Close()
 
-	task := NewTaskComplete(svc.GenerateTaskID(), Todo, TypeTask, "Test task", "", 3, "")
+	task := NewTaskComplete(svc.GenerateTaskID(), Todo, "Test task", "", 3, "")
 	if err := svc.CreateTask(task); err != nil {
 		t.Fatalf("failed to create task: %v", err)
 	}
@@ -198,8 +198,8 @@ func TestCloseTaskRemovesBlockingDeps(t *testing.T) {
 	svc := setupTestService(t)
 	defer svc.Close()
 
-	blocker := NewTaskComplete(svc.GenerateTaskID(), InProgress, TypeTask, "Blocker", "", 3, "")
-	blocked := NewTaskComplete(svc.GenerateTaskID(), Todo, TypeTask, "Blocked", "", 3, "")
+	blocker := NewTaskComplete(svc.GenerateTaskID(), InProgress, "Blocker", "", 3, "")
+	blocked := NewTaskComplete(svc.GenerateTaskID(), Todo, "Blocked", "", 3, "")
 	if err := svc.CreateTask(blocker); err != nil {
 		t.Fatalf("failed to create blocker: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestSearchLogs(t *testing.T) {
 	svc := setupTestService(t)
 	defer svc.Close()
 
-	task := NewTaskComplete(svc.GenerateTaskID(), Todo, TypeTask, "Test task", "", 3, "")
+	task := NewTaskComplete(svc.GenerateTaskID(), Todo, "Test task", "", 3, "")
 	if err := svc.CreateTask(task); err != nil {
 		t.Fatalf("failed to create task: %v", err)
 	}

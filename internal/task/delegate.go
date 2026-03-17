@@ -43,23 +43,18 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	// Build the title with dependency indicators
 	title := task.title
 
-	// Add label indicator (first label only, with +N for extras)
-	var labelStr string
-	if len(task.labels) > 0 {
-		labelStr = fmt.Sprintf(" [%s]", task.labels[0])
-		if len(task.labels) > 1 {
-			labelStr += fmt.Sprintf(" +%d", len(task.labels)-1)
-		}
-	}
-
 	// Add dependency indicators
 	var indicators string
 	if len(task.blocks) > 0 {
 		indicators += fmt.Sprintf(" [%d]", len(task.blocks))
 	}
 
-	// Type prefix
-	typePrefix := fmt.Sprintf("[%s] ", task.taskType.Symbol())
+	// Label suffix
+	label := task.Label()
+	if label == "" {
+		label = "task"
+	}
+	labelSuffix := fmt.Sprintf(" [%s]", label)
 
 	// Styles
 	hasLink := task.link != ""
@@ -68,8 +63,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Underline(hasLink)
 	blockedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Underline(hasLink)
 	indicatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Cyan for labels
-	typeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")) // Gray for type
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 
 	isSelected := index == m.Index()
 	isCursor := isSelected
@@ -81,13 +75,17 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	if isCursor {
 		cursor := "> "
 		if isBlocked {
-			rendered = cursorStyle.Render(cursor) + typeStyle.Render(typePrefix) + blockedStyle.Render(title) + labelStyle.Render(labelStr) + indicatorStyle.Render(indicators)		} else {
-			rendered = cursorStyle.Render(cursor) + typeStyle.Render(typePrefix) + titleStyle.Render(title) + labelStyle.Render(labelStr) + indicatorStyle.Render(indicators)		}
+			rendered = cursorStyle.Render(cursor) + blockedStyle.Render(title) + labelStyle.Render(labelSuffix) + indicatorStyle.Render(indicators)
+		} else {
+			rendered = cursorStyle.Render(cursor) + titleStyle.Render(title) + labelStyle.Render(labelSuffix) + indicatorStyle.Render(indicators)
+		}
 	} else {
 		cursor := "  "
 		if isBlocked {
-			rendered = cursor + typeStyle.Render(typePrefix) + blockedStyle.Render(title) + labelStyle.Render(labelStr) + indicatorStyle.Render(indicators)		} else {
-			rendered = cursor + typeStyle.Render(typePrefix) + normalStyle.Render(title) + labelStyle.Render(labelStr) + indicatorStyle.Render(indicators)		}
+			rendered = cursor + blockedStyle.Render(title) + labelStyle.Render(labelSuffix) + indicatorStyle.Render(indicators)
+		} else {
+			rendered = cursor + normalStyle.Render(title) + labelStyle.Render(labelSuffix) + indicatorStyle.Render(indicators)
+		}
 	}
 
 	fmt.Fprint(w, rendered)

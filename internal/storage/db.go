@@ -17,10 +17,9 @@ type TaskRecord struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
-	Status      int    `json:"status"`
-	TaskType    int    `json:"task_type"`
-	Priority    int    `json:"priority"`
-	Link        string `json:"link"`
+	Status   int    `json:"status"`
+	Priority int    `json:"priority"`
+	Link     string `json:"link"`
 }
 
 type LogRecord struct {
@@ -99,11 +98,6 @@ func (db *DB) createTables() error {
 
 	// Migration: add priority column if it doesn't exist
 	_, err := db.conn.Exec(`ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`)
-	// Ignore error if column already exists
-	_ = err
-
-	// Migration: add task_type column if it doesn't exist (0 = task, 1 = bug, 2 = feature, 3 = chore, 4 = docs)
-	_, err = db.conn.Exec(`ALTER TABLE tasks ADD COLUMN task_type INTEGER NOT NULL DEFAULT 0`)
 	// Ignore error if column already exists
 	_ = err
 
@@ -243,14 +237,14 @@ func (db *DB) GetAllConfig() (map[string]string, error) {
 	return config, rows.Err()
 }
 
-func (db *DB) CreateTask(id, title, description string, status, taskType, priority int, link string) error {
-	query := `INSERT INTO tasks (id, title, description, status, task_type, priority, link) VALUES (?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(query, id, title, description, status, taskType, priority, link)
+func (db *DB) CreateTask(id, title, description string, status, priority int, link string) error {
+	query := `INSERT INTO tasks (id, title, description, status, priority, link) VALUES (?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(query, id, title, description, status, priority, link)
 	return err
 }
 
 func (db *DB) GetAllTasks() ([]TaskRecord, error) {
-	query := `SELECT id, title, description, status, task_type, priority, COALESCE(link, '') FROM tasks ORDER BY priority DESC, title`
+	query := `SELECT id, title, description, status, priority, COALESCE(link, '') FROM tasks ORDER BY priority DESC, title`
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
@@ -260,7 +254,7 @@ func (db *DB) GetAllTasks() ([]TaskRecord, error) {
 	var tasks []TaskRecord
 	for rows.Next() {
 		var task TaskRecord
-		err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.TaskType, &task.Priority, &task.Link)
+		err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.Priority, &task.Link)
 		if err != nil {
 			return nil, err
 		}
@@ -270,9 +264,9 @@ func (db *DB) GetAllTasks() ([]TaskRecord, error) {
 	return tasks, rows.Err()
 }
 
-func (db *DB) UpdateTask(id, title, description string, status, taskType, priority int, link string) error {
-	query := `UPDATE tasks SET title = ?, description = ?, status = ?, task_type = ?, priority = ?, link = ? WHERE id = ?`
-	_, err := db.conn.Exec(query, title, description, status, taskType, priority, link, id)
+func (db *DB) UpdateTask(id, title, description string, status, priority int, link string) error {
+	query := `UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, link = ? WHERE id = ?`
+	_, err := db.conn.Exec(query, title, description, status, priority, link, id)
 	return err
 }
 
@@ -283,11 +277,11 @@ func (db *DB) DeleteTask(id string) error {
 }
 
 func (db *DB) GetTaskByID(id string) (*TaskRecord, error) {
-	query := `SELECT id, title, description, status, task_type, priority, COALESCE(link, '') FROM tasks WHERE id = ?`
+	query := `SELECT id, title, description, status, priority, COALESCE(link, '') FROM tasks WHERE id = ?`
 	row := db.conn.QueryRow(query, id)
 
 	var task TaskRecord
-	err := row.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.TaskType, &task.Priority, &task.Link)
+	err := row.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.Priority, &task.Link)
 	if err != nil {
 		return nil, err
 	}
@@ -445,6 +439,26 @@ func (db *DB) RemoveAllLabels(taskID string) error {
 	query := `DELETE FROM task_labels WHERE task_id = ?`
 	_, err := db.conn.Exec(query, taskID)
 	return err
+}
+
+// SetLabel atomically replaces all labels for a task with a single label.
+// Pass an empty string to clear all labels.
+func (db *DB) SetLabel(taskID, label string) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM task_labels WHERE task_id = ?`, taskID); err != nil {
+		return err
+	}
+	if label != "" {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO task_labels (task_id, label) VALUES (?, ?)`, taskID, label); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // CreateLog inserts a log entry and syncs it to the FTS5 index

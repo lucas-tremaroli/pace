@@ -51,7 +51,7 @@ func (s *Service) CreateTask(task Task) error {
 		return err
 	}
 
-	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), int(task.Type()), task.Priority(), task.Link())
+	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority(), task.Link())
 }
 
 // UpdateTask updates an existing task in the database
@@ -60,7 +60,7 @@ func (s *Service) UpdateTask(task Task) error {
 		return err
 	}
 
-	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), int(task.Type()), task.Priority(), task.Link())
+	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority(), task.Link())
 }
 
 // DeleteTask removes a task from the database and cleans up dependencies, labels, and logs
@@ -111,7 +111,7 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 
 	var tasks []Task
 	for _, record := range taskRecords {
-		task := NewTaskComplete(record.ID, Status(record.Status), TaskType(record.TaskType), record.Title, record.Description, record.Priority, record.Link)
+		task := NewTaskComplete(record.ID, Status(record.Status), record.Title, record.Description, record.Priority, record.Link)
 		task.SetBlockedBy(blockedByMap[record.ID])
 		task.SetBlocks(blocksMap[record.ID])
 		task.SetLabels(labelsMap[record.ID])
@@ -129,7 +129,7 @@ func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 		return nil, err
 	}
 
-	task := NewTaskComplete(record.ID, Status(record.Status), TaskType(record.TaskType), record.Title, record.Description, record.Priority, record.Link)
+	task := NewTaskComplete(record.ID, Status(record.Status), record.Title, record.Description, record.Priority, record.Link)
 
 	// Load dependencies for this task
 	blockedBy, err := s.db.GetBlockers(taskID)
@@ -177,18 +177,14 @@ func (s *Service) RemoveDependency(blockerID, blockedID string) error {
 	return s.db.RemoveDependency(blockerID, blockedID)
 }
 
-// AddLabel adds a label to a task
-func (s *Service) AddLabel(taskID, label string) error {
+// SetLabel sets the label for a task, replacing any existing label.
+// Pass an empty string to clear the label.
+func (s *Service) SetLabel(taskID, label string) error {
 	// Verify task exists
 	if _, err := s.db.GetTaskByID(taskID); err != nil {
 		return err
 	}
-	return s.db.AddLabel(taskID, label)
-}
-
-// RemoveLabel removes a label from a task
-func (s *Service) RemoveLabel(taskID, label string) error {
-	return s.db.RemoveLabel(taskID, label)
+	return s.db.SetLabel(taskID, label)
 }
 
 // LinkNote links a note to a task
@@ -261,7 +257,7 @@ func (s *Service) CloseTask(taskID, outcome string) error {
 		return err
 	}
 
-	if err := s.db.UpdateTask(existing.ID, existing.Title, existing.Description, int(Done), existing.TaskType, existing.Priority, existing.Link); err != nil {
+	if err := s.db.UpdateTask(existing.ID, existing.Title, existing.Description, int(Done), existing.Priority, existing.Link); err != nil {
 		return err
 	}
 
