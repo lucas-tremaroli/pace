@@ -63,7 +63,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Bold(true).Underline(hasLink)
 	blockedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Underline(hasLink)
 	indicatorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 
 	isSelected := index == m.Index()
 	isCursor := isSelected
