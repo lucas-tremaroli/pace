@@ -31,20 +31,20 @@ type TaskJSON struct {
 	Priority    int      `json:"priority"`
 	BlockedBy   []string `json:"blocked_by,omitempty"`
 	Blocks      []string `json:"blocks,omitempty"`
-	Labels      []string `json:"labels,omitempty"`
+	Label       string   `json:"label,omitempty"`
 	Notes       []string `json:"notes,omitempty"`
 	Link        string   `json:"link,omitempty"`
 }
 
 // TaskInput is used for parsing bulk task creation input
 type TaskInput struct {
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Status      string   `json:"status"`
-	Type        string   `json:"type"`
-	Priority    int      `json:"priority"`
-	Labels      []string `json:"labels"`
-	Link        string   `json:"link"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	Type        string `json:"type"`
+	Priority    int    `json:"priority"`
+	Label       string `json:"label"`
+	Link        string `json:"link"`
 }
 
 // NewTask creates a new task with the given ID
@@ -165,34 +165,31 @@ func (t *Task) RemoveBlocks(id string) {
 	}
 }
 
-// Labels returns the task's labels
+// Label returns the task's label (empty string if none)
+func (t Task) Label() string {
+	if len(t.labels) > 0 {
+		return t.labels[0]
+	}
+	return ""
+}
+
+// Labels returns the task's labels (for internal/storage compatibility)
 func (t Task) Labels() []string {
 	return t.labels
 }
 
-// SetLabels sets the task's labels
+// SetLabel sets the task's label (replaces any existing label)
+func (t *Task) SetLabel(label string) {
+	if label == "" {
+		t.labels = nil
+	} else {
+		t.labels = []string{label}
+	}
+}
+
+// SetLabels sets the task's labels (used by storage layer loading)
 func (t *Task) SetLabels(labels []string) {
 	t.labels = labels
-}
-
-// AddLabel adds a label to the task
-func (t *Task) AddLabel(label string) {
-	for _, existing := range t.labels {
-		if existing == label {
-			return // Already exists
-		}
-	}
-	t.labels = append(t.labels, label)
-}
-
-// RemoveLabel removes a label from the task
-func (t *Task) RemoveLabel(label string) {
-	for i, existing := range t.labels {
-		if existing == label {
-			t.labels = append(t.labels[:i], t.labels[i+1:]...)
-			return
-		}
-	}
 }
 
 // Notes returns the task's linked note filenames
@@ -207,12 +204,7 @@ func (t *Task) SetNotes(notes []string) {
 
 // HasLabel returns true if the task has the given label
 func (t Task) HasLabel(label string) bool {
-	for _, l := range t.labels {
-		if l == label {
-			return true
-		}
-	}
-	return false
+	return t.Label() == label
 }
 
 // IsBlocked returns true if this task has any unresolved blockers
@@ -231,7 +223,7 @@ func (t Task) ToJSON() TaskJSON {
 		Priority:    t.priority,
 		BlockedBy:   t.blockedBy,
 		Blocks:      t.blocks,
-		Labels:      t.labels,
+		Label:       t.Label(),
 		Notes:       t.notes,
 		Link:        t.link,
 	}

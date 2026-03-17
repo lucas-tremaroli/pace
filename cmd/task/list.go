@@ -36,7 +36,7 @@ var (
 	listPretty         bool
 	listFilterStatus   string
 	listFilterPriority []string
-	listFilterLabel    []string
+	listFilterLabel    string
 	listFields         string
 	listHead           int
 )
@@ -64,7 +64,10 @@ var listCmd = &cobra.Command{
 		}
 
 		// Build and apply filter
-		filter := task.TaskFilter{AnyLabels: listFilterLabel}
+		filter := task.TaskFilter{}
+		if listFilterLabel != "" {
+			filter.Label = &listFilterLabel
+		}
 		if listFilterStatus != "" {
 			status, err := task.ParseStatus(listFilterStatus)
 			if err != nil {
@@ -133,8 +136,8 @@ func init() {
 	listCmd.Flags().BoolVar(&listPretty, "pretty", false, "Human-readable formatted output")
 	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (todo, in-progress, done)")
 	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (1-4, repeatable)")
-	listCmd.Flags().StringArrayVar(&listFilterLabel, "label", nil, "Filter by label (repeatable)")
-	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, notes, link")
+	listCmd.Flags().StringVar(&listFilterLabel, "label", "", "Filter by label")
+	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, type, priority, blocked_by, blocks, label, notes, link")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")
 }
 
@@ -217,8 +220,8 @@ func formatTaskPretty(t task.Task) string {
 	// Title
 	parts = append(parts, titleStyle.Render(t.Title()))
 
-	// Labels
-	for _, label := range t.Labels() {
+	// Label
+	if label := t.Label(); label != "" {
 		parts = append(parts, labelStyle.Render(fmt.Sprintf("[%s]", label)))
 	}
 

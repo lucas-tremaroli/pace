@@ -126,8 +126,8 @@ func TestParseFilter_Label(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseFilter(label=sprint-1) unexpected error: %v", err)
 	}
-	if len(f.Labels) != 1 || f.Labels[0] != "sprint-1" {
-		t.Errorf("ParseFilter(label=sprint-1) Labels = %v, want [sprint-1]", f.Labels)
+	if f.Label == nil || *f.Label != "sprint-1" {
+		t.Errorf("ParseFilter(label=sprint-1) Label = %v, want sprint-1", f.Label)
 	}
 }
 
@@ -154,11 +154,10 @@ func TestParseFilter_InvalidFormat(t *testing.T) {
 func TestTaskFilter_Matches(t *testing.T) {
 	// Create test tasks
 	todoTask := NewTaskComplete("t1", Todo, TypeFeature, "Todo Feature", "", 1, "")
-	todoTask.AddLabel("sprint-1")
-	todoTask.AddLabel("urgent")
+	todoTask.SetLabel("sprint-1")
 
 	doneTask := NewTaskComplete("t2", Done, TypeBug, "Done Bug", "", 2, "")
-	doneTask.AddLabel("sprint-1")
+	doneTask.SetLabel("sprint-1")
 
 	tests := []struct {
 		name   string
@@ -203,26 +202,14 @@ func TestTaskFilter_Matches(t *testing.T) {
 			want:   false,
 		},
 		{
-			name:   "single label match",
-			filter: &TaskFilter{Labels: []string{"sprint-1"}},
+			name:   "label match",
+			filter: &TaskFilter{Label: ptrStr("sprint-1")},
 			task:   todoTask,
 			want:   true,
 		},
 		{
-			name:   "single label no match",
-			filter: &TaskFilter{Labels: []string{"sprint-2"}},
-			task:   todoTask,
-			want:   false,
-		},
-		{
-			name:   "multiple labels match (AND)",
-			filter: &TaskFilter{Labels: []string{"sprint-1", "urgent"}},
-			task:   todoTask,
-			want:   true,
-		},
-		{
-			name:   "multiple labels partial match (AND fails)",
-			filter: &TaskFilter{Labels: []string{"sprint-1", "not-present"}},
+			name:   "label no match",
+			filter: &TaskFilter{Label: ptrStr("sprint-2")},
 			task:   todoTask,
 			want:   false,
 		},
@@ -260,10 +247,9 @@ func TestMergeFilters_Success(t *testing.T) {
 	statusFilter, _ := ParseFilter("status=todo")
 	typeFilter, _ := ParseFilter("type=bug")
 	priorityFilter, _ := ParseFilter("priority=1")
-	labelFilter1, _ := ParseFilter("label=sprint-1")
-	labelFilter2, _ := ParseFilter("label=urgent")
+	labelFilter, _ := ParseFilter("label=sprint-1")
 
-	merged, err := MergeFilters([]*TaskFilter{statusFilter, typeFilter, priorityFilter, labelFilter1, labelFilter2})
+	merged, err := MergeFilters([]*TaskFilter{statusFilter, typeFilter, priorityFilter, labelFilter})
 	if err != nil {
 		t.Fatalf("MergeFilters() unexpected error: %v", err)
 	}
@@ -277,8 +263,8 @@ func TestMergeFilters_Success(t *testing.T) {
 	if merged.Priority == nil || *merged.Priority != 1 {
 		t.Errorf("MergeFilters() Priority = %v, want 1", merged.Priority)
 	}
-	if len(merged.Labels) != 2 {
-		t.Errorf("MergeFilters() Labels = %v, want 2 labels", merged.Labels)
+	if merged.Label == nil || *merged.Label != "sprint-1" {
+		t.Errorf("MergeFilters() Label = %v, want sprint-1", merged.Label)
 	}
 }
 
@@ -312,25 +298,13 @@ func TestMergeFilters_DuplicatePriority(t *testing.T) {
 	}
 }
 
-func TestMergeFilters_MultipleLabelsAllowed(t *testing.T) {
+func TestMergeFilters_DuplicateLabel(t *testing.T) {
 	filter1, _ := ParseFilter("label=sprint-1")
 	filter2, _ := ParseFilter("label=urgent")
-	filter3, _ := ParseFilter("label=backend")
 
-	merged, err := MergeFilters([]*TaskFilter{filter1, filter2, filter3})
-	if err != nil {
-		t.Fatalf("MergeFilters() unexpected error: %v", err)
-	}
-
-	if len(merged.Labels) != 3 {
-		t.Errorf("MergeFilters() Labels count = %d, want 3", len(merged.Labels))
-	}
-
-	expectedLabels := map[string]bool{"sprint-1": true, "urgent": true, "backend": true}
-	for _, label := range merged.Labels {
-		if !expectedLabels[label] {
-			t.Errorf("MergeFilters() unexpected label: %s", label)
-		}
+	_, err := MergeFilters([]*TaskFilter{filter1, filter2})
+	if err == nil {
+		t.Error("MergeFilters() expected error for duplicate label, got nil")
 	}
 }
 
@@ -363,32 +337,29 @@ func TestTaskFilter_Matches_Priorities(t *testing.T) {
 	}
 }
 
-func TestTaskFilter_Matches_AnyLabels(t *testing.T) {
+func TestTaskFilter_Matches_Label(t *testing.T) {
 	task1 := NewTaskComplete("t1", Todo, TypeTask, "Task 1", "", 1, "")
-	task1.AddLabel("backend")
-	task1.AddLabel("sprint-1")
+	task1.SetLabel("backend")
 
 	task2 := NewTaskComplete("t2", Todo, TypeTask, "Task 2", "", 1, "")
-	task2.AddLabel("frontend")
+	task2.SetLabel("frontend")
 
 	task3 := NewTaskComplete("t3", Todo, TypeTask, "Task 3", "", 1, "")
 
 	tests := []struct {
-		name      string
-		anyLabels []string
-		task      Task
-		want      bool
+		name  string
+		label string
+		task  Task
+		want  bool
 	}{
-		{"matches first label", []string{"backend", "frontend"}, task1, true},
-		{"matches second label", []string{"backend", "frontend"}, task2, true},
-		{"no label match", []string{"backend", "frontend"}, task3, false},
-		{"empty anyLabels matches all", []string{}, task3, true},
-		{"single match", []string{"sprint-1"}, task1, true},
+		{"matches label", "backend", task1, true},
+		{"no match", "backend", task2, false},
+		{"no label on task", "backend", task3, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := &TaskFilter{AnyLabels: tt.anyLabels}
+			f := &TaskFilter{Label: &tt.label}
 			got := f.Matches(tt.task)
 			if got != tt.want {
 				t.Errorf("Matches() = %v, want %v", got, tt.want)
@@ -455,4 +426,8 @@ func ptrType(t TaskType) *TaskType {
 
 func ptrInt(i int) *int {
 	return &i
+}
+
+func ptrStr(s string) *string {
+	return &s
 }

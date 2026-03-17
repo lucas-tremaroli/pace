@@ -177,18 +177,21 @@ func (s *Service) RemoveDependency(blockerID, blockedID string) error {
 	return s.db.RemoveDependency(blockerID, blockedID)
 }
 
-// AddLabel adds a label to a task
-func (s *Service) AddLabel(taskID, label string) error {
+// SetLabel sets the label for a task, replacing any existing label.
+// Pass an empty string to clear the label.
+func (s *Service) SetLabel(taskID, label string) error {
 	// Verify task exists
 	if _, err := s.db.GetTaskByID(taskID); err != nil {
 		return err
 	}
-	return s.db.AddLabel(taskID, label)
-}
-
-// RemoveLabel removes a label from a task
-func (s *Service) RemoveLabel(taskID, label string) error {
-	return s.db.RemoveLabel(taskID, label)
+	// Remove existing labels first
+	if err := s.db.RemoveAllLabels(taskID); err != nil {
+		return err
+	}
+	if label != "" {
+		return s.db.AddLabel(taskID, label)
+	}
+	return nil
 }
 
 // LinkNote links a note to a task

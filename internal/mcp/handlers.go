@@ -246,12 +246,8 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 			filter.Priorities = append(filter.Priorities, priority)
 		}
 	}
-	if labels, ok := args["label"].([]any); ok {
-		for _, l := range labels {
-			if s, ok := l.(string); ok && s != "" {
-				filter.AnyLabels = append(filter.AnyLabels, s)
-			}
-		}
+	if label, ok := args["label"].(string); ok && label != "" {
+		filter.Label = &label
 	}
 	tasks = filter.Apply(tasks)
 
@@ -348,16 +344,10 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 		return errorResult(fmt.Sprintf("failed to create task: %v", err))
 	}
 
-	// Add labels if provided
-	if labelsRaw, ok := args["labels"]; ok {
-		if labels, ok := labelsRaw.([]any); ok {
-			for _, l := range labels {
-				if label, ok := l.(string); ok && label != "" {
-					if err := h.taskService.AddLabel(id, label); err != nil {
-						return errorResult(fmt.Sprintf("task %s created but failed to add label %q: %v", id, label, err))
-					}
-				}
-			}
+	// Set label if provided
+	if label, ok := args["label"].(string); ok && label != "" {
+		if err := h.taskService.SetLabel(id, label); err != nil {
+			return errorResult(fmt.Sprintf("task %s created but failed to set label %q: %v", id, label, err))
 		}
 	}
 
@@ -436,6 +426,13 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	updatedTask := task.NewTaskComplete(id, status, taskType, title, description, priority, link)
 	if err := h.taskService.UpdateTask(updatedTask); err != nil {
 		return errorResult(fmt.Sprintf("failed to update task: %v", err))
+	}
+
+	// Set label if provided
+	if label, ok := args["label"].(string); ok {
+		if err := h.taskService.SetLabel(id, label); err != nil {
+			return errorResult(fmt.Sprintf("task updated but failed to set label: %v", err))
+		}
 	}
 
 	// Reload task to get full data

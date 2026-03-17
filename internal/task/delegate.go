@@ -43,13 +43,10 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	// Build the title with dependency indicators
 	title := task.title
 
-	// Add label indicator (first label only, with +N for extras)
+	// Add label indicator
 	var labelStr string
-	if len(task.labels) > 0 {
-		labelStr = fmt.Sprintf(" [%s]", task.labels[0])
-		if len(task.labels) > 1 {
-			labelStr += fmt.Sprintf(" +%d", len(task.labels)-1)
-		}
+	if task.Label() != "" {
+		labelStr = fmt.Sprintf(" [%s]", task.Label())
 	}
 
 	// Add dependency indicators

@@ -10,10 +10,9 @@ import (
 type TaskFilter struct {
 	Status     *Status
 	Type       *TaskType
-	Priority   *int     // Single priority, AND semantics (used by bulk ops)
-	Priorities []int    // Multiple priorities, OR semantics (used by list)
-	Labels     []string // Multiple labels, AND semantics (task must have all, used by bulk ops)
-	AnyLabels  []string // Multiple labels, OR semantics (task must have at least one, used by list)
+	Priority   *int   // Single priority, AND semantics (used by bulk ops)
+	Priorities []int  // Multiple priorities, OR semantics (used by list)
+	Label      *string // Filter by label
 }
 
 // ParseFilter parses a filter string in the format "key=value"
@@ -51,7 +50,7 @@ func ParseFilter(s string) (*TaskFilter, error) {
 		}
 		filter.Priority = &priority
 	case "label":
-		filter.Labels = []string{value}
+		filter.Label = &value
 	default:
 		return nil, fmt.Errorf("unknown filter key: %s (valid: status, type, priority, label)", key)
 	}
@@ -82,24 +81,8 @@ func (f *TaskFilter) Matches(t Task) bool {
 			return false
 		}
 	}
-	// All specified labels must be present (AND semantics)
-	for _, label := range f.Labels {
-		if !t.HasLabel(label) {
-			return false
-		}
-	}
-	// At least one label must be present (OR semantics)
-	if len(f.AnyLabels) > 0 {
-		found := false
-		for _, label := range f.AnyLabels {
-			if t.HasLabel(label) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
+	if f.Label != nil && t.Label() != *f.Label {
+		return false
 	}
 	return true
 }
@@ -119,8 +102,7 @@ func (f *TaskFilter) Apply(tasks []Task) []Task {
 }
 
 // MergeFilters combines multiple filters into one that requires all conditions.
-// Returns an error if duplicate status, type, or priority filters are specified.
-// Multiple label filters are allowed and use AND semantics (task must have all labels).
+// Returns an error if duplicate status, type, priority, or label filters are specified.
 func MergeFilters(filters []*TaskFilter) (*TaskFilter, error) {
 	merged := &TaskFilter{}
 	for _, f := range filters {
@@ -142,8 +124,12 @@ func MergeFilters(filters []*TaskFilter) (*TaskFilter, error) {
 			}
 			merged.Priority = f.Priority
 		}
-		// Labels can be specified multiple times (AND semantics)
-		merged.Labels = append(merged.Labels, f.Labels...)
+		if f.Label != nil {
+			if merged.Label != nil {
+				return nil, fmt.Errorf("duplicate filter: label specified multiple times")
+			}
+			merged.Label = f.Label
+		}
 	}
 	return merged, nil
 }

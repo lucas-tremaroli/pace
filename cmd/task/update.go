@@ -16,8 +16,8 @@ var (
 	updateStatus       string
 	updateType         string
 	updatePriority     int
-	updateAddLabels    []string
-	updateRemoveLabels []string
+	updateLabel       string
+	updateRemoveLabel bool
 	updateLink         string
 	updateFilters      []string
 	updateDryRun       bool
@@ -108,16 +108,13 @@ For batch updates, use --filter with update flags:
 			output.Error(err)
 		}
 
-		// Add labels if specified
-		for _, label := range updateAddLabels {
-			if err := svc.AddLabel(taskID, label); err != nil {
+		// Set or remove label if specified
+		if cmd.Flags().Changed("label") {
+			if err := svc.SetLabel(taskID, updateLabel); err != nil {
 				output.Error(err)
 			}
-		}
-
-		// Remove labels if specified
-		for _, label := range updateRemoveLabels {
-			if err := svc.RemoveLabel(taskID, label); err != nil {
+		} else if updateRemoveLabel {
+			if err := svc.SetLabel(taskID, ""); err != nil {
 				output.Error(err)
 			}
 		}
@@ -178,7 +175,7 @@ func handleBatchUpdate(cmd *cobra.Command) error {
 
 	// Validate we have something to update
 	if batchStatus == nil && batchType == nil && batchPriority == nil &&
-		len(updateAddLabels) == 0 && len(updateRemoveLabels) == 0 {
+		!cmd.Flags().Changed("label") && !updateRemoveLabel {
 		output.ErrorMsgWithCode("no updates specified (use --status, --type, --priority, --label, or --remove-label)", output.ErrCodeInvalidParams, "")
 	}
 
@@ -225,11 +222,11 @@ func handleBatchUpdate(cmd *cobra.Command) error {
 			if batchPriority != nil {
 				changes["priority"] = fmt.Sprintf("%d -> %d", t.Priority(), *batchPriority)
 			}
-			if len(updateAddLabels) > 0 {
-				changes["add_labels"] = updateAddLabels
+			if cmd.Flags().Changed("label") {
+				changes["label"] = updateLabel
 			}
-			if len(updateRemoveLabels) > 0 {
-				changes["remove_labels"] = updateRemoveLabels
+			if updateRemoveLabel {
+				changes["remove_label"] = true
 			}
 			preview = append(preview, changes)
 		}
@@ -275,17 +272,14 @@ func handleBatchUpdate(cmd *cobra.Command) error {
 		// Track warnings for non-fatal label errors
 		var warnings []string
 
-		// Add labels
-		for _, label := range updateAddLabels {
-			if err := svc.AddLabel(t.ID(), label); err != nil {
-				warnings = append(warnings, "add label '"+label+"': "+err.Error())
+		// Set or remove label
+		if cmd.Flags().Changed("label") {
+			if err := svc.SetLabel(t.ID(), updateLabel); err != nil {
+				warnings = append(warnings, "set label '"+updateLabel+"': "+err.Error())
 			}
-		}
-
-		// Remove labels
-		for _, label := range updateRemoveLabels {
-			if err := svc.RemoveLabel(t.ID(), label); err != nil {
-				warnings = append(warnings, "remove label '"+label+"': "+err.Error())
+		} else if updateRemoveLabel {
+			if err := svc.SetLabel(t.ID(), ""); err != nil {
+				warnings = append(warnings, "remove label: "+err.Error())
 			}
 		}
 
@@ -306,8 +300,8 @@ func init() {
 	updateCmd.Flags().StringVar(&updateStatus, "status", "", "Task status (todo, in-progress, done)")
 	updateCmd.Flags().StringVar(&updateType, "type", "", "Task type (task, bug, feature, chore, docs)")
 	updateCmd.Flags().IntVar(&updatePriority, "priority", 0, "Task priority (0=none, 1=urgent, 2=high, 3=normal, 4=low)")
-	updateCmd.Flags().StringSliceVar(&updateAddLabels, "label", nil, "Add labels (can be specified multiple times)")
-	updateCmd.Flags().StringSliceVar(&updateRemoveLabels, "remove-label", nil, "Remove labels (can be specified multiple times)")
+	updateCmd.Flags().StringVar(&updateLabel, "label", "", "Set task label (replaces existing)")
+	updateCmd.Flags().BoolVar(&updateRemoveLabel, "remove-label", false, "Remove the task's label")
 	updateCmd.Flags().StringVar(&updateLink, "url", "", "URL associated with the task (e.g., google.com)")
 	updateCmd.Flags().StringArrayVar(&updateFilters, "filter", nil, "Filter tasks to update (status=X, type=X, priority=X, label=X)")
 	updateCmd.Flags().BoolVar(&updateDryRun, "dry-run", false, "Preview changes without applying them")
