@@ -38,7 +38,7 @@ func GetToolDefinitions() []Tool {
 					},
 					"fields": {
 						Type:        "array",
-						Description: "Limit response to specific fields. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, link",
+						Description: "Limit response to specific fields. Available: id, title, description, status, type, priority, blocked_by, blocks, labels, notes, link",
 						Items: &Property{
 							Type: "string",
 						},
@@ -209,6 +209,42 @@ func GetToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "pace_task_note_link",
+			Description: "Link a note to a task",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"task_id": {
+						Type:        "string",
+						Description: "Task ID to link the note to",
+					},
+					"note_filename": {
+						Type:        "string",
+						Description: "Note filename (with or without .md extension)",
+					},
+				},
+				Required: []string{"task_id", "note_filename"},
+			},
+		},
+		{
+			Name:        "pace_task_note_unlink",
+			Description: "Unlink a note from a task",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"task_id": {
+						Type:        "string",
+						Description: "Task ID to unlink the note from",
+					},
+					"note_filename": {
+						Type:        "string",
+						Description: "Note filename (with or without .md extension)",
+					},
+				},
+				Required: []string{"task_id", "note_filename"},
+			},
+		},
+		{
 			Name:        "pace_note_list",
 			Description: "List all notes with their filenames, descriptions, and labels",
 			InputSchema: ToolInputSchema{
@@ -241,6 +277,13 @@ func GetToolDefinitions() []Tool {
 					"content": {
 						Type:        "string",
 						Description: "Note content in markdown format (required)",
+					},
+					"task_ids": {
+						Type:        "array",
+						Description: "Task IDs to link to this note",
+						Items: &Property{
+							Type: "string",
+						},
 					},
 				},
 				Required: []string{"filename", "content"},

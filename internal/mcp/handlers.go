@@ -124,6 +124,10 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 		return h.toolTaskDepAdd(args)
 	case "pace_task_dep_remove":
 		return h.toolTaskDepRemove(args)
+	case "pace_task_note_link":
+		return h.toolTaskNoteLink(args)
+	case "pace_task_note_unlink":
+		return h.toolTaskNoteUnlink(args)
 	case "pace_note_list":
 		return h.toolNoteList(args)
 	case "pace_note_create":
@@ -522,6 +526,61 @@ func (h *Handler) toolTaskDepRemove(args map[string]any) ToolCallResult {
 	})
 }
 
+func (h *Handler) toolTaskNoteLink(args map[string]any) ToolCallResult {
+	taskID, ok := args["task_id"].(string)
+	if !ok || taskID == "" {
+		return codedError(output.ErrCodeMissingField, "task_id is required", "Provide the task ID to link the note to")
+	}
+
+	noteFilename, ok := args["note_filename"].(string)
+	if !ok || noteFilename == "" {
+		return codedError(output.ErrCodeMissingField, "note_filename is required", "Provide the note filename")
+	}
+
+	// Normalize filename to include .md extension
+	if !strings.HasSuffix(noteFilename, ".md") {
+		noteFilename += ".md"
+	}
+
+	if err := h.taskService.LinkNote(taskID, noteFilename); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", taskID), "Use pace_task_list to see available task IDs")
+		}
+		return errorResult(fmt.Sprintf("failed to link note: %v", err))
+	}
+
+	return jsonResult(map[string]any{
+		"success": true,
+		"message": fmt.Sprintf("linked %s to task %s", noteFilename, taskID),
+	})
+}
+
+func (h *Handler) toolTaskNoteUnlink(args map[string]any) ToolCallResult {
+	taskID, ok := args["task_id"].(string)
+	if !ok || taskID == "" {
+		return codedError(output.ErrCodeMissingField, "task_id is required", "Provide the task ID to unlink the note from")
+	}
+
+	noteFilename, ok := args["note_filename"].(string)
+	if !ok || noteFilename == "" {
+		return codedError(output.ErrCodeMissingField, "note_filename is required", "Provide the note filename")
+	}
+
+	// Normalize filename to include .md extension
+	if !strings.HasSuffix(noteFilename, ".md") {
+		noteFilename += ".md"
+	}
+
+	if err := h.taskService.UnlinkNote(taskID, noteFilename); err != nil {
+		return errorResult(fmt.Sprintf("failed to unlink note: %v", err))
+	}
+
+	return jsonResult(map[string]any{
+		"success": true,
+		"message": fmt.Sprintf("unlinked %s from task %s", noteFilename, taskID),
+	})
+}
+
 func (h *Handler) toolNoteList(args map[string]any) ToolCallResult {
 	notes, err := h.noteService.ListNotesWithMeta(false)
 	if err != nil {
@@ -576,6 +635,19 @@ func (h *Handler) toolNoteCreate(args map[string]any) ToolCallResult {
 		displayName += ".md"
 	}
 
+	// Link to tasks if task_ids provided
+	if taskIDsRaw, ok := args["task_ids"]; ok {
+		if taskIDs, ok := taskIDsRaw.([]any); ok {
+			for _, tid := range taskIDs {
+				if id, ok := tid.(string); ok && id != "" {
+					if err := h.taskService.LinkNote(id, displayName); err != nil {
+						return errorResult(fmt.Sprintf("note %s created but failed to link to task %s: %v", displayName, id, err))
+					}
+				}
+			}
+		}
+	}
+
 	return jsonResult(map[string]any{
 		"success":  true,
 		"message":  fmt.Sprintf("created note %s", displayName),
@@ -600,13 +672,17 @@ func (h *Handler) toolNoteRead(args map[string]any) ToolCallResult {
 		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to read note: %v", err), "")
 	}
 
-	return jsonResult(map[string]any{
+	result := map[string]any{
 		"filename":    noteData.Filename,
 		"content":     noteData.Content,
 		"description": noteData.Description,
 		"labels":      noteData.Labels,
-		"modTime":    noteData.ModTime,
-	})
+		"modTime":     noteData.ModTime,
+	}
+	if len(noteData.Tasks) > 0 {
+		result["tasks"] = noteData.Tasks
+	}
+	return jsonResult(result)
 }
 
 func (h *Handler) toolNoteDelete(args map[string]any) ToolCallResult {

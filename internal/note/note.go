@@ -13,6 +13,7 @@ type Note struct {
 	Description string    `json:"description"`
 	ModTime     time.Time `json:"modTime"`
 	Labels      []string  `json:"labels,omitempty"`
+	Tasks       []string  `json:"tasks,omitempty"`
 }
 
 // Frontmatter represents YAML frontmatter in a note
