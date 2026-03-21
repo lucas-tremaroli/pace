@@ -66,13 +66,8 @@ type Tui struct {
 	lastKey     string
 }
 
-func newList(title string, items []list.Item) list.Model {
-	d := list.NewDefaultDelegate()
-	d.SetHeight(1)
-	d.ShowDescription = false
-	d.SetSpacing(0)
-
-	l := list.New(items, d, 0, 0)
+func newList(title string, items []list.Item, delegate list.ItemDelegate) list.Model {
+	l := list.New(items, delegate, 0, 0)
 	l.Title = title
 	l.Styles.Title = listTitleStyle
 	l.Styles.TitleBar = listTitleBarStyle
@@ -82,6 +77,7 @@ func newList(title string, items []list.Item) list.Model {
 	l.DisableQuitKeybindings()
 	return l
 }
+
 
 func NewTui() (*Tui, error) {
 	taskService, err := task.NewService()
@@ -140,9 +136,12 @@ func NewTui() (*Tui, error) {
 		noteItems[i] = NoteItem{Note: n}
 	}
 
+	noteList := newList("Notes", noteItems, noteDelegate{})
+	noteList.SetFilteringEnabled(false) // only focused list gets filtering
+
 	return &Tui{
-		taskList:    newList("Tasks", taskItems),
-		noteList:    newList("Notes", noteItems),
+		taskList:    newList("Tasks", taskItems, taskDelegate{}),
+		noteList:    noteList,
 		viewport:    viewport.New(0, 0),
 		help:        help.New(),
 		taskService: taskService,
@@ -158,6 +157,14 @@ func (t *Tui) Init() tea.Cmd {
 func (t *Tui) isFiltering() bool {
 	return t.taskList.FilterState() == list.Filtering ||
 		t.noteList.FilterState() == list.Filtering
+}
+
+// syncFilterEnabled enables filtering only on the focused list and disables
+// it on the other, preventing both lists from entering filter mode and
+// conflicting with each other.
+func (t *Tui) syncFilterEnabled() {
+	t.taskList.SetFilteringEnabled(t.focus == focusTasks)
+	t.noteList.SetFilteringEnabled(t.focus == focusNotes)
 }
 
 func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -182,9 +189,28 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t, tea.Quit
 
 		case key.Matches(msg, tuiKeys.Tab):
-			t.focus = (t.focus + 1) % 3
+			if t.focus == focusTasks {
+				t.focus = focusNotes
+			} else {
+				t.focus = focusTasks
+			}
+			t.syncFilterEnabled()
 			t.refreshDetail()
 			return t, nil
+
+		case key.Matches(msg, tuiKeys.Right):
+			if t.focus != focusDetail {
+				t.focus = focusDetail
+				return t, nil
+			}
+
+		case key.Matches(msg, tuiKeys.Left):
+			if t.focus == focusDetail {
+				t.focus = focusTasks
+				t.syncFilterEnabled()
+				t.refreshDetail()
+				return t, nil
+			}
 		}
 
 		switch t.focus {
@@ -220,7 +246,12 @@ func (t *Tui) updateFilteringList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else {
 		t.noteList, cmd = t.noteList.Update(msg)
 	}
-	t.refreshDetail()
+	// Only refresh detail when filtering completes, not on every keystroke.
+	// The isFiltering() check after Update sees the new state — if the user
+	// just pressed Enter/Esc, filtering has ended and we should update.
+	if !t.isFiltering() {
+		t.refreshDetail()
+	}
 	return t, cmd
 }
 

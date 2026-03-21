@@ -55,18 +55,36 @@ func RenderMarkdown(content string) string {
 	return RenderMarkdownWithWidth(content, 100)
 }
 
-func RenderMarkdownWithWidth(content string, width int) string {
-	_, body, _ := ParseFrontmatter(content)
+var (
+	rendererCache      *glamour.TermRenderer
+	rendererCacheWidth int
+)
 
-	renderer, err := glamour.NewTermRenderer(
+func getRenderer(width int) *glamour.TermRenderer {
+	if rendererCache != nil && rendererCacheWidth == width {
+		return rendererCache
+	}
+	r, err := glamour.NewTermRenderer(
 		glamour.WithAutoStyle(),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
+		return nil
+	}
+	rendererCache = r
+	rendererCacheWidth = width
+	return r
+}
+
+func RenderMarkdownWithWidth(content string, width int) string {
+	_, body, _ := ParseFrontmatter(content)
+
+	r := getRenderer(width)
+	if r == nil {
 		return body
 	}
 
-	rendered, err := renderer.Render(body)
+	rendered, err := r.Render(body)
 	if err != nil {
 		return body
 	}

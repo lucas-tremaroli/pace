@@ -3,13 +3,15 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Tab      key.Binding
-	Quit     key.Binding
-	Filter   key.Binding
+	Tab    key.Binding
+	Left   key.Binding
+	Right  key.Binding
+	Quit   key.Binding
+	Filter key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Tab, k.Filter, k.Quit}
+	return []key.Binding{k.Tab, k.Left, k.Right, k.Filter, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
@@ -19,7 +21,15 @@ func (k keyMap) FullHelp() [][]key.Binding {
 var tuiKeys = keyMap{
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
-		key.WithHelp("tab", "switch panel"),
+		key.WithHelp("tab", "tasks/notes"),
+	),
+	Left: key.NewBinding(
+		key.WithKeys("left"),
+		key.WithHelp("←", "lists"),
+	),
+	Right: key.NewBinding(
+		key.WithKeys("right"),
+		key.WithHelp("→", "detail"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
