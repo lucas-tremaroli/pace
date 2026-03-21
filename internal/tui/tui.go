@@ -107,56 +107,11 @@ func NewTui() (*Tui, error) {
 		return nil, fmt.Errorf("failed to init note service: %w", err)
 	}
 
-	tasks, err := taskService.LoadAllTasks()
-	if err != nil {
-		taskService.Close()
-		noteService.Close()
-		return nil, fmt.Errorf("failed to load tasks: %w", err)
-	}
-
-	notes, err := noteService.ListNotesWithMeta(true)
-	if err != nil {
-		taskService.Close()
-		noteService.Close()
-		return nil, fmt.Errorf("failed to load notes: %w", err)
-	}
-
-	// Sort tasks: in-progress → todo → done, then by priority
-	sort.Slice(tasks, func(i, j int) bool {
-		order := func(s task.Status) int {
-			switch s {
-			case task.InProgress:
-				return 0
-			case task.Todo:
-				return 1
-			case task.Done:
-				return 2
-			default:
-				return 3
-			}
-		}
-		oi, oj := order(tasks[i].Status()), order(tasks[j].Status())
-		if oi != oj {
-			return oi < oj
-		}
-		return tasks[i].Priority() < tasks[j].Priority()
-	})
-
-	taskItems := make([]list.Item, len(tasks))
-	for i, t := range tasks {
-		taskItems[i] = TaskItem{Task: t}
-	}
-
-	noteItems := make([]list.Item, len(notes))
-	for i, n := range notes {
-		noteItems[i] = NoteItem{Note: n}
-	}
-
-	noteList := newList("Notes", noteItems, noteDelegate{})
-	noteList.SetFilteringEnabled(false) // only focused list gets filtering
+	noteList := newList("Notes", nil, noteDelegate{})
+	noteList.SetFilteringEnabled(false)
 
 	return &Tui{
-		taskList:    newList("Tasks", taskItems, taskDelegate{}),
+		taskList:    newList("Tasks", nil, taskDelegate{}),
 		noteList:    noteList,
 		viewport:    viewport.New(0, 0),
 		help:        help.New(),
@@ -167,7 +122,7 @@ func NewTui() (*Tui, error) {
 }
 
 func (t *Tui) Init() tea.Cmd {
-	return nil
+	return t.loadDataCmd()
 }
 
 func (t *Tui) isFiltering() bool {
@@ -219,7 +174,14 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			t.noteList.Select(len(msg.notes) - 1)
 		}
 		t.lastKey = ""
-		t.refreshDetail()
+		return t, t.refreshDetailCmd()
+
+	case detailRenderedMsg:
+		if msg.key != t.lastKey {
+			t.lastKey = msg.key
+			t.viewport.SetContent(msg.content)
+			t.viewport.GotoTop()
+		}
 		return t, nil
 
 	case tea.WindowSizeMsg:
@@ -228,9 +190,11 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.tooSmall = msg.Width < minWidth || msg.Height < minHeight
 		if !t.tooSmall {
 			t.recalcLayout()
-			t.refreshDetail()
 		}
 		t.loaded = true
+		if !t.tooSmall {
+			return t, t.refreshDetailCmd()
+		}
 		return t, nil
 
 	case tea.KeyMsg:
@@ -254,8 +218,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				t.focus = focusTasks
 			}
 			t.syncFilterEnabled()
-			t.refreshDetail()
-			return t, nil
+			return t, t.refreshDetailCmd()
 
 		case key.Matches(msg, tuiKeys.Right):
 			if t.focus != focusDetail {
@@ -267,8 +230,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if t.focus == focusDetail {
 				t.focus = focusTasks
 				t.syncFilterEnabled()
-				t.refreshDetail()
-				return t, nil
+				return t, t.refreshDetailCmd()
 			}
 		}
 
@@ -276,13 +238,11 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case focusTasks:
 			var cmd tea.Cmd
 			t.taskList, cmd = t.taskList.Update(msg)
-			t.refreshDetail()
-			return t, cmd
+			return t, tea.Batch(cmd, t.refreshDetailCmd())
 		case focusNotes:
 			var cmd tea.Cmd
 			t.noteList, cmd = t.noteList.Update(msg)
-			t.refreshDetail()
-			return t, cmd
+			return t, tea.Batch(cmd, t.refreshDetailCmd())
 		case focusDetail:
 			return t.updateViewport(msg)
 		}
@@ -336,15 +296,72 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 	return t, t.confirmForm.Init()
 }
 
-// dataReloadedMsg carries refreshed list items after a mutation.
+// dataReloadedMsg carries refreshed list items after a mutation or initial load.
 type dataReloadedMsg struct {
 	tasks []list.Item
 	notes []list.Item
 }
 
+// detailRenderedMsg carries pre-rendered detail content for the viewport.
+type detailRenderedMsg struct {
+	key     string
+	content string
+}
+
+func sortTasks(tasks []task.Task) {
+	sort.Slice(tasks, func(i, j int) bool {
+		order := func(s task.Status) int {
+			switch s {
+			case task.InProgress:
+				return 0
+			case task.Todo:
+				return 1
+			case task.Done:
+				return 2
+			default:
+				return 3
+			}
+		}
+		oi, oj := order(tasks[i].Status()), order(tasks[j].Status())
+		if oi != oj {
+			return oi < oj
+		}
+		return tasks[i].Priority() < tasks[j].Priority()
+	})
+}
+
+func fetchData(taskSvc *task.Service, noteSvc *note.Service) dataReloadedMsg {
+	var taskItems []list.Item
+	if tasks, err := taskSvc.LoadAllTasks(); err == nil {
+		sortTasks(tasks)
+		taskItems = make([]list.Item, len(tasks))
+		for i, tk := range tasks {
+			taskItems[i] = TaskItem{Task: tk}
+		}
+	}
+
+	var noteItems []list.Item
+	if notes, err := noteSvc.ListNotesWithMeta(true); err == nil {
+		noteItems = make([]list.Item, len(notes))
+		for i, n := range notes {
+			noteItems[i] = NoteItem{Note: n}
+		}
+	}
+
+	return dataReloadedMsg{tasks: taskItems, notes: noteItems}
+}
+
+// loadDataCmd returns a tea.Cmd that loads all data from services.
+func (t *Tui) loadDataCmd() tea.Cmd {
+	taskSvc := t.taskService
+	noteSvc := t.noteService
+	return func() tea.Msg {
+		return fetchData(taskSvc, noteSvc)
+	}
+}
+
 // deleteCmd returns a tea.Cmd that performs the deletion and reloads data.
 func (t *Tui) deleteCmd(target string) tea.Cmd {
-	// Capture what to delete before entering the Cmd closure.
 	var taskID string
 	var noteFilename string
 	switch target {
@@ -372,43 +389,7 @@ func (t *Tui) deleteCmd(target string) tea.Cmd {
 				noteSvc.DeleteNote(noteFilename)
 			}
 		}
-
-		var taskItems []list.Item
-		if tasks, err := taskSvc.LoadAllTasks(); err == nil {
-			sort.Slice(tasks, func(i, j int) bool {
-				order := func(s task.Status) int {
-					switch s {
-					case task.InProgress:
-						return 0
-					case task.Todo:
-						return 1
-					case task.Done:
-						return 2
-					default:
-						return 3
-					}
-				}
-				oi, oj := order(tasks[i].Status()), order(tasks[j].Status())
-				if oi != oj {
-					return oi < oj
-				}
-				return tasks[i].Priority() < tasks[j].Priority()
-			})
-			taskItems = make([]list.Item, len(tasks))
-			for i, tk := range tasks {
-				taskItems[i] = TaskItem{Task: tk}
-			}
-		}
-
-		var noteItems []list.Item
-		if notes, err := noteSvc.ListNotesWithMeta(true); err == nil {
-			noteItems = make([]list.Item, len(notes))
-			for i, n := range notes {
-				noteItems[i] = NoteItem{Note: n}
-			}
-		}
-
-		return dataReloadedMsg{tasks: taskItems, notes: noteItems}
+		return fetchData(taskSvc, noteSvc)
 	}
 }
 
@@ -423,7 +404,7 @@ func (t *Tui) updateFilteringList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// The isFiltering() check after Update sees the new state — if the user
 	// just pressed Enter/Esc, filtering has ended and we should update.
 	if !t.isFiltering() {
-		t.refreshDetail()
+		return t, tea.Batch(cmd, t.refreshDetailCmd())
 	}
 	return t, cmd
 }
@@ -454,44 +435,54 @@ func (t *Tui) updateViewport(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return t, nil
 }
 
-func (t *Tui) refreshDetail() {
+func (t *Tui) refreshDetailCmd() tea.Cmd {
+	if t.focus == focusDetail {
+		return nil
+	}
+
 	var itemKey string
-	var content string
+	var tk *task.Task
+	var nt *note.Note
 
 	switch t.focus {
 	case focusTasks:
 		if item, ok := t.taskList.SelectedItem().(TaskItem); ok {
 			itemKey = "task:" + item.Task.ID()
-			if itemKey != t.lastKey {
-				content = t.renderTaskDetail(item.Task)
-			}
+			cp := item.Task
+			tk = &cp
 		}
 	case focusNotes:
 		if item, ok := t.noteList.SelectedItem().(NoteItem); ok {
 			itemKey = "note:" + item.Note.Filename
-			if itemKey != t.lastKey {
-				content = t.renderNoteDetail(item.Note)
-			}
+			cp := item.Note
+			nt = &cp
 		}
-	case focusDetail:
-		return
 	}
 
 	if itemKey == "" {
 		t.lastKey = ""
 		t.viewport.SetContent("  Select an item to view details")
-		return
+		return nil
 	}
-	if itemKey != t.lastKey {
-		t.lastKey = itemKey
-		t.viewport.SetContent(content)
-		t.viewport.GotoTop()
+	if itemKey == t.lastKey {
+		return nil
+	}
+
+	w := t.contentWidth()
+	taskSvc := t.taskService
+
+	return func() tea.Msg {
+		var content string
+		if tk != nil {
+			content = renderTaskDetail(*tk, w, taskSvc)
+		} else if nt != nil {
+			content = renderNoteDetail(*nt, w)
+		}
+		return detailRenderedMsg{key: itemKey, content: content}
 	}
 }
 
-func (t *Tui) renderTaskDetail(tk task.Task) string {
-	w := t.contentWidth()
-
+func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 	// wrapStyled wraps plain text to width, then applies a style to each line
 	// so ANSI codes don't interfere with the wrap calculation.
 	wrapStyled := func(s string, style lipgloss.Style) string {
@@ -560,8 +551,8 @@ func (t *Tui) renderTaskDetail(tk task.Task) string {
 		message   string
 	}
 	var logEntries []logEntry
-	if t.taskService != nil {
-		if logs, err := t.taskService.GetTaskLogs(tk.ID()); err == nil && len(logs) > 0 {
+	if taskSvc != nil {
+		if logs, err := taskSvc.GetTaskLogs(tk.ID()); err == nil && len(logs) > 0 {
 			for _, l := range logs {
 				logEntries = append(logEntries, logEntry{
 					time:      l.CreatedAt,
@@ -656,8 +647,7 @@ func renderPriority(tk task.Task) string {
 	}
 }
 
-func (t *Tui) renderNoteDetail(n note.Note) string {
-	w := t.contentWidth()
+func renderNoteDetail(n note.Note, w int) string {
 
 	var b strings.Builder
 	b.WriteString(detailHeader.Render(wrap.String(n.Filename, w)))
