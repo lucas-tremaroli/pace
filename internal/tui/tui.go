@@ -391,16 +391,8 @@ func (t *Tui) renderTaskDetail(tk task.Task) string {
 	}
 	b.WriteString("\n")
 
-	// --- Link ---
-	if tk.Link() != "" {
-		b.WriteString("\n")
-		b.WriteString(detailLabel.Render("Link: "))
-		b.WriteString(wrapIndent(tk.Link(), 6, detailValue))
-		b.WriteString("\n")
-	}
-
 	// --- Metadata section ---
-	hasMetadata := len(tk.BlockedBy()) > 0 || len(tk.Blocks()) > 0 || len(tk.Notes()) > 0
+	hasMetadata := tk.Link() != "" || len(tk.BlockedBy()) > 0 || len(tk.Blocks()) > 0 || len(tk.Notes()) > 0
 
 	type logEntry struct {
 		time      string
@@ -427,6 +419,11 @@ func (t *Tui) renderTaskDetail(tk task.Task) string {
 		b.WriteString("\n\n")
 
 		const labelW = 12 // "Blocked by  " width for alignment
+		if tk.Link() != "" {
+			b.WriteString(detailLabel.Render("Link        "))
+			b.WriteString(wrapIndent(tk.Link(), labelW, detailValue))
+			b.WriteString("\n")
+		}
 		if len(tk.BlockedBy()) > 0 {
 			b.WriteString(detailLabel.Render("Blocked by  "))
 			b.WriteString(wrapIndent(strings.Join(tk.BlockedBy(), ", "), labelW, detailValue))
