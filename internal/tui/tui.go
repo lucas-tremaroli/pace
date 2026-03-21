@@ -22,6 +22,8 @@ const (
 	focusNotes  = 1
 	focusDetail = 2
 	minListW    = 30
+	minWidth    = 80
+	minHeight   = 20
 )
 
 var (
@@ -73,6 +75,7 @@ type Tui struct {
 	height      int
 	loaded      bool
 	quitting    bool
+	tooSmall    bool
 	lastKey     string
 }
 
@@ -181,9 +184,12 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		t.width = msg.Width
 		t.height = msg.Height
-		t.recalcLayout()
+		t.tooSmall = msg.Width < minWidth || msg.Height < minHeight
+		if !t.tooSmall {
+			t.recalcLayout()
+			t.refreshDetail()
+		}
 		t.loaded = true
-		t.refreshDetail()
 		return t, nil
 
 	case tea.KeyMsg:
@@ -563,6 +569,13 @@ func (t *Tui) View() string {
 	}
 	if !t.loaded {
 		return "Loading..."
+	}
+	if t.tooSmall {
+		msg := fmt.Sprintf("Terminal too small (%dx%d).\nMinimum size: %dx%d.\nPlease resize your terminal.", t.width, t.height, minWidth, minHeight)
+		style := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Padding(1, 2)
+		return style.Render(msg)
 	}
 
 	lw := t.listWidth()
