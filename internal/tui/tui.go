@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/wrap"
 
@@ -76,7 +77,10 @@ type Tui struct {
 	loaded      bool
 	quitting    bool
 	tooSmall    bool
-	lastKey     string
+	lastKey       string
+	confirmForm   *huh.Form
+	confirmResult *bool
+	deleteTarget  string // "task" or "note"
 }
 
 func newList(title string, items []list.Item, delegate list.ItemDelegate) list.Model {
@@ -180,7 +184,40 @@ func (t *Tui) syncFilterEnabled() {
 }
 
 func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Handle confirm dialog when active
+	if t.confirmForm != nil {
+		form, cmd := t.confirmForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			t.confirmForm = f
+			if t.confirmForm.State == huh.StateCompleted {
+				t.confirmForm = nil
+				confirmed := t.confirmResult != nil && *t.confirmResult
+				t.confirmResult = nil
+				target := t.deleteTarget
+				t.deleteTarget = ""
+				if confirmed {
+					return t, t.deleteCmd(target)
+				}
+				return t, nil
+			}
+			if t.confirmForm.State == huh.StateAborted {
+				t.confirmForm = nil
+				t.confirmResult = nil
+				t.deleteTarget = ""
+				return t, nil
+			}
+		}
+		return t, cmd
+	}
+
 	switch msg := msg.(type) {
+	case dataReloadedMsg:
+		t.taskList.SetItems(msg.tasks)
+		t.noteList.SetItems(msg.notes)
+		t.lastKey = ""
+		t.refreshDetail()
+		return t, nil
+
 	case tea.WindowSizeMsg:
 		t.width = msg.Width
 		t.height = msg.Height
@@ -202,6 +239,9 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, tuiKeys.Quit):
 			t.quitting = true
 			return t, tea.Quit
+
+		case key.Matches(msg, tuiKeys.Delete):
+			return t.startDelete()
 
 		case key.Matches(msg, tuiKeys.Tab):
 			if t.focus == focusTasks {
@@ -252,6 +292,120 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	t.noteList, cmd = t.noteList.Update(msg)
 	cmds = append(cmds, cmd)
 	return t, tea.Batch(cmds...)
+}
+
+func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
+	var title, description string
+
+	switch t.focus {
+	case focusTasks:
+		item, ok := t.taskList.SelectedItem().(TaskItem)
+		if !ok {
+			return t, nil
+		}
+		title = item.Task.Title()
+		description = "Delete this task and all its dependencies, links, and logs?"
+		t.deleteTarget = "task"
+	case focusNotes:
+		item, ok := t.noteList.SelectedItem().(NoteItem)
+		if !ok {
+			return t, nil
+		}
+		title = item.Note.Filename
+		description = "Delete this note?"
+		t.deleteTarget = "note"
+	default:
+		return t, nil
+	}
+
+	t.confirmResult = new(bool)
+	t.confirmForm = huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(title).
+				Description(description).
+				Affirmative("Yes").
+				Negative("No").
+				Value(t.confirmResult),
+		),
+	)
+	return t, t.confirmForm.Init()
+}
+
+// dataReloadedMsg carries refreshed list items after a mutation.
+type dataReloadedMsg struct {
+	tasks []list.Item
+	notes []list.Item
+}
+
+// deleteCmd returns a tea.Cmd that performs the deletion and reloads data.
+func (t *Tui) deleteCmd(target string) tea.Cmd {
+	// Capture what to delete before entering the Cmd closure.
+	var taskID string
+	var noteFilename string
+	switch target {
+	case "task":
+		if item, ok := t.taskList.SelectedItem().(TaskItem); ok {
+			taskID = item.Task.ID()
+		}
+	case "note":
+		if item, ok := t.noteList.SelectedItem().(NoteItem); ok {
+			noteFilename = item.Note.Filename
+		}
+	}
+
+	taskSvc := t.taskService
+	noteSvc := t.noteService
+
+	return func() tea.Msg {
+		switch target {
+		case "task":
+			if taskID != "" {
+				taskSvc.DeleteTask(taskID)
+			}
+		case "note":
+			if noteFilename != "" {
+				noteSvc.DeleteNote(noteFilename)
+			}
+		}
+
+		var taskItems []list.Item
+		if tasks, err := taskSvc.LoadAllTasks(); err == nil {
+			sort.Slice(tasks, func(i, j int) bool {
+				order := func(s task.Status) int {
+					switch s {
+					case task.InProgress:
+						return 0
+					case task.Todo:
+						return 1
+					case task.Done:
+						return 2
+					default:
+						return 3
+					}
+				}
+				oi, oj := order(tasks[i].Status()), order(tasks[j].Status())
+				if oi != oj {
+					return oi < oj
+				}
+				return tasks[i].Priority() < tasks[j].Priority()
+			})
+			taskItems = make([]list.Item, len(tasks))
+			for i, tk := range tasks {
+				taskItems[i] = TaskItem{Task: tk}
+			}
+		}
+
+		var noteItems []list.Item
+		if notes, err := noteSvc.ListNotesWithMeta(true); err == nil {
+			noteItems = make([]list.Item, len(notes))
+			for i, n := range notes {
+				noteItems[i] = NoteItem{Note: n}
+			}
+		}
+
+		return dataReloadedMsg{tasks: taskItems, notes: noteItems}
+	}
 }
 
 func (t *Tui) updateFilteringList(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -383,7 +537,9 @@ func (t *Tui) renderTaskDetail(tk task.Task) string {
 	b.WriteString(meta)
 	b.WriteString("\n\n")
 
-	// --- Description ---
+	// --- Description section ---
+	b.WriteString(detailSection.Render("─── Description"))
+	b.WriteString("\n\n")
 	if desc := tk.Description(); desc != "" {
 		b.WriteString(wrapStyled(desc, detailDesc))
 	} else {
@@ -596,5 +752,18 @@ func (t *Tui) View() string {
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, left, detailBox)
 	footer := helpStyle.Render(t.help.View(tuiKeys))
 
-	return lipgloss.JoinVertical(lipgloss.Left, panels, footer)
+	view := lipgloss.JoinVertical(lipgloss.Left, panels, footer)
+
+	if t.confirmForm != nil {
+		dialog := lipgloss.NewStyle().Width(50).Render(t.confirmForm.View())
+		return lipgloss.Place(
+			t.width,
+			t.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			dialog,
+		)
+	}
+
+	return view
 }
