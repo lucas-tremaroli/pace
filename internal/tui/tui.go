@@ -212,8 +212,12 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case dataReloadedMsg:
+		noteIdx := t.noteList.Index()
 		t.taskList.SetItems(msg.tasks)
 		t.noteList.SetItems(msg.notes)
+		if noteIdx >= len(msg.notes) && len(msg.notes) > 0 {
+			t.noteList.Select(len(msg.notes) - 1)
+		}
 		t.lastKey = ""
 		t.refreshDetail()
 		return t, nil
