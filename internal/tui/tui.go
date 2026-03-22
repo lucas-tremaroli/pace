@@ -19,13 +19,14 @@ import (
 )
 
 const (
-	focusTasks   = 0
-	focusNotes   = 1
-	focusDetail  = 2
-	minListW     = 30
-	minWidth     = 80
-	minHeight    = 20
-	dialogWidth  = 50
+	focusTasks       = 0
+	focusNotes       = 1
+	focusDetail      = 2
+	minListW         = 30
+	minWidth         = 80
+	minHeight        = 20
+	dialogWidth      = 50
+	detailPlaceholder = "Press enter or → to view details"
 )
 
 var (
@@ -79,6 +80,7 @@ type Tui struct {
 	quitting    bool
 	tooSmall    bool
 	lastKey       string
+	lastListFocus int // tracks which list was focused before entering detail
 	detailSeq     uint64
 	confirmForm   *huh.Form
 	confirmResult *bool
@@ -88,6 +90,7 @@ type Tui struct {
 	layoutAvailH int
 	layoutTaskH  int
 	layoutNoteH  int
+
 }
 
 func newList(title string, items []list.Item, delegate list.ItemDelegate) list.Model {
@@ -117,10 +120,13 @@ func NewTui() (*Tui, error) {
 	noteList := newList("Notes", nil, noteDelegate{})
 	noteList.SetFilteringEnabled(false)
 
+	vp := viewport.New(0, 0)
+	vp.SetContent(detailPlaceholder)
+
 	return &Tui{
 		taskList:    newList("Tasks", nil, taskDelegate{}),
 		noteList:    noteList,
-		viewport:    viewport.New(0, 0),
+		viewport:    vp,
 		help:        help.New(),
 		taskService: taskService,
 		noteService: noteService,
@@ -184,8 +190,12 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if t.loaded && !t.tooSmall {
 			t.recalcLayout()
 		}
-		t.lastKey = ""
-		return t, t.refreshDetailCmd()
+		hadDetail := t.lastKey != ""
+		t.lastKey = "" // force re-render on next open or below
+		if hadDetail {
+			return t, t.refreshDetailCmd()
+		}
+		return t, nil
 
 	case taskStatusUpdatedMsg:
 		// Find the task by ID to update in-place, since the index captured at
@@ -196,8 +206,12 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 		}
-		t.lastKey = "" // force detail refresh
-		return t, t.refreshDetailCmd()
+		hadDetail := t.lastKey != ""
+		t.lastKey = "" // force re-render with updated data
+		if hadDetail {
+			return t, t.refreshDetailCmd()
+		}
+		return t, nil
 
 	case detailRenderedMsg:
 		if msg.seq != t.detailSeq {
@@ -217,7 +231,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		t.loaded = true
 		t.lastKey = "" // force detail re-render at new width
-		if !t.tooSmall {
+		if !t.tooSmall && t.focus == focusDetail {
 			return t, t.refreshDetailCmd()
 		}
 		return t, nil
@@ -249,19 +263,21 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				t.focus = focusTasks
 			}
 			t.syncFilterEnabled()
-			return t, t.refreshDetailCmd()
+			return t, nil
 
-		case key.Matches(msg, tuiKeys.Right):
+		case key.Matches(msg, tuiKeys.Enter), key.Matches(msg, tuiKeys.Right):
 			if t.focus != focusDetail {
+				t.lastListFocus = t.focus
+				cmd := t.refreshDetailCmd()
 				t.focus = focusDetail
-				return t, nil
+				return t, cmd
 			}
 
 		case key.Matches(msg, tuiKeys.Left):
 			if t.focus == focusDetail {
-				t.focus = focusTasks
+				t.focus = t.lastListFocus
 				t.syncFilterEnabled()
-				return t, t.refreshDetailCmd()
+				return t, nil
 			}
 
 		case key.Matches(msg, tuiKeys.StatusNext):
@@ -278,11 +294,11 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case focusTasks:
 			var cmd tea.Cmd
 			t.taskList, cmd = t.taskList.Update(msg)
-			return t, tea.Batch(cmd, t.refreshDetailCmd())
+			return t, cmd
 		case focusNotes:
 			var cmd tea.Cmd
 			t.noteList, cmd = t.noteList.Update(msg)
-			return t, tea.Batch(cmd, t.refreshDetailCmd())
+			return t, cmd
 		case focusDetail:
 			return t.updateViewport(msg)
 		}
@@ -487,12 +503,6 @@ func (t *Tui) updateFilteringList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else {
 		t.noteList, cmd = t.noteList.Update(msg)
 	}
-	// Only refresh detail when filtering completes, not on every keystroke.
-	// The isFiltering() check after Update sees the new state — if the user
-	// just pressed Enter/Esc, filtering has ended and we should update.
-	if !t.isFiltering() {
-		return t, tea.Batch(cmd, t.refreshDetailCmd())
-	}
 	return t, cmd
 }
 
@@ -523,15 +533,31 @@ func (t *Tui) updateViewport(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (t *Tui) refreshDetailCmd() tea.Cmd {
-	if t.focus == focusDetail {
-		return nil
-	}
-
 	var itemKey string
 	var tk *task.Task
 	var nt *note.Note
 
-	switch t.focus {
+	// When already in the detail panel (e.g. data reload), re-render whichever
+	// list last provided the detail content.
+	listFocus := t.focus
+	if listFocus == focusDetail {
+		switch {
+		case strings.HasPrefix(t.lastKey, "task:"):
+			listFocus = focusTasks
+		case strings.HasPrefix(t.lastKey, "note:"):
+			listFocus = focusNotes
+		default:
+			// If lastKey was cleared before this refresh, fall back to the last
+			// list focus so we preserve the previous detail source.
+			if t.lastListFocus == focusTasks || t.lastListFocus == focusNotes {
+				listFocus = t.lastListFocus
+			} else {
+				listFocus = focusTasks
+			}
+		}
+	}
+
+	switch listFocus {
 	case focusTasks:
 		if item, ok := t.taskList.SelectedItem().(TaskItem); ok {
 			itemKey = "task:" + item.Task.ID()
@@ -548,7 +574,7 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 
 	if itemKey == "" {
 		t.lastKey = ""
-		t.viewport.SetContent("  Select an item to view details")
+		t.viewport.SetContent(detailPlaceholder)
 		return nil
 	}
 	if itemKey == t.lastKey {
@@ -859,7 +885,15 @@ func (t *Tui) View() string {
 
 	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Render(fitHeight(t.taskList.View(), taskH-2))
 	noteBox := bdr(t.focus == focusNotes).Width(lw - 2).Render(fitHeight(t.noteList.View(), noteH-2))
-	detailBox := bdr(t.focus == focusDetail).Width(dw - 2).Render(fitHeight(t.viewport.View(), availH-2))
+
+	var detailContent string
+	if t.lastKey == "" {
+		detailContent = lipgloss.Place(dw-2, availH-2, lipgloss.Center, lipgloss.Center,
+			detailDim.Render(detailPlaceholder))
+	} else {
+		detailContent = fitHeight(t.viewport.View(), availH-2)
+	}
+	detailBox := bdr(t.focus == focusDetail).Width(dw - 2).Render(detailContent)
 
 	left := lipgloss.JoinVertical(lipgloss.Left, taskBox, noteBox)
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, left, detailBox)
