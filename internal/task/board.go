@@ -78,7 +78,7 @@ func (m *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.cols[m.focused].Set(msg.index, task)
 	case moveMsg:
 		m.service.UpdateTask(msg.Task)
-		return m, m.cols[m.focused.getNext()].Set(AppendIndex, msg.Task)
+		return m, m.cols[m.focused.GetNext()].Set(AppendIndex, msg.Task)
 	case deleteMsg:
 		m.service.DeleteTask(msg.Task.ID())
 		return m, nil
@@ -92,11 +92,11 @@ func (m *Board) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case key.Matches(msg, keys.Left):
 			m.cols[m.focused].Blur()
-			m.focused = m.focused.getPrev()
+			m.focused = m.focused.GetPrev()
 			m.cols[m.focused].Focus()
 		case key.Matches(msg, keys.Right):
 			m.cols[m.focused].Blur()
-			m.focused = m.focused.getNext()
+			m.focused = m.focused.GetNext()
 			m.cols[m.focused].Focus()
 		}
 	}

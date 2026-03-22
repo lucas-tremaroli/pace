@@ -62,9 +62,9 @@ func TestStatusGetNext(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := tt.current.getNext()
+		result := tt.current.GetNext()
 		if result != tt.expected {
-			t.Errorf("getNext(%d) = %d, expected %d", tt.current, result, tt.expected)
+			t.Errorf("GetNext(%d) = %d, expected %d", tt.current, result, tt.expected)
 		}
 	}
 }
@@ -80,9 +80,9 @@ func TestStatusGetPrev(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := tt.current.getPrev()
+		result := tt.current.GetPrev()
 		if result != tt.expected {
-			t.Errorf("getPrev(%d) = %d, expected %d", tt.current, result, tt.expected)
+			t.Errorf("GetPrev(%d) = %d, expected %d", tt.current, result, tt.expected)
 		}
 	}
 }
