@@ -12,6 +12,7 @@ import (
 	"github.com/lucas-tremaroli/pace/cmd/note"
 	"github.com/lucas-tremaroli/pace/cmd/task"
 	"github.com/lucas-tremaroli/pace/cmd/tick"
+	"github.com/lucas-tremaroli/pace/cmd/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -105,6 +106,7 @@ func init() {
 	rootCmd.AddGroup(&cobra.Group{ID: "configuration", Title: "Configuration"})
 	rootCmd.AddGroup(&cobra.Group{ID: "recharge", Title: "Recharge"})
 
+	rootCmd.AddCommand(tui.TuiCmd)
 	rootCmd.AddCommand(task.TaskCmd)
 	rootCmd.AddCommand(note.NoteCmd)
 	rootCmd.AddCommand(tick.TickCmd)

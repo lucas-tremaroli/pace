@@ -3,6 +3,7 @@ package note
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -52,18 +53,42 @@ func NewViewer(filename, renderedContent string) Viewer {
 }
 
 func RenderMarkdown(content string) string {
-	// Strip frontmatter before rendering
-	_, body, _ := ParseFrontmatter(content)
+	return RenderMarkdownWithWidth(content, 100)
+}
 
-	renderer, err := glamour.NewTermRenderer(
+var (
+	rendererMu         sync.Mutex
+	rendererCache      *glamour.TermRenderer
+	rendererCacheWidth int
+)
+
+func getRenderer(width int) *glamour.TermRenderer {
+	rendererMu.Lock()
+	defer rendererMu.Unlock()
+	if rendererCache != nil && rendererCacheWidth == width {
+		return rendererCache
+	}
+	r, err := glamour.NewTermRenderer(
 		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(100),
+		glamour.WithWordWrap(width),
 	)
 	if err != nil {
+		return nil
+	}
+	rendererCache = r
+	rendererCacheWidth = width
+	return r
+}
+
+func RenderMarkdownWithWidth(content string, width int) string {
+	_, body, _ := ParseFrontmatter(content)
+
+	r := getRenderer(width)
+	if r == nil {
 		return body
 	}
 
-	rendered, err := renderer.Render(body)
+	rendered, err := r.Render(body)
 	if err != nil {
 		return body
 	}
