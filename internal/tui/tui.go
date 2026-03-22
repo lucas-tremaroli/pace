@@ -188,7 +188,14 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, t.refreshDetailCmd()
 
 	case taskStatusUpdatedMsg:
-		t.taskList.SetItem(msg.index, TaskItem{Task: msg.task})
+		// Find the task by ID to update in-place, since the index captured at
+		// cycle time can become stale (filtering, reloads, tab switching).
+		for i, item := range t.taskList.Items() {
+			if ti, ok := item.(TaskItem); ok && ti.Task.ID() == msg.task.ID() {
+				t.taskList.SetItem(i, TaskItem{Task: msg.task})
+				break
+			}
+		}
 		t.lastKey = "" // force detail refresh
 		return t, t.refreshDetailCmd()
 
@@ -332,14 +339,12 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 
 // taskStatusUpdatedMsg signals that a task's status was persisted.
 type taskStatusUpdatedMsg struct {
-	index int
-	task  task.Task
+	task task.Task
 }
 
 // cycleTaskStatusCmd cycles the selected task's status forward or backward.
 // It returns a Cmd that persists the change and sends a taskStatusUpdatedMsg.
 func (t *Tui) cycleTaskStatusCmd(forward bool) tea.Cmd {
-	idx := t.taskList.Index()
 	item, ok := t.taskList.SelectedItem().(TaskItem)
 	if !ok {
 		return nil
@@ -357,7 +362,7 @@ func (t *Tui) cycleTaskStatusCmd(forward bool) tea.Cmd {
 	taskSvc := t.taskService
 	return func() tea.Msg {
 		taskSvc.UpdateTask(tk)
-		return taskStatusUpdatedMsg{index: idx, task: tk}
+		return taskStatusUpdatedMsg{task: tk}
 	}
 }
 
