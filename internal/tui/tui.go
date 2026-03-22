@@ -541,10 +541,19 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 	// list last provided the detail content.
 	listFocus := t.focus
 	if listFocus == focusDetail {
-		if strings.HasPrefix(t.lastKey, "task:") {
+		switch {
+		case strings.HasPrefix(t.lastKey, "task:"):
 			listFocus = focusTasks
-		} else {
+		case strings.HasPrefix(t.lastKey, "note:"):
 			listFocus = focusNotes
+		default:
+			// If lastKey was cleared before this refresh, fall back to the last
+			// list focus so we preserve the previous detail source.
+			if t.lastListFocus == focusTasks || t.lastListFocus == focusNotes {
+				listFocus = t.lastListFocus
+			} else {
+				listFocus = focusTasks
+			}
 		}
 	}
 
