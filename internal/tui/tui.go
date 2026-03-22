@@ -249,14 +249,15 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Forward non-key messages (blink, etc.) to both lists
-	var cmds []tea.Cmd
+	// Forward non-key messages (blink, etc.) to the focused list only
 	var cmd tea.Cmd
-	t.taskList, cmd = t.taskList.Update(msg)
-	cmds = append(cmds, cmd)
-	t.noteList, cmd = t.noteList.Update(msg)
-	cmds = append(cmds, cmd)
-	return t, tea.Batch(cmds...)
+	switch t.focus {
+	case focusTasks:
+		t.taskList, cmd = t.taskList.Update(msg)
+	case focusNotes:
+		t.noteList, cmd = t.noteList.Update(msg)
+	}
+	return t, cmd
 }
 
 func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
@@ -342,7 +343,7 @@ func fetchData(taskSvc *task.Service, noteSvc *note.Service) dataReloadedMsg {
 	}
 
 	var noteItems []list.Item
-	if notes, err := noteSvc.ListNotesWithMeta(true); err == nil {
+	if notes, err := noteSvc.ListNotesWithMeta(false); err == nil {
 		noteItems = make([]list.Item, len(notes))
 		for i, n := range notes {
 			noteItems[i] = NoteItem{Note: n}
@@ -471,13 +472,14 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 
 	w := t.contentWidth()
 	taskSvc := t.taskService
+	noteSvc := t.noteService
 
 	return func() tea.Msg {
 		var content string
 		if tk != nil {
 			content = renderTaskDetail(*tk, w, taskSvc)
 		} else if nt != nil {
-			content = renderNoteDetail(*nt, w)
+			content = renderNoteDetail(*nt, w, noteSvc)
 		}
 		return detailRenderedMsg{key: itemKey, content: content}
 	}
@@ -648,8 +650,7 @@ func renderPriority(tk task.Task) string {
 	}
 }
 
-func renderNoteDetail(n note.Note, w int) string {
-
+func renderNoteDetail(n note.Note, w int, noteSvc *note.Service) string {
 	var b strings.Builder
 	b.WriteString(detailHeader.Render(wrap.String(n.Filename, w)))
 	b.WriteString("\n")
@@ -665,8 +666,15 @@ func renderNoteDetail(n note.Note, w int) string {
 		b.WriteString("\n\n")
 	}
 
-	if n.Content != "" {
-		b.WriteString(note.RenderMarkdownWithWidth(n.Content, w))
+	// Lazy-load note content only when viewing the detail panel
+	content := n.Content
+	if content == "" && noteSvc != nil {
+		if raw, err := noteSvc.ReadNote(n.Filename); err == nil {
+			content = raw
+		}
+	}
+	if content != "" {
+		b.WriteString(note.RenderMarkdownWithWidth(content, w))
 	}
 
 	return b.String()

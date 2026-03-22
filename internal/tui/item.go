@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/task"
+	"github.com/muesli/reflow/truncate"
 )
 
 var (
@@ -49,15 +50,15 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		switch {
 		case t.IsBlocked():
 			line := prefix + taskBlockedIcon.Render(icon+" ") + taskBlockedText.Render(text)
-			fmt.Fprint(w, truncate(line, m.Width()))
+			fmt.Fprint(w, truncateText(line, m.Width()))
 			return
 		case t.Status() == task.InProgress:
 			line := prefix + taskInProgressIcon.Render(icon+" ") + text
-			fmt.Fprint(w, truncate(line, m.Width()))
+			fmt.Fprint(w, truncateText(line, m.Width()))
 			return
 		case t.Status() == task.Done:
 			line := prefix + taskDoneIcon.Render(icon+" ") + taskDoneText.Render(text)
-			fmt.Fprint(w, truncate(line, m.Width()))
+			fmt.Fprint(w, truncateText(line, m.Width()))
 			return
 		}
 	}
@@ -75,7 +76,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 			iconStyle := taskSelected.Foreground(lipgloss.Color("42"))
 			textStyle := iconStyle.Strikethrough(true)
 			line := iconStyle.Render(prefix+icon+" ") + textStyle.Render(text)
-			fmt.Fprint(w, truncate(line, m.Width()))
+			fmt.Fprint(w, truncateText(line, m.Width()))
 			return
 		default:
 			style = taskSelected
@@ -84,14 +85,11 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		style = taskNormal
 	}
 
-	fmt.Fprint(w, truncate(style.Render(title), m.Width()))
+	fmt.Fprint(w, truncateText(style.Render(title), m.Width()))
 }
 
-func truncate(s string, maxW int) string {
-	if lipgloss.Width(s) > maxW {
-		return s[:maxW-1] + "…"
-	}
-	return s
+func truncateText(s string, maxW int) string {
+	return truncate.StringWithTail(s, uint(maxW), "…")
 }
 
 // TaskItem wraps a task for use in a bubbles list.
@@ -143,7 +141,7 @@ func (d noteDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		style = taskSelected
 	}
 
-	fmt.Fprint(w, truncate(style.Render(prefix+ni.Note.Filename), m.Width()))
+	fmt.Fprint(w, truncateText(style.Render(prefix+ni.Note.Filename), m.Width()))
 }
 
 // NoteItem wraps a note for use in a bubbles list.
