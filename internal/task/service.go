@@ -1,6 +1,9 @@
 package task
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/lucas-tremaroli/pace/internal/storage"
 )
 
@@ -54,10 +57,26 @@ func (s *Service) CreateTask(task Task) error {
 	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority(), task.Link())
 }
 
-// UpdateTask updates an existing task in the database
+// UpdateTask updates an existing task in the database.
+// Status changes are rejected for blocked tasks (tasks with unresolved blockers).
 func (s *Service) UpdateTask(task Task) error {
 	if err := task.Validate(); err != nil {
 		return err
+	}
+
+	// Reject status changes on blocked tasks
+	existing, err := s.db.GetTaskByID(task.ID())
+	if err != nil {
+		return err
+	}
+	if Status(existing.Status) != task.Status() {
+		blockers, err := s.db.GetBlockers(task.ID())
+		if err != nil {
+			return err
+		}
+		if len(blockers) > 0 {
+			return fmt.Errorf("cannot change status of blocked task %s (blocked by %s)", task.ID(), strings.Join(blockers, ", "))
+		}
 	}
 
 	return s.db.UpdateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority(), task.Link())

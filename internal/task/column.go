@@ -205,7 +205,7 @@ func (c *column) MoveToNext() tea.Cmd {
 		return nil
 	}
 	c.list.RemoveItem(c.list.Index())
-	task.status = c.status.getNext()
+	task.status = c.status.GetNext()
 
 	var cmd tea.Cmd
 	c.list, cmd = c.list.Update(nil)

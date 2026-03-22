@@ -3,16 +3,19 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Tab    key.Binding
-	Left   key.Binding
-	Right  key.Binding
-	Delete key.Binding
-	Quit   key.Binding
-	Filter key.Binding
+	Tab         key.Binding
+	Left        key.Binding
+	Right       key.Binding
+	Delete      key.Binding
+	StatusNext  key.Binding
+	StatusPrev  key.Binding
+	StatusCycle key.Binding // display-only combined help entry
+	Quit        key.Binding
+	Filter      key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Tab, k.Left, k.Right, k.Delete, k.Filter, k.Quit}
+	return []key.Binding{k.Tab, k.Left, k.Right, k.Delete, k.StatusCycle, k.Filter, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
@@ -35,6 +38,16 @@ var tuiKeys = keyMap{
 	Delete: key.NewBinding(
 		key.WithKeys("backspace"),
 		key.WithHelp("⌫", "delete"),
+	),
+	StatusNext: key.NewBinding(
+		key.WithKeys("shift+right"),
+	),
+	StatusPrev: key.NewBinding(
+		key.WithKeys("shift+left"),
+	),
+	StatusCycle: key.NewBinding(
+		key.WithKeys("shift+right", "shift+left"),
+		key.WithHelp("shift+←/→", "cycle status"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),

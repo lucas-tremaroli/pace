@@ -289,14 +289,16 @@ func (t Task) Validate() error {
 
 type Status int
 
-func (s Status) getNext() Status {
+// GetNext returns the next status in the cycle (Todo → InProgress → Done → Todo)
+func (s Status) GetNext() Status {
 	if s == Done {
 		return Todo
 	}
 	return s + 1
 }
 
-func (s Status) getPrev() Status {
+// GetPrev returns the previous status in the cycle (Todo ← InProgress ← Done ← Todo)
+func (s Status) GetPrev() Status {
 	if s == Todo {
 		return Done
 	}

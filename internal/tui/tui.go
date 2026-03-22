@@ -83,6 +83,11 @@ type Tui struct {
 	confirmForm   *huh.Form
 	confirmResult *bool
 	deleteTarget  string // "task" or "note"
+
+	// Cached layout dimensions, updated by recalcLayout.
+	layoutAvailH int
+	layoutTaskH  int
+	layoutNoteH  int
 }
 
 func newList(title string, items []list.Item, delegate list.ItemDelegate) list.Model {
@@ -175,7 +180,23 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if noteIdx >= len(msg.notes) && len(msg.notes) > 0 {
 			t.noteList.Select(len(msg.notes) - 1)
 		}
+		// Re-sync list sizes so pagination is calculated with the new items
+		if t.loaded && !t.tooSmall {
+			t.recalcLayout()
+		}
 		t.lastKey = ""
+		return t, t.refreshDetailCmd()
+
+	case taskStatusUpdatedMsg:
+		// Find the task by ID to update in-place, since the index captured at
+		// cycle time can become stale (filtering, reloads, tab switching).
+		for i, item := range t.taskList.Items() {
+			if ti, ok := item.(TaskItem); ok && ti.Task.ID() == msg.task.ID() {
+				t.taskList.SetItem(i, TaskItem{Task: msg.task})
+				break
+			}
+		}
+		t.lastKey = "" // force detail refresh
 		return t, t.refreshDetailCmd()
 
 	case detailRenderedMsg:
@@ -242,6 +263,15 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				t.syncFilterEnabled()
 				return t, t.refreshDetailCmd()
 			}
+
+		case key.Matches(msg, tuiKeys.StatusNext):
+			if t.focus == focusTasks {
+				return t, t.cycleTaskStatusCmd(true)
+			}
+		case key.Matches(msg, tuiKeys.StatusPrev):
+			if t.focus == focusTasks {
+				return t, t.cycleTaskStatusCmd(false)
+			}
 		}
 
 		switch t.focus {
@@ -305,6 +335,51 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 		),
 	).WithWidth(dialogWidth)
 	return t, t.confirmForm.Init()
+}
+
+// taskStatusUpdatedMsg signals that a task's status was persisted.
+type taskStatusUpdatedMsg struct {
+	task task.Task
+}
+
+// cycleTaskStatusCmd cycles the selected task's status forward or backward.
+// It returns a Cmd that persists the change and sends a taskStatusUpdatedMsg.
+// When cycling to Done, it uses CloseTask to remove blocking dependencies
+// (matching the CLI's "pace task close" behavior), then triggers a full data
+// reload so unblocked tasks update in the list.
+func (t *Tui) cycleTaskStatusCmd(forward bool) tea.Cmd {
+	item, ok := t.taskList.SelectedItem().(TaskItem)
+	if !ok {
+		return nil
+	}
+	tk := item.Task
+	if tk.IsBlocked() {
+		return nil
+	}
+	var next task.Status
+	if forward {
+		next = tk.Status().GetNext()
+	} else {
+		next = tk.Status().GetPrev()
+	}
+	if err := tk.SetStatus(next); err != nil {
+		return nil
+	}
+	taskSvc := t.taskService
+	noteSvc := t.noteService
+	return func() tea.Msg {
+		if next == task.Done {
+			if err := taskSvc.CloseTask(tk.ID(), ""); err != nil {
+				return fetchData(taskSvc, noteSvc)
+			}
+			// Deps changed — reload everything so blocked tasks update.
+			return fetchData(taskSvc, noteSvc)
+		}
+		if err := taskSvc.UpdateTask(tk); err != nil {
+			return fetchData(taskSvc, noteSvc)
+		}
+		return taskStatusUpdatedMsg{task: tk}
+	}
 }
 
 // dataReloadedMsg carries refreshed list items after a mutation or initial load.
@@ -717,8 +792,27 @@ func (t *Tui) contentWidth() int {
 	return w
 }
 
+// fitHeight ensures s is exactly h lines tall, truncating or padding as needed.
+func fitHeight(s string, h int) string {
+	if h <= 0 {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) > h {
+		lines = lines[:h]
+	}
+	for len(lines) < h {
+		lines = append(lines, "")
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (t *Tui) recalcLayout() {
-	availH := t.height - 1 // help bar
+	// Set help width so it wraps internally rather than overflowing the terminal.
+	t.help.Width = t.width - 2 // account for helpStyle horizontal padding
+	helpH := lipgloss.Height(t.help.View(tuiKeys))
+
+	availH := t.height - helpH
 	lw := t.listWidth() - 2
 	dw := t.detailWidth() - 2
 
@@ -729,6 +823,10 @@ func (t *Tui) recalcLayout() {
 	t.noteList.SetSize(lw, noteH-2)
 	t.viewport.Width = dw
 	t.viewport.Height = availH - 2
+
+	t.layoutAvailH = availH
+	t.layoutTaskH = taskH
+	t.layoutNoteH = noteH
 }
 
 func (t *Tui) View() string {
@@ -748,9 +846,9 @@ func (t *Tui) View() string {
 
 	lw := t.listWidth()
 	dw := t.detailWidth()
-	availH := t.height - 1
-	taskH := availH / 2
-	noteH := availH - taskH
+	availH := t.layoutAvailH
+	taskH := t.layoutTaskH
+	noteH := t.layoutNoteH
 
 	bdr := func(focused bool) lipgloss.Style {
 		if focused {
@@ -759,9 +857,9 @@ func (t *Tui) View() string {
 		return blurredBorder
 	}
 
-	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Height(taskH - 2).Render(t.taskList.View())
-	noteBox := bdr(t.focus == focusNotes).Width(lw - 2).Height(noteH - 2).Render(t.noteList.View())
-	detailBox := bdr(t.focus == focusDetail).Width(dw - 2).Height(availH - 2).Render(t.viewport.View())
+	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Render(fitHeight(t.taskList.View(), taskH-2))
+	noteBox := bdr(t.focus == focusNotes).Width(lw - 2).Render(fitHeight(t.noteList.View(), noteH-2))
+	detailBox := bdr(t.focus == focusDetail).Width(dw - 2).Render(fitHeight(t.viewport.View(), availH-2))
 
 	left := lipgloss.JoinVertical(lipgloss.Left, taskBox, noteBox)
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, left, detailBox)
