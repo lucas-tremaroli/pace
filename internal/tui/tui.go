@@ -181,7 +181,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			t.noteList.Select(len(msg.notes) - 1)
 		}
 		// Re-sync list sizes so pagination is calculated with the new items
-		if t.loaded {
+		if t.loaded && !t.tooSmall {
 			t.recalcLayout()
 		}
 		t.lastKey = ""

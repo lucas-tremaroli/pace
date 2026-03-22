@@ -297,7 +297,7 @@ func (s Status) GetNext() Status {
 	return s + 1
 }
 
-// GetPrev returns the previous status in the cycle (Todo → Done → InProgress → Todo)
+// GetPrev returns the previous status in the cycle (Todo ← InProgress ← Done ← Todo)
 func (s Status) GetPrev() Status {
 	if s == Todo {
 		return Done
