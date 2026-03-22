@@ -79,6 +79,7 @@ type Tui struct {
 	quitting    bool
 	tooSmall    bool
 	lastKey       string
+	detailSeq     uint64
 	confirmForm   *huh.Form
 	confirmResult *bool
 	deleteTarget  string // "task" or "note"
@@ -178,11 +179,12 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, t.refreshDetailCmd()
 
 	case detailRenderedMsg:
-		if msg.key != t.lastKey {
-			t.lastKey = msg.key
-			t.viewport.SetContent(msg.content)
-			t.viewport.GotoTop()
+		if msg.seq != t.detailSeq {
+			return t, nil // stale render from an older request; discard
 		}
+		t.lastKey = msg.key
+		t.viewport.SetContent(msg.content)
+		t.viewport.GotoTop()
 		return t, nil
 
 	case tea.WindowSizeMsg:
@@ -193,6 +195,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			t.recalcLayout()
 		}
 		t.loaded = true
+		t.lastKey = "" // force detail re-render at new width
 		if !t.tooSmall {
 			return t, t.refreshDetailCmd()
 		}
@@ -207,6 +210,12 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, tuiKeys.Quit):
 			t.quitting = true
+			if t.taskService != nil {
+				t.taskService.Close()
+			}
+			if t.noteService != nil {
+				t.noteService.Close()
+			}
 			return t, tea.Quit
 
 		case key.Matches(msg, tuiKeys.Delete):
@@ -306,6 +315,7 @@ type dataReloadedMsg struct {
 
 // detailRenderedMsg carries pre-rendered detail content for the viewport.
 type detailRenderedMsg struct {
+	seq     uint64
 	key     string
 	content string
 }
@@ -470,6 +480,8 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 		return nil
 	}
 
+	t.detailSeq++
+	seq := t.detailSeq
 	w := t.contentWidth()
 	taskSvc := t.taskService
 	noteSvc := t.noteService
@@ -481,7 +493,7 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 		} else if nt != nil {
 			content = renderNoteDetail(*nt, w, noteSvc)
 		}
-		return detailRenderedMsg{key: itemKey, content: content}
+		return detailRenderedMsg{seq: seq, key: itemKey, content: content}
 	}
 }
 

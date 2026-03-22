@@ -3,6 +3,7 @@ package note
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -56,11 +57,14 @@ func RenderMarkdown(content string) string {
 }
 
 var (
+	rendererMu         sync.Mutex
 	rendererCache      *glamour.TermRenderer
 	rendererCacheWidth int
 )
 
 func getRenderer(width int) *glamour.TermRenderer {
+	rendererMu.Lock()
+	defer rendererMu.Unlock()
 	if rendererCache != nil && rendererCacheWidth == width {
 		return rendererCache
 	}
