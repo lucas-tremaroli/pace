@@ -19,12 +19,13 @@ import (
 )
 
 const (
-	focusTasks  = 0
-	focusNotes  = 1
-	focusDetail = 2
-	minListW    = 30
-	minWidth    = 80
-	minHeight   = 20
+	focusTasks   = 0
+	focusNotes   = 1
+	focusDetail  = 2
+	minListW     = 30
+	minWidth     = 80
+	minHeight    = 20
+	dialogWidth  = 50
 )
 
 var (
@@ -268,7 +269,7 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 			return t, nil
 		}
 		title = item.Task.Title()
-		description = "Delete this task and all its dependencies, links, and logs?"
+		description = "This will also remove its dependencies, links, and logs."
 		t.deleteTarget = "task"
 	case focusNotes:
 		item, ok := t.noteList.SelectedItem().(NoteItem)
@@ -276,7 +277,7 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 			return t, nil
 		}
 		title = item.Note.Filename
-		description = "Delete this note?"
+		description = "This will permanently delete the note."
 		t.deleteTarget = "note"
 	default:
 		return t, nil
@@ -286,13 +287,13 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 	t.confirmForm = huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
-				Title(title).
+				Title("Delete \""+title+"\"?").
 				Description(description).
 				Affirmative("Yes").
 				Negative("No").
 				Value(t.confirmResult),
 		),
-	)
+	).WithWidth(dialogWidth)
 	return t, t.confirmForm.Init()
 }
 
@@ -749,7 +750,7 @@ func (t *Tui) View() string {
 	view := lipgloss.JoinVertical(lipgloss.Left, panels, footer)
 
 	if t.confirmForm != nil {
-		dialog := lipgloss.NewStyle().Width(50).Render(t.confirmForm.View())
+		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.confirmForm.View())
 		return lipgloss.Place(
 			t.width,
 			t.height,
