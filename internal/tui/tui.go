@@ -344,12 +344,18 @@ type taskStatusUpdatedMsg struct {
 
 // cycleTaskStatusCmd cycles the selected task's status forward or backward.
 // It returns a Cmd that persists the change and sends a taskStatusUpdatedMsg.
+// When cycling to Done, it uses CloseTask to remove blocking dependencies
+// (matching the CLI's "pace task close" behavior), then triggers a full data
+// reload so unblocked tasks update in the list.
 func (t *Tui) cycleTaskStatusCmd(forward bool) tea.Cmd {
 	item, ok := t.taskList.SelectedItem().(TaskItem)
 	if !ok {
 		return nil
 	}
 	tk := item.Task
+	if tk.IsBlocked() {
+		return nil
+	}
 	var next task.Status
 	if forward {
 		next = tk.Status().GetNext()
@@ -360,8 +366,18 @@ func (t *Tui) cycleTaskStatusCmd(forward bool) tea.Cmd {
 		return nil
 	}
 	taskSvc := t.taskService
+	noteSvc := t.noteService
 	return func() tea.Msg {
-		taskSvc.UpdateTask(tk)
+		if next == task.Done {
+			if err := taskSvc.CloseTask(tk.ID(), ""); err != nil {
+				return fetchData(taskSvc, noteSvc)
+			}
+			// Deps changed — reload everything so blocked tasks update.
+			return fetchData(taskSvc, noteSvc)
+		}
+		if err := taskSvc.UpdateTask(tk); err != nil {
+			return fetchData(taskSvc, noteSvc)
+		}
 		return taskStatusUpdatedMsg{task: tk}
 	}
 }
