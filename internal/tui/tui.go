@@ -86,6 +86,14 @@ type Tui struct {
 	confirmResult *bool
 	deleteTarget  string // "task" or "note"
 
+	editForm     *huh.Form
+	editTaskID   string // ID of task being edited
+	editTitle    string
+	editDesc     string
+	editLink     string
+	editLabel    string
+	editPriority int
+
 	// Cached layout dimensions, updated by recalcLayout.
 	layoutAvailH int
 	layoutTaskH  int
@@ -172,6 +180,27 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				t.confirmForm = nil
 				t.confirmResult = nil
 				t.deleteTarget = ""
+				return t, nil
+			}
+		}
+		return t, cmd
+	}
+
+	// Handle edit form when active
+	if t.editForm != nil {
+		form, cmd := t.editForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			t.editForm = f
+			if t.editForm.State == huh.StateCompleted {
+				saveCmd := t.editSaveCmd()
+				t.editForm = nil
+				t.editTaskID = ""
+				t.lastKey = "" // force detail re-render
+				return t, saveCmd
+			}
+			if t.editForm.State == huh.StateAborted {
+				t.editForm = nil
+				t.editTaskID = ""
 				return t, nil
 			}
 		}
@@ -266,12 +295,13 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t, nil
 
 		case key.Matches(msg, tuiKeys.Enter), key.Matches(msg, tuiKeys.Right):
-			if t.focus != focusDetail {
-				t.lastListFocus = t.focus
-				cmd := t.refreshDetailCmd()
-				t.focus = focusDetail
-				return t, cmd
+			if t.focus == focusDetail {
+				return t.startEdit()
 			}
+			t.lastListFocus = t.focus
+			cmd := t.refreshDetailCmd()
+			t.focus = focusDetail
+			return t, cmd
 
 		case key.Matches(msg, tuiKeys.Left):
 			if t.focus == focusDetail {
@@ -351,6 +381,95 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 		),
 	).WithWidth(dialogWidth)
 	return t, t.confirmForm.Init()
+}
+
+func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
+	// Only edit tasks, and only from the detail panel with a task showing
+	if t.lastListFocus != focusTasks {
+		return t, nil
+	}
+	item, ok := t.taskList.SelectedItem().(TaskItem)
+	if !ok {
+		return t, nil
+	}
+
+	tk := item.Task
+	t.editTaskID = tk.ID()
+	t.editTitle = tk.Title()
+	t.editDesc = tk.Description()
+	t.editLink = tk.Link()
+	t.editLabel = tk.Label()
+	if t.editLabel == "" {
+		t.editLabel = "task"
+	}
+	t.editPriority = tk.Priority()
+	if t.editPriority == 0 {
+		t.editPriority = 3
+	}
+
+	t.editForm = huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Title").
+				Value(&t.editTitle).
+				Validate(huh.ValidateNotEmpty()),
+			huh.NewText().
+				Title("Description").
+				Value(&t.editDesc).
+				Lines(4),
+			huh.NewInput().
+				Title("Link").
+				Value(&t.editLink),
+			huh.NewSelect[string]().
+				Title("Label").
+				Options(
+					huh.NewOption("task", "task"),
+					huh.NewOption("bug", "bug"),
+					huh.NewOption("feature", "feature"),
+					huh.NewOption("chore", "chore"),
+					huh.NewOption("docs", "docs"),
+				).
+				Value(&t.editLabel),
+			huh.NewSelect[int]().
+				Title("Priority").
+				Options(
+					huh.NewOption("P1 (urgent)", 1),
+					huh.NewOption("P2 (high)", 2),
+					huh.NewOption("P3 (normal)", 3),
+					huh.NewOption("P4 (low)", 4),
+				).
+				Value(&t.editPriority),
+		),
+	).WithWidth(dialogWidth).WithShowHelp(true)
+
+	return t, t.editForm.Init()
+}
+
+// editSaveCmd persists the edited task and reloads data.
+func (t *Tui) editSaveCmd() tea.Cmd {
+	taskID := t.editTaskID
+	title := t.editTitle
+	desc := t.editDesc
+	link := t.editLink
+	label := t.editLabel
+	priority := t.editPriority
+	taskSvc := t.taskService
+	noteSvc := t.noteService
+
+	return func() tea.Msg {
+		tk, err := taskSvc.GetTaskByID(taskID)
+		if err != nil {
+			return fetchData(taskSvc, noteSvc)
+		}
+		updated := task.NewTaskComplete(tk.ID(), tk.Status(), title, desc, priority, link)
+		updated.SetLabel(label)
+		updated.SetBlockedBy(tk.BlockedBy())
+		updated.SetBlocks(tk.Blocks())
+		updated.SetNotes(tk.Notes())
+		taskSvc.UpdateTask(updated)
+		taskSvc.SetLabel(taskID, label)
+		return fetchData(taskSvc, noteSvc)
+	}
 }
 
 // taskStatusUpdatedMsg signals that a task's status was persisted.
@@ -903,6 +1022,17 @@ func (t *Tui) View() string {
 
 	if t.confirmForm != nil {
 		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.confirmForm.View())
+		return lipgloss.Place(
+			t.width,
+			t.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			dialog,
+		)
+	}
+
+	if t.editForm != nil {
+		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.editForm.View())
 		return lipgloss.Place(
 			t.width,
 			t.height,
