@@ -8,6 +8,7 @@ type keyMap struct {
 	Left        key.Binding
 	Right       key.Binding
 	Delete      key.Binding
+	New         key.Binding
 	StatusNext  key.Binding
 	StatusPrev  key.Binding
 	StatusCycle key.Binding // display-only combined help entry
@@ -16,7 +17,7 @@ type keyMap struct {
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Tab, k.Enter, k.Left, k.Right, k.Delete, k.StatusCycle, k.Filter, k.Quit}
+	return []key.Binding{k.Tab, k.Enter, k.Left, k.Right, k.New, k.Delete, k.StatusCycle, k.Filter, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
@@ -30,7 +31,7 @@ var tuiKeys = keyMap{
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
-		key.WithHelp("enter", "open detail"),
+		key.WithHelp("enter", "detail/edit"),
 	),
 	Left: key.NewBinding(
 		key.WithKeys("left"),
@@ -43,6 +44,10 @@ var tuiKeys = keyMap{
 	Delete: key.NewBinding(
 		key.WithKeys("backspace"),
 		key.WithHelp("⌫", "delete"),
+	),
+	New: key.NewBinding(
+		key.WithKeys("+"),
+		key.WithHelp("+", "new task"),
 	),
 	StatusNext: key.NewBinding(
 		key.WithKeys("shift+right"),

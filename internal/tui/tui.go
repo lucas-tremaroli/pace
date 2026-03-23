@@ -86,6 +86,15 @@ type Tui struct {
 	confirmResult *bool
 	deleteTarget  string // "task" or "note"
 
+	taskForm     *huh.Form
+	formTaskID   string // non-empty for edit, empty for create
+	formTitle    string
+	formDesc     string
+	formLink     string
+	formLabel    string
+	formPriority int
+	formError    string // error message from last save attempt
+
 	// Cached layout dimensions, updated by recalcLayout.
 	layoutAvailH int
 	layoutTaskH  int
@@ -152,6 +161,17 @@ func (t *Tui) syncFilterEnabled() {
 }
 
 func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Always track window size, even when a form overlay is active.
+	if ws, ok := msg.(tea.WindowSizeMsg); ok {
+		t.width = ws.Width
+		t.height = ws.Height
+		t.tooSmall = ws.Width < minWidth || ws.Height < minHeight
+		if !t.tooSmall {
+			t.recalcLayout()
+		}
+		t.loaded = true
+	}
+
 	// Handle confirm dialog when active
 	if t.confirmForm != nil {
 		form, cmd := t.confirmForm.Update(msg)
@@ -178,7 +198,37 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, cmd
 	}
 
+	// Handle task form (create/edit) when active
+	if t.taskForm != nil {
+		form, cmd := t.taskForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			t.taskForm = f
+			if t.taskForm.State == huh.StateCompleted {
+				saveCmd := t.taskFormSaveCmd()
+				t.taskForm = nil
+				t.formTaskID = ""
+				return t, saveCmd
+			}
+			if t.taskForm.State == huh.StateAborted {
+				t.taskForm = nil
+				t.formTaskID = ""
+				t.formError = ""
+				return t, nil
+			}
+		}
+		return t, cmd
+	}
+
 	switch msg := msg.(type) {
+	case taskFormSavedMsg:
+		if msg.err != nil {
+			t.formError = msg.err.Error()
+			return t, nil
+		}
+		t.formError = ""
+		t.lastKey = "" // force detail re-render after save
+		return t, t.loadDataCmd()
+
 	case dataReloadedMsg:
 		noteIdx := t.noteList.Index()
 		t.taskList.SetItems(msg.tasks)
@@ -190,7 +240,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if t.loaded && !t.tooSmall {
 			t.recalcLayout()
 		}
-		hadDetail := t.lastKey != ""
+		hadDetail := t.lastKey != "" || t.focus == focusDetail
 		t.lastKey = "" // force re-render on next open or below
 		if hadDetail {
 			return t, t.refreshDetailCmd()
@@ -223,13 +273,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, nil
 
 	case tea.WindowSizeMsg:
-		t.width = msg.Width
-		t.height = msg.Height
-		t.tooSmall = msg.Width < minWidth || msg.Height < minHeight
-		if !t.tooSmall {
-			t.recalcLayout()
-		}
-		t.loaded = true
+		// Size tracking already handled above; just refresh detail if needed.
 		t.lastKey = "" // force detail re-render at new width
 		if !t.tooSmall && t.focus == focusDetail {
 			return t, t.refreshDetailCmd()
@@ -237,6 +281,8 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, nil
 
 	case tea.KeyMsg:
+		t.formError = "" // clear any stale error on key press
+
 		// When a list is filtering, all keys go to it
 		if t.isFiltering() {
 			return t.updateFilteringList(msg)
@@ -253,6 +299,11 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return t, tea.Quit
 
+		case key.Matches(msg, tuiKeys.New):
+			if t.focus == focusTasks {
+				return t.startCreate()
+			}
+
 		case key.Matches(msg, tuiKeys.Delete):
 			return t.startDelete()
 
@@ -266,12 +317,13 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t, nil
 
 		case key.Matches(msg, tuiKeys.Enter), key.Matches(msg, tuiKeys.Right):
-			if t.focus != focusDetail {
-				t.lastListFocus = t.focus
-				cmd := t.refreshDetailCmd()
-				t.focus = focusDetail
-				return t, cmd
+			if t.focus == focusDetail {
+				return t.startEdit()
 			}
+			t.lastListFocus = t.focus
+			cmd := t.refreshDetailCmd()
+			t.focus = focusDetail
+			return t, cmd
 
 		case key.Matches(msg, tuiKeys.Left):
 			if t.focus == focusDetail {
@@ -351,6 +403,137 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 		),
 	).WithWidth(dialogWidth)
 	return t, t.confirmForm.Init()
+}
+
+func (t *Tui) buildTaskForm() *huh.Form {
+	labelOptions := make([]huh.Option[string], len(task.ValidLabels))
+	for i, l := range task.ValidLabels {
+		labelOptions[i] = huh.NewOption(l, l)
+	}
+
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Title").
+				Value(&t.formTitle).
+				Validate(huh.ValidateNotEmpty()),
+			huh.NewText().
+				Title("Description").
+				Value(&t.formDesc).
+				Lines(4),
+			huh.NewInput().
+				Title("Link").
+				Value(&t.formLink).
+				Validate(func(s string) error {
+					normalized := task.NormalizeLink(s)
+					return task.ValidateLink(normalized)
+				}),
+			huh.NewSelect[string]().
+				Title("Label").
+				Options(labelOptions...).
+				Value(&t.formLabel),
+			huh.NewSelect[int]().
+				Title("Priority").
+				Options(
+					huh.NewOption("P1 (urgent)", 1),
+					huh.NewOption("P2 (high)", 2),
+					huh.NewOption("P3 (normal)", 3),
+					huh.NewOption("P4 (low)", 4),
+				).
+				Value(&t.formPriority),
+		),
+	).WithWidth(dialogWidth).WithShowHelp(true)
+}
+
+func (t *Tui) startCreate() (tea.Model, tea.Cmd) {
+	t.formTaskID = ""
+	t.formTitle = ""
+	t.formDesc = ""
+	t.formLink = ""
+	t.formLabel = "task"
+	t.formPriority = 3
+
+	t.taskForm = t.buildTaskForm()
+	return t, t.taskForm.Init()
+}
+
+func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
+	if t.lastListFocus != focusTasks {
+		return t, nil
+	}
+	item, ok := t.taskList.SelectedItem().(TaskItem)
+	if !ok {
+		return t, nil
+	}
+
+	tk := item.Task
+	t.formTaskID = tk.ID()
+	t.formTitle = tk.Title()
+	t.formDesc = tk.Description()
+	t.formLink = tk.Link()
+	t.formLabel = tk.Label()
+	if t.formLabel == "" {
+		t.formLabel = "task"
+	}
+	t.formPriority = tk.Priority()
+	if t.formPriority == 0 {
+		t.formPriority = 3
+	}
+
+	t.taskForm = t.buildTaskForm()
+	return t, t.taskForm.Init()
+}
+
+// taskFormSavedMsg signals that a task form save completed.
+type taskFormSavedMsg struct {
+	err error
+}
+
+// taskFormSaveCmd persists the created or edited task and reloads data.
+func (t *Tui) taskFormSaveCmd() tea.Cmd {
+	taskID := t.formTaskID
+	title := t.formTitle
+	desc := t.formDesc
+	link := t.formLink
+	label := t.formLabel
+	priority := t.formPriority
+	taskSvc := t.taskService
+
+	if taskID == "" {
+		// Create
+		return func() tea.Msg {
+			id := taskSvc.GenerateTaskID()
+			newTask := task.NewTaskComplete(id, task.Todo, title, desc, priority, link)
+			newTask.SetLabel(label)
+			if err := taskSvc.CreateTask(newTask); err != nil {
+				return taskFormSavedMsg{err: err}
+			}
+			if err := taskSvc.SetLabel(id, label); err != nil {
+				return taskFormSavedMsg{err: err}
+			}
+			return taskFormSavedMsg{}
+		}
+	}
+
+	// Edit
+	return func() tea.Msg {
+		tk, err := taskSvc.GetTaskByID(taskID)
+		if err != nil {
+			return taskFormSavedMsg{err: err}
+		}
+		updated := task.NewTaskComplete(tk.ID(), tk.Status(), title, desc, priority, link)
+		updated.SetLabel(label)
+		updated.SetBlockedBy(tk.BlockedBy())
+		updated.SetBlocks(tk.Blocks())
+		updated.SetNotes(tk.Notes())
+		if err := taskSvc.UpdateTask(updated); err != nil {
+			return taskFormSavedMsg{err: err}
+		}
+		if err := taskSvc.SetLabel(taskID, label); err != nil {
+			return taskFormSavedMsg{err: err}
+		}
+		return taskFormSavedMsg{}
+	}
 }
 
 // taskStatusUpdatedMsg signals that a task's status was persisted.
@@ -899,10 +1082,29 @@ func (t *Tui) View() string {
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, left, detailBox)
 	footer := helpStyle.Render(t.help.View(tuiKeys))
 
-	view := lipgloss.JoinVertical(lipgloss.Left, panels, footer)
+	var errorLine string
+	if t.formError != "" {
+		errorLine = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Padding(0, 1).
+			Render("Error: " + t.formError)
+	}
+
+	view := lipgloss.JoinVertical(lipgloss.Left, panels, footer, errorLine)
 
 	if t.confirmForm != nil {
 		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.confirmForm.View())
+		return lipgloss.Place(
+			t.width,
+			t.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			dialog,
+		)
+	}
+
+	if t.taskForm != nil {
+		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.taskForm.View())
 		return lipgloss.Place(
 			t.width,
 			t.height,
