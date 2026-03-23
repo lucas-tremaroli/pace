@@ -78,7 +78,7 @@ var listCmd = &cobra.Command{
 			pri, err := task.ParsePriority(p)
 			if err != nil {
 				output.ErrorMsgWithCode(
-					fmt.Sprintf("invalid priority %q: %v", p, err),
+					err.Error(),
 					output.ErrCodeInvalidPriority,
 					task.ValidPriorityHelp,
 				)
@@ -133,7 +133,7 @@ var listCmd = &cobra.Command{
 func init() {
 	listCmd.Flags().BoolVar(&listPretty, "pretty", false, "Human-readable formatted output")
 	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (todo, in-progress, done)")
-	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (high, medium, low, repeatable)")
+	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (high, medium, low or 1-3, repeatable)")
 	listCmd.Flags().StringVar(&listFilterLabel, "label", "", "Filter by label")
 	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")

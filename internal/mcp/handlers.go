@@ -342,6 +342,8 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 			if float64(priority) != v || priority < 1 || priority > 3 {
 				return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
 			}
+		default:
+			return codedError(output.ErrCodeInvalidPriority, "priority must be a string or number", task.ValidPriorityHelp)
 		}
 	}
 
@@ -424,6 +426,8 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 			if float64(priority) != v || priority < 1 || priority > 3 {
 				return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
 			}
+		default:
+			return codedError(output.ErrCodeInvalidPriority, "priority must be a string or number", task.ValidPriorityHelp)
 		}
 	}
 

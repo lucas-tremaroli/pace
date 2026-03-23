@@ -276,7 +276,7 @@ func init() {
 	updateCmd.Flags().StringVar(&updateTitle, "title", "", "Task title")
 	updateCmd.Flags().StringVar(&updateDescription, "description", "", "Task description")
 	updateCmd.Flags().StringVar(&updateStatus, "status", "", "Task status (todo, in-progress, done)")
-	updateCmd.Flags().StringVar(&updatePriority, "priority", "", "Task priority (high, medium, low)")
+	updateCmd.Flags().StringVar(&updatePriority, "priority", "", "Task priority (high, medium, low or 1-3)")
 	updateCmd.Flags().StringVar(&updateLabel, "label", "", "Set task label (task, bug, feature, chore, docs)")
 	updateCmd.Flags().StringVar(&updateLink, "url", "", "URL associated with the task (e.g., google.com)")
 	updateCmd.Flags().StringArrayVar(&updateFilters, "filter", nil, "Filter tasks to update (status=X, priority=X, label=X)")

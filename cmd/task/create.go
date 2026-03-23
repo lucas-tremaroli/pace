@@ -2,6 +2,7 @@ package task
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
@@ -146,10 +147,17 @@ func handleBulkCreate(bulkInput string) error {
 			continue
 		}
 
-		// Default priority to 2 (medium) if not specified
+		// Default priority to 2 (medium) if not specified; validate range
 		priority := input.Priority
 		if priority == 0 {
 			priority = 2
+		}
+		if priority < 1 || priority > 3 {
+			result.Failed = append(result.Failed, output.BulkItem{
+				Title: input.Title,
+				Error: fmt.Sprintf("priority must be 1-3, got %d", priority),
+			})
+			continue
 		}
 
 		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, input.Title, input.Description, priority, input.Link)
@@ -183,7 +191,7 @@ func init() {
 	createCmd.Flags().StringVar(&createTitle, "title", "", "Task title (required for single task creation)")
 	createCmd.Flags().StringVar(&createDescription, "description", "", "Task description")
 	createCmd.Flags().StringVar(&createStatus, "status", "todo", "Task status (todo, in-progress, done)")
-	createCmd.Flags().StringVar(&createPriority, "priority", "medium", "Task priority (high, medium, low)")
+	createCmd.Flags().StringVar(&createPriority, "priority", "medium", "Task priority (high, medium, low or 1-3)")
 	createCmd.Flags().StringVar(&createLabel, "label", "task", "Task label (task, bug, feature, chore, docs)")
 	createCmd.Flags().StringVar(&createLink, "url", "", "URL associated with the task (e.g., google.com)")
 	createCmd.Flags().StringVar(&createBulk, "bulk", "", "JSON array of tasks to create, or '-' for stdin")
