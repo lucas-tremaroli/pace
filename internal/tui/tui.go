@@ -94,9 +94,11 @@ type Tui struct {
 	formPriority int
 
 	// Cached layout dimensions, updated by recalcLayout.
-	layoutAvailH int
-	layoutTaskH  int
-	layoutNoteH  int
+	layoutAvailH    int
+	layoutTaskH     int
+	layoutNoteH     int
+	cachedHelpH     int
+	cachedHelpWidth int
 
 }
 
@@ -600,7 +602,7 @@ func fetchData(taskSvc *task.Service, noteSvc *note.Service) dataReloadedMsg {
 	}
 
 	var noteItems []list.Item
-	if notes, err := noteSvc.ListNotesWithMeta(false); err == nil {
+	if notes, err := noteSvc.ListNoteNames(); err == nil {
 		noteItems = make([]list.Item, len(notes))
 		for i, n := range notes {
 			noteItems[i] = NoteItem{Note: n}
@@ -918,6 +920,13 @@ func renderPriority(tk task.Task) string {
 }
 
 func renderNoteDetail(n note.Note, w int, noteSvc *note.Service) string {
+	// Lazy-load full note metadata (content, tasks, labels) when viewing detail.
+	if noteSvc != nil {
+		if full, err := noteSvc.ReadNoteWithMeta(n.Filename); err == nil {
+			n = *full
+		}
+	}
+
 	var b strings.Builder
 	b.WriteString(detailHeader.Render(wrap.String(n.Filename, w)))
 	b.WriteString("\n")
@@ -933,15 +942,8 @@ func renderNoteDetail(n note.Note, w int, noteSvc *note.Service) string {
 		b.WriteString("\n\n")
 	}
 
-	// Lazy-load note content only when viewing the detail panel
-	content := n.Content
-	if content == "" && noteSvc != nil {
-		if raw, err := noteSvc.ReadNote(n.Filename); err == nil {
-			content = raw
-		}
-	}
-	if content != "" {
-		b.WriteString(note.RenderMarkdownWithWidth(content, w))
+	if n.Content != "" {
+		b.WriteString(note.RenderMarkdownWithWidth(n.Content, w))
 	}
 
 	return b.String()
@@ -988,9 +990,14 @@ func fitHeight(s string, h int) string {
 }
 
 func (t *Tui) recalcLayout() {
-	// Set help width so it wraps internally rather than overflowing the terminal.
-	t.help.Width = t.width - 2 // account for helpStyle horizontal padding
-	helpH := lipgloss.Height(t.help.View(tuiKeys))
+	// Cache help height — only recompute when terminal width changes.
+	helpH := t.cachedHelpH
+	if t.width != t.cachedHelpWidth {
+		t.help.Width = t.width - 2 // account for helpStyle horizontal padding
+		helpH = lipgloss.Height(t.help.View(tuiKeys))
+		t.cachedHelpH = helpH
+		t.cachedHelpWidth = t.width
+	}
 
 	availH := t.height - helpH
 	lw := t.listWidth() - 2
