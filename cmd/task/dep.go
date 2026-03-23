@@ -346,10 +346,10 @@ func printTaskStatus(t task.Task) {
 			pStyle = p2Style
 		case 3:
 			pStyle = p3Style
-		case 4:
-			pStyle = p4Style
+		default:
+			pStyle = priorityStyle
 		}
-		fmt.Printf(" %s", pStyle.Render(fmt.Sprintf("P%d", p)))
+		fmt.Printf(" %s", pStyle.Render(task.PriorityName(p)))
 	}
 	fmt.Println()
 }

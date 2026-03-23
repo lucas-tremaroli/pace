@@ -2,7 +2,6 @@ package task
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -34,12 +33,9 @@ func ParseFilter(s string) (*TaskFilter, error) {
 		}
 		filter.Status = &status
 	case "priority":
-		priority, err := strconv.Atoi(value)
+		priority, err := ParsePriority(value)
 		if err != nil {
-			return nil, fmt.Errorf("invalid priority: %s", value)
-		}
-		if priority < 1 || priority > 4 {
-			return nil, fmt.Errorf("priority must be 1-4, got %d", priority)
+			return nil, err
 		}
 		filter.Priority = &priority
 	case "label":

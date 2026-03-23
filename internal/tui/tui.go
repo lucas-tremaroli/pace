@@ -63,7 +63,6 @@ var (
 	priorityP1     = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	priorityP2     = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
 	priorityP3     = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
-	priorityP4     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 )
 
 type Tui struct {
@@ -422,10 +421,9 @@ func (t *Tui) buildTaskForm() *huh.Form {
 			huh.NewSelect[int]().
 				Title("Priority").
 				Options(
-					huh.NewOption("P1 (urgent)", 1),
-					huh.NewOption("P2 (high)", 2),
-					huh.NewOption("P3 (normal)", 3),
-					huh.NewOption("P4 (low)", 4),
+					huh.NewOption("High (1)", 1),
+					huh.NewOption("Medium (2)", 2),
+					huh.NewOption("Low (3)", 3),
 				).
 				Value(&t.formPriority),
 		),
@@ -438,7 +436,7 @@ func (t *Tui) startCreate() (tea.Model, tea.Cmd) {
 	t.formDesc = ""
 	t.formLink = ""
 	t.formLabel = "task"
-	t.formPriority = 3
+	t.formPriority = 2
 
 	t.taskForm = t.buildTaskForm()
 	return t, t.taskForm.Init()
@@ -464,7 +462,7 @@ func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
 	}
 	t.formPriority = tk.Priority()
 	if t.formPriority == 0 {
-		t.formPriority = 3
+		t.formPriority = 2
 	}
 
 	t.taskForm = t.buildTaskForm()
@@ -909,15 +907,13 @@ func renderStatus(tk task.Task) string {
 func renderPriority(tk task.Task) string {
 	switch tk.Priority() {
 	case 1:
-		return priorityP1.Render("P1 (urgent)")
+		return priorityP1.Render("High")
 	case 2:
-		return priorityP2.Render("P2 (high)")
+		return priorityP2.Render("Medium")
 	case 3:
-		return priorityP3.Render("P3 (normal)")
-	case 4:
-		return priorityP4.Render("P4 (low)")
+		return priorityP3.Render("Low")
 	default:
-		return detailValue.Render(fmt.Sprintf("P%d", tk.Priority()))
+		return detailValue.Render(task.PriorityName(tk.Priority()))
 	}
 }
 

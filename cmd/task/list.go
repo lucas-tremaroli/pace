@@ -28,7 +28,6 @@ var (
 	p1Style = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	p2Style = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
 	p3Style = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
-	p4Style = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 )
 
 var (
@@ -76,12 +75,12 @@ var listCmd = &cobra.Command{
 			filter.Status = &status
 		}
 		for _, p := range listFilterPriority {
-			var pri int
-			if _, err := fmt.Sscanf(p, "%d", &pri); err != nil || pri < 1 || pri > 4 {
+			pri, err := task.ParsePriority(p)
+			if err != nil {
 				output.ErrorMsgWithCode(
-					fmt.Sprintf("invalid priority %q: must be 1-4", p),
+					fmt.Sprintf("invalid priority %q: %v", p, err),
 					output.ErrCodeInvalidPriority,
-					"Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
+					task.ValidPriorityHelp,
 				)
 				return nil
 			}
@@ -134,7 +133,7 @@ var listCmd = &cobra.Command{
 func init() {
 	listCmd.Flags().BoolVar(&listPretty, "pretty", false, "Human-readable formatted output")
 	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (todo, in-progress, done)")
-	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (1-4, repeatable)")
+	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (high, medium, low, repeatable)")
 	listCmd.Flags().StringVar(&listFilterLabel, "label", "", "Filter by label")
 	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")
@@ -164,10 +163,9 @@ func printLegend() {
 	fmt.Println(status)
 
 	priority := countStyle.Render("Priority: ") +
-		p1Style.Render("P1") + countStyle.Render(" urgent  ") +
-		p2Style.Render("P2") + countStyle.Render(" high  ") +
-		p3Style.Render("P3") + countStyle.Render(" normal  ") +
-		p4Style.Render("P4") + countStyle.Render(" low")
+		p1Style.Render("High") + countStyle.Render("  ") +
+		p2Style.Render("Med") + countStyle.Render("  ") +
+		p3Style.Render("Low")
 	fmt.Println(priority)
 }
 
@@ -205,12 +203,10 @@ func formatTaskPretty(t task.Task) string {
 			pStyle = p2Style
 		case 3:
 			pStyle = p3Style
-		case 4:
-			pStyle = p4Style
 		default:
 			pStyle = priorityStyle
 		}
-		parts = append(parts, pStyle.Render(fmt.Sprintf("P%d", p)))
+		parts = append(parts, pStyle.Render(task.PriorityName(p)))
 	}
 
 	// Title

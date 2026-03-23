@@ -14,7 +14,7 @@ var (
 	updateTitle       string
 	updateDescription string
 	updateStatus      string
-	updatePriority    int
+	updatePriority    string
 	updateLabel       string
 	updateLink        string
 	updateFilters     []string
@@ -86,7 +86,11 @@ For batch updates, use --filter with update flags:
 			status = parsedStatus
 		}
 		if cmd.Flags().Changed("priority") {
-			priority = updatePriority
+			parsedPriority, err := task.ParsePriority(updatePriority)
+			if err != nil {
+				output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
+			}
+			priority = parsedPriority
 		}
 		if cmd.Flags().Changed("url") {
 			link = updateLink
@@ -151,7 +155,11 @@ func handleBatchUpdate(cmd *cobra.Command) error {
 		batchStatus = &parsedStatus
 	}
 	if cmd.Flags().Changed("priority") {
-		batchPriority = &updatePriority
+		parsedPriority, err := task.ParsePriority(updatePriority)
+		if err != nil {
+			output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
+		}
+		batchPriority = &parsedPriority
 	}
 	if cmd.Flags().Changed("label") {
 		if err := task.ValidateLabel(updateLabel); err != nil {
@@ -268,7 +276,7 @@ func init() {
 	updateCmd.Flags().StringVar(&updateTitle, "title", "", "Task title")
 	updateCmd.Flags().StringVar(&updateDescription, "description", "", "Task description")
 	updateCmd.Flags().StringVar(&updateStatus, "status", "", "Task status (todo, in-progress, done)")
-	updateCmd.Flags().IntVar(&updatePriority, "priority", 0, "Task priority (0=none, 1=urgent, 2=high, 3=normal, 4=low)")
+	updateCmd.Flags().StringVar(&updatePriority, "priority", "", "Task priority (high, medium, low)")
 	updateCmd.Flags().StringVar(&updateLabel, "label", "", "Set task label (task, bug, feature, chore, docs)")
 	updateCmd.Flags().StringVar(&updateLink, "url", "", "URL associated with the task (e.g., google.com)")
 	updateCmd.Flags().StringArrayVar(&updateFilters, "filter", nil, "Filter tasks to update (status=X, priority=X, label=X)")

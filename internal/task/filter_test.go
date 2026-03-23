@@ -51,11 +51,14 @@ func TestParseFilter_Priority(t *testing.T) {
 		{"priority 1", "priority=1", 1, false},
 		{"priority 2", "priority=2", 2, false},
 		{"priority 3", "priority=3", 3, false},
-		{"priority 4", "priority=4", 4, false},
+		{"priority high", "priority=high", 1, false},
+		{"priority medium", "priority=medium", 2, false},
+		{"priority low", "priority=low", 3, false},
+		{"priority 4 invalid", "priority=4", 0, true},
 		{"priority 0", "priority=0", 0, true},
 		{"priority 5", "priority=5", 0, true},
 		{"priority negative", "priority=-1", 0, true},
-		{"priority non-numeric", "priority=high", 0, true},
+		{"priority invalid name", "priority=urgent", 0, true},
 	}
 
 	for _, tt := range tests {
