@@ -86,13 +86,13 @@ type Tui struct {
 	confirmResult *bool
 	deleteTarget  string // "task" or "note"
 
-	editForm     *huh.Form
-	editTaskID   string // ID of task being edited
-	editTitle    string
-	editDesc     string
-	editLink     string
-	editLabel    string
-	editPriority int
+	taskForm     *huh.Form
+	formTaskID   string // non-empty for edit, empty for create
+	formTitle    string
+	formDesc     string
+	formLink     string
+	formLabel    string
+	formPriority int
 
 	// Cached layout dimensions, updated by recalcLayout.
 	layoutAvailH int
@@ -186,21 +186,21 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, cmd
 	}
 
-	// Handle edit form when active
-	if t.editForm != nil {
-		form, cmd := t.editForm.Update(msg)
+	// Handle task form (create/edit) when active
+	if t.taskForm != nil {
+		form, cmd := t.taskForm.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
-			t.editForm = f
-			if t.editForm.State == huh.StateCompleted {
-				saveCmd := t.editSaveCmd()
-				t.editForm = nil
-				t.editTaskID = ""
+			t.taskForm = f
+			if t.taskForm.State == huh.StateCompleted {
+				saveCmd := t.taskFormSaveCmd()
+				t.taskForm = nil
+				t.formTaskID = ""
 				t.lastKey = "" // force detail re-render
 				return t, saveCmd
 			}
-			if t.editForm.State == huh.StateAborted {
-				t.editForm = nil
-				t.editTaskID = ""
+			if t.taskForm.State == huh.StateAborted {
+				t.taskForm = nil
+				t.formTaskID = ""
 				return t, nil
 			}
 		}
@@ -281,6 +281,11 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				t.noteService.Close()
 			}
 			return t, tea.Quit
+
+		case key.Matches(msg, tuiKeys.New):
+			if t.focus == focusTasks {
+				return t.startCreate()
+			}
 
 		case key.Matches(msg, tuiKeys.Delete):
 			return t.startDelete()
@@ -383,43 +388,20 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 	return t, t.confirmForm.Init()
 }
 
-func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
-	// Only edit tasks, and only from the detail panel with a task showing
-	if t.lastListFocus != focusTasks {
-		return t, nil
-	}
-	item, ok := t.taskList.SelectedItem().(TaskItem)
-	if !ok {
-		return t, nil
-	}
-
-	tk := item.Task
-	t.editTaskID = tk.ID()
-	t.editTitle = tk.Title()
-	t.editDesc = tk.Description()
-	t.editLink = tk.Link()
-	t.editLabel = tk.Label()
-	if t.editLabel == "" {
-		t.editLabel = "task"
-	}
-	t.editPriority = tk.Priority()
-	if t.editPriority == 0 {
-		t.editPriority = 3
-	}
-
-	t.editForm = huh.NewForm(
+func (t *Tui) buildTaskForm() *huh.Form {
+	return huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Title").
-				Value(&t.editTitle).
+				Value(&t.formTitle).
 				Validate(huh.ValidateNotEmpty()),
 			huh.NewText().
 				Title("Description").
-				Value(&t.editDesc).
+				Value(&t.formDesc).
 				Lines(4),
 			huh.NewInput().
 				Title("Link").
-				Value(&t.editLink),
+				Value(&t.formLink),
 			huh.NewSelect[string]().
 				Title("Label").
 				Options(
@@ -429,7 +411,7 @@ func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
 					huh.NewOption("chore", "chore"),
 					huh.NewOption("docs", "docs"),
 				).
-				Value(&t.editLabel),
+				Value(&t.formLabel),
 			huh.NewSelect[int]().
 				Title("Priority").
 				Options(
@@ -438,24 +420,74 @@ func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
 					huh.NewOption("P3 (normal)", 3),
 					huh.NewOption("P4 (low)", 4),
 				).
-				Value(&t.editPriority),
+				Value(&t.formPriority),
 		),
 	).WithWidth(dialogWidth).WithShowHelp(true)
-
-	return t, t.editForm.Init()
 }
 
-// editSaveCmd persists the edited task and reloads data.
-func (t *Tui) editSaveCmd() tea.Cmd {
-	taskID := t.editTaskID
-	title := t.editTitle
-	desc := t.editDesc
-	link := t.editLink
-	label := t.editLabel
-	priority := t.editPriority
+func (t *Tui) startCreate() (tea.Model, tea.Cmd) {
+	t.formTaskID = ""
+	t.formTitle = ""
+	t.formDesc = ""
+	t.formLink = ""
+	t.formLabel = "task"
+	t.formPriority = 3
+
+	t.taskForm = t.buildTaskForm()
+	return t, t.taskForm.Init()
+}
+
+func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
+	if t.lastListFocus != focusTasks {
+		return t, nil
+	}
+	item, ok := t.taskList.SelectedItem().(TaskItem)
+	if !ok {
+		return t, nil
+	}
+
+	tk := item.Task
+	t.formTaskID = tk.ID()
+	t.formTitle = tk.Title()
+	t.formDesc = tk.Description()
+	t.formLink = tk.Link()
+	t.formLabel = tk.Label()
+	if t.formLabel == "" {
+		t.formLabel = "task"
+	}
+	t.formPriority = tk.Priority()
+	if t.formPriority == 0 {
+		t.formPriority = 3
+	}
+
+	t.taskForm = t.buildTaskForm()
+	return t, t.taskForm.Init()
+}
+
+// taskFormSaveCmd persists the created or edited task and reloads data.
+func (t *Tui) taskFormSaveCmd() tea.Cmd {
+	taskID := t.formTaskID
+	title := t.formTitle
+	desc := t.formDesc
+	link := t.formLink
+	label := t.formLabel
+	priority := t.formPriority
 	taskSvc := t.taskService
 	noteSvc := t.noteService
 
+	if taskID == "" {
+		// Create
+		return func() tea.Msg {
+			id := taskSvc.GenerateTaskID()
+			newTask := task.NewTaskComplete(id, task.Todo, title, desc, priority, link)
+			newTask.SetLabel(label)
+			taskSvc.CreateTask(newTask)
+			taskSvc.SetLabel(id, label)
+			return fetchData(taskSvc, noteSvc)
+		}
+	}
+
+	// Edit
 	return func() tea.Msg {
 		tk, err := taskSvc.GetTaskByID(taskID)
 		if err != nil {
@@ -1031,8 +1063,8 @@ func (t *Tui) View() string {
 		)
 	}
 
-	if t.editForm != nil {
-		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.editForm.View())
+	if t.taskForm != nil {
+		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.taskForm.View())
 		return lipgloss.Place(
 			t.width,
 			t.height,
