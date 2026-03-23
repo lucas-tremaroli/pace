@@ -160,6 +160,17 @@ func (t *Tui) syncFilterEnabled() {
 }
 
 func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Always track window size, even when a form overlay is active.
+	if ws, ok := msg.(tea.WindowSizeMsg); ok {
+		t.width = ws.Width
+		t.height = ws.Height
+		t.tooSmall = ws.Width < minWidth || ws.Height < minHeight
+		if !t.tooSmall {
+			t.recalcLayout()
+		}
+		t.loaded = true
+	}
+
 	// Handle confirm dialog when active
 	if t.confirmForm != nil {
 		form, cmd := t.confirmForm.Update(msg)
@@ -252,13 +263,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, nil
 
 	case tea.WindowSizeMsg:
-		t.width = msg.Width
-		t.height = msg.Height
-		t.tooSmall = msg.Width < minWidth || msg.Height < minHeight
-		if !t.tooSmall {
-			t.recalcLayout()
-		}
-		t.loaded = true
+		// Size tracking already handled above; just refresh detail if needed.
 		t.lastKey = "" // force detail re-render at new width
 		if !t.tooSmall && t.focus == focusDetail {
 			return t, t.refreshDetailCmd()
