@@ -2,6 +2,7 @@ package task
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
@@ -14,7 +15,7 @@ var (
 	createTitle       string
 	createDescription string
 	createStatus      string
-	createPriority    int
+	createPriority    string
 	createLabel       string
 	createLink        string
 	createBulk        string
@@ -49,13 +50,18 @@ For bulk creation, use --bulk with a JSON array or '-' for stdin:
 			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, chore, docs")
 		}
 
+		priority, err := task.ParsePriority(createPriority)
+		if err != nil {
+			output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
+		}
+
 		svc, err := task.NewService()
 		if err != nil {
 			output.Error(err)
 		}
 		defer svc.Close()
 
-		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, createTitle, createDescription, createPriority, createLink)
+		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, createTitle, createDescription, priority, createLink)
 
 		if err := svc.CreateTask(newTask); err != nil {
 			output.Error(err)
@@ -141,10 +147,17 @@ func handleBulkCreate(bulkInput string) error {
 			continue
 		}
 
-		// Default priority to 3 (normal) if not specified
+		// Default priority to 2 (medium) if not specified; validate range
 		priority := input.Priority
 		if priority == 0 {
-			priority = 3
+			priority = 2
+		}
+		if priority < 1 || priority > 3 {
+			result.Failed = append(result.Failed, output.BulkItem{
+				Title: input.Title,
+				Error: fmt.Sprintf("priority must be 1-3, got %d", priority),
+			})
+			continue
 		}
 
 		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, input.Title, input.Description, priority, input.Link)
@@ -178,7 +191,7 @@ func init() {
 	createCmd.Flags().StringVar(&createTitle, "title", "", "Task title (required for single task creation)")
 	createCmd.Flags().StringVar(&createDescription, "description", "", "Task description")
 	createCmd.Flags().StringVar(&createStatus, "status", "todo", "Task status (todo, in-progress, done)")
-	createCmd.Flags().IntVar(&createPriority, "priority", 3, "Task priority (1=urgent, 2=high, 3=normal, 4=low)")
+	createCmd.Flags().StringVar(&createPriority, "priority", "medium", "Task priority (high, medium, low or 1-3)")
 	createCmd.Flags().StringVar(&createLabel, "label", "task", "Task label (task, bug, feature, chore, docs)")
 	createCmd.Flags().StringVar(&createLink, "url", "", "URL associated with the task (e.g., google.com)")
 	createCmd.Flags().StringVar(&createBulk, "bulk", "", "JSON array of tasks to create, or '-' for stdin")

@@ -250,6 +250,27 @@ func (s *Service) ReadAllNotes() ([]Note, error) {
 	return notes, nil
 }
 
+// ListNoteNames returns notes with only filenames and paths, without reading
+// file contents. This is much faster than ListNotesWithMeta for use cases that
+// only need to display note names (e.g. TUI list).
+func (s *Service) ListNoteNames() ([]Note, error) {
+	entries, err := os.ReadDir(s.notesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var notes []Note
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+			notes = append(notes, Note{
+				Filename: e.Name(),
+				Path:     filepath.Join(s.notesDir, e.Name()),
+			})
+		}
+	}
+	return notes, nil
+}
+
 // ListNotesWithMeta lists notes with optional content inclusion and label metadata
 func (s *Service) ListNotesWithMeta(includeContent bool) ([]Note, error) {
 	entries, err := os.ReadDir(s.notesDir)

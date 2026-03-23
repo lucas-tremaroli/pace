@@ -232,16 +232,21 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 	}
 	if priorities, ok := args["priority"].([]any); ok {
 		for _, p := range priorities {
-			v, ok := p.(float64)
-			if !ok {
-				return codedError(output.ErrCodeInvalidPriority, "priority values must be numbers", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
-			}
-			priority := int(v)
-			if float64(priority) != v {
-				return codedError(output.ErrCodeInvalidPriority, "priority values must be integers", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
-			}
-			if priority < 1 || priority > 4 {
-				return codedError(output.ErrCodeInvalidPriority, "priority values must be between 1 and 4", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
+			var priority int
+			switch v := p.(type) {
+			case string:
+				var err error
+				priority, err = task.ParsePriority(v)
+				if err != nil {
+					return codedError(output.ErrCodeInvalidPriority, err.Error(), task.ValidPriorityHelp)
+				}
+			case float64:
+				priority = int(v)
+				if float64(priority) != v || priority < 1 || priority > 3 {
+					return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
+				}
+			default:
+				return codedError(output.ErrCodeInvalidPriority, "priority values must be strings or numbers", task.ValidPriorityHelp)
 			}
 			filter.Priorities = append(filter.Priorities, priority)
 		}
@@ -323,16 +328,23 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	}
 
 	// Parse priority
-	priority := 3
-	if p, ok := args["priority"].(float64); ok {
-		if p != float64(int(p)) {
-			return codedError(output.ErrCodeInvalidPriority, "priority must be an integer", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
+	priority := 2
+	if p, ok := args["priority"]; ok {
+		switch v := p.(type) {
+		case string:
+			var err error
+			priority, err = task.ParsePriority(v)
+			if err != nil {
+				return codedError(output.ErrCodeInvalidPriority, err.Error(), task.ValidPriorityHelp)
+			}
+		case float64:
+			priority = int(v)
+			if float64(priority) != v || priority < 1 || priority > 3 {
+				return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
+			}
+		default:
+			return codedError(output.ErrCodeInvalidPriority, "priority must be a string or number", task.ValidPriorityHelp)
 		}
-		pi := int(p)
-		if pi < 1 || pi > 4 {
-			return codedError(output.ErrCodeInvalidPriority, "priority must be between 1 and 4", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
-		}
-		priority = pi
 	}
 
 	// Generate ID and create task
@@ -401,15 +413,22 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	}
 
 	priority := existingTask.Priority()
-	if p, ok := args["priority"].(float64); ok {
-		if p != float64(int(p)) {
-			return codedError(output.ErrCodeInvalidPriority, "priority must be an integer", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
+	if p, ok := args["priority"]; ok {
+		switch v := p.(type) {
+		case string:
+			var err error
+			priority, err = task.ParsePriority(v)
+			if err != nil {
+				return codedError(output.ErrCodeInvalidPriority, err.Error(), task.ValidPriorityHelp)
+			}
+		case float64:
+			priority = int(v)
+			if float64(priority) != v || priority < 1 || priority > 3 {
+				return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
+			}
+		default:
+			return codedError(output.ErrCodeInvalidPriority, "priority must be a string or number", task.ValidPriorityHelp)
 		}
-		pi := int(p)
-		if pi < 1 || pi > 4 {
-			return codedError(output.ErrCodeInvalidPriority, "priority must be between 1 and 4", "Valid values: 1 (urgent), 2 (high), 3 (normal), 4 (low)")
-		}
-		priority = pi
 	}
 
 	updatedTask := task.NewTaskComplete(id, status, title, description, priority, link)

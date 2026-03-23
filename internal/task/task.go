@@ -410,3 +410,35 @@ func ValidateLabel(s string) error {
 	_, err := ParseTaskType(s)
 	return err
 }
+
+// ParsePriority parses a priority string (name or number) into an int.
+// Accepts "high"/"medium"/"low" or "1"/"2"/"3".
+func ParsePriority(s string) (int, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "high", "1":
+		return 1, nil
+	case "medium", "med", "2":
+		return 2, nil
+	case "low", "3":
+		return 3, nil
+	default:
+		return 0, fmt.Errorf("invalid priority: %s (valid: high, medium, low or 1-3)", s)
+	}
+}
+
+// PriorityName returns the display name for a priority level.
+func PriorityName(p int) string {
+	switch p {
+	case 1:
+		return "High"
+	case 2:
+		return "Medium"
+	case 3:
+		return "Low"
+	default:
+		return fmt.Sprintf("P%d", p)
+	}
+}
+
+// ValidPriorityHelp is a help text string for priority values.
+const ValidPriorityHelp = "Valid values: high (1), medium (2), low (3)"

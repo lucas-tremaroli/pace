@@ -106,6 +106,9 @@ func (db *DB) createTables() error {
 	// Ignore error if column already exists
 	_ = err
 
+	// Migration: consolidate P4 into P3 (4-level → 3-level priority)
+	_, _ = db.conn.Exec(`UPDATE tasks SET priority = 3 WHERE priority = 4`)
+
 	// Create task_dependencies table for blocking relationships
 	depQuery := `
 		CREATE TABLE IF NOT EXISTS task_dependencies (

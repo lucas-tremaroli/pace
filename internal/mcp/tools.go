@@ -24,9 +24,9 @@ func GetToolDefinitions() []Tool {
 					},
 					"priority": {
 						Type:        "array",
-						Description: "Filter by one or more priority levels: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
+						Description: "Filter by one or more priority levels: 1 (high), 2 (medium), 3 (low). Accepts names (high, medium, low) or numbers (1-3)",
 						Items: &Property{
-							Type: "integer",
+							Type: "string",
 						},
 					},
 					"label": {
@@ -82,9 +82,9 @@ func GetToolDefinitions() []Tool {
 						Default:     "todo",
 					},
 					"priority": {
-						Type:        "integer",
-						Description: "Priority level: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
-						Default:     3,
+						Type:        "string",
+						Description: "Priority level: high (1), medium (2), low (3). Accepts names or numbers",
+						Default:     "medium",
 					},
 					"label": {
 						Type:        "string",
@@ -124,8 +124,8 @@ func GetToolDefinitions() []Tool {
 						Enum:        []string{"todo", "in-progress", "done"},
 					},
 					"priority": {
-						Type:        "integer",
-						Description: "New priority level: 1 (urgent), 2 (high), 3 (normal), 4 (low)",
+						Type:        "string",
+						Description: "New priority level: high (1), medium (2), low (3). Accepts names or numbers",
 					},
 					"label": {
 						Type:        "string",

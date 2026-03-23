@@ -114,7 +114,7 @@ func (i TaskItem) Title() string {
 }
 
 func (i TaskItem) Description() string {
-	return fmt.Sprintf("%s P%d", i.Task.ID(), i.Task.Priority())
+	return fmt.Sprintf("%s %s", i.Task.ID(), task.PriorityName(i.Task.Priority()))
 }
 
 func (i TaskItem) FilterValue() string {

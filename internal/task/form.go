@@ -43,7 +43,7 @@ func NewForm(title, description string, board *Board) *Form {
 		description: textarea.New(),
 		link:        textinput.New(),
 		label:       TypeTask,
-		priority:    3,
+		priority:    2,
 		board:       board,
 		focused:     fieldTitle,
 		isEdit:      false,
@@ -187,7 +187,7 @@ func (f Form) prevLabel() TaskType {
 }
 
 func (f Form) nextPriority() int {
-	if f.priority >= 4 {
+	if f.priority >= 3 {
 		return 1
 	}
 	return f.priority + 1
@@ -195,7 +195,7 @@ func (f Form) nextPriority() int {
 
 func (f Form) prevPriority() int {
 	if f.priority <= 1 {
-		return 4
+		return 3
 	}
 	return f.priority - 1
 }
@@ -358,10 +358,9 @@ func (f Form) renderPriorityOptions(normalStyle, selectedStyle lipgloss.Style) s
 		p    int
 		name string
 	}{
-		{1, "P1"},
-		{2, "P2"},
-		{3, "P3"},
-		{4, "P4"},
+		{1, "High"},
+		{2, "Med"},
+		{3, "Low"},
 	}
 
 	var parts []string
@@ -380,5 +379,5 @@ func (f Form) renderPriorityOptions(normalStyle, selectedStyle lipgloss.Style) s
 		arrows = "     "
 	}
 
-	return fmt.Sprintf("[%s]%s", lipgloss.JoinHorizontal(lipgloss.Left, parts[0], " ", parts[1], " ", parts[2], " ", parts[3]), arrows)
+	return fmt.Sprintf("[%s]%s", lipgloss.JoinHorizontal(lipgloss.Left, parts[0], " ", parts[1], " ", parts[2]), arrows)
 }
