@@ -93,7 +93,6 @@ type Tui struct {
 	formLink     string
 	formLabel    string
 	formPriority int
-	formError    string // error message from last save attempt
 
 	// Cached layout dimensions, updated by recalcLayout.
 	layoutAvailH int
@@ -212,7 +211,6 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if t.taskForm.State == huh.StateAborted {
 				t.taskForm = nil
 				t.formTaskID = ""
-				t.formError = ""
 				return t, nil
 			}
 		}
@@ -220,15 +218,6 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case taskFormSavedMsg:
-		if msg.err != nil {
-			t.formError = msg.err.Error()
-			return t, nil
-		}
-		t.formError = ""
-		t.lastKey = "" // force detail re-render after save
-		return t, t.loadDataCmd()
-
 	case dataReloadedMsg:
 		noteIdx := t.noteList.Index()
 		t.taskList.SetItems(msg.tasks)
@@ -281,8 +270,6 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, nil
 
 	case tea.KeyMsg:
-		t.formError = "" // clear any stale error on key press
-
 		// When a list is filtering, all keys go to it
 		if t.isFiltering() {
 			return t.updateFilteringList(msg)
@@ -484,11 +471,6 @@ func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
 	return t, t.taskForm.Init()
 }
 
-// taskFormSavedMsg signals that a task form save completed.
-type taskFormSavedMsg struct {
-	err error
-}
-
 // taskFormSaveCmd persists the created or edited task and reloads data.
 func (t *Tui) taskFormSaveCmd() tea.Cmd {
 	taskID := t.formTaskID
@@ -498,6 +480,7 @@ func (t *Tui) taskFormSaveCmd() tea.Cmd {
 	label := t.formLabel
 	priority := t.formPriority
 	taskSvc := t.taskService
+	noteSvc := t.noteService
 
 	if taskID == "" {
 		// Create
@@ -505,13 +488,9 @@ func (t *Tui) taskFormSaveCmd() tea.Cmd {
 			id := taskSvc.GenerateTaskID()
 			newTask := task.NewTaskComplete(id, task.Todo, title, desc, priority, link)
 			newTask.SetLabel(label)
-			if err := taskSvc.CreateTask(newTask); err != nil {
-				return taskFormSavedMsg{err: err}
-			}
-			if err := taskSvc.SetLabel(id, label); err != nil {
-				return taskFormSavedMsg{err: err}
-			}
-			return taskFormSavedMsg{}
+			taskSvc.CreateTask(newTask)
+			taskSvc.SetLabel(id, label)
+			return fetchData(taskSvc, noteSvc)
 		}
 	}
 
@@ -519,20 +498,16 @@ func (t *Tui) taskFormSaveCmd() tea.Cmd {
 	return func() tea.Msg {
 		tk, err := taskSvc.GetTaskByID(taskID)
 		if err != nil {
-			return taskFormSavedMsg{err: err}
+			return fetchData(taskSvc, noteSvc)
 		}
 		updated := task.NewTaskComplete(tk.ID(), tk.Status(), title, desc, priority, link)
 		updated.SetLabel(label)
 		updated.SetBlockedBy(tk.BlockedBy())
 		updated.SetBlocks(tk.Blocks())
 		updated.SetNotes(tk.Notes())
-		if err := taskSvc.UpdateTask(updated); err != nil {
-			return taskFormSavedMsg{err: err}
-		}
-		if err := taskSvc.SetLabel(taskID, label); err != nil {
-			return taskFormSavedMsg{err: err}
-		}
-		return taskFormSavedMsg{}
+		taskSvc.UpdateTask(updated)
+		taskSvc.SetLabel(taskID, label)
+		return fetchData(taskSvc, noteSvc)
 	}
 }
 
@@ -1082,15 +1057,7 @@ func (t *Tui) View() string {
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, left, detailBox)
 	footer := helpStyle.Render(t.help.View(tuiKeys))
 
-	var errorLine string
-	if t.formError != "" {
-		errorLine = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Padding(0, 1).
-			Render("Error: " + t.formError)
-	}
-
-	view := lipgloss.JoinVertical(lipgloss.Left, panels, footer, errorLine)
+	view := lipgloss.JoinVertical(lipgloss.Left, panels, footer)
 
 	if t.confirmForm != nil {
 		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.confirmForm.View())
