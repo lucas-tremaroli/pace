@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/muesli/reflow/wrap"
 
 	"github.com/lucas-tremaroli/pace/internal/note"
+	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/lucas-tremaroli/pace/internal/task"
 )
 
@@ -65,13 +67,14 @@ var (
 	priorityP3     = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
 
 	// Overview styles
-	overviewLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	overviewCount = lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Bold(true)
+	overviewLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	overviewPct    = lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Bold(true)
+	storageTag     = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
 	progressFilled = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
 	progressEmpty  = lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
+	noTasksStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
 )
 
-const overviewHeight = 3 // border-less: counts line + progress bar + blank line
 
 type Tui struct {
 	taskList    list.Model
@@ -80,6 +83,8 @@ type Tui struct {
 	help        help.Model
 	taskService *task.Service
 	noteService *note.Service
+	storagePath string
+	storageType storage.StorageType
 	focus       int
 	width       int
 	height      int
@@ -103,6 +108,7 @@ type Tui struct {
 
 	// Cached layout dimensions, updated by recalcLayout.
 	layoutAvailH    int
+	layoutOverviewH int
 	layoutTaskH     int
 	layoutNoteH     int
 	cachedHelpH     int
@@ -140,6 +146,13 @@ func NewTui() (*Tui, error) {
 	vp := viewport.New(0, 0)
 	vp.SetContent(detailPlaceholder)
 
+	var storePath string
+	var storeType storage.StorageType
+	if resolved, err := storage.ResolvePaceDir(); err == nil {
+		storePath = resolved.Path
+		storeType = resolved.Type
+	}
+
 	return &Tui{
 		taskList:    newList("Tasks", nil, taskDelegate{}),
 		noteList:    noteList,
@@ -147,6 +160,8 @@ func NewTui() (*Tui, error) {
 		help:        help.New(),
 		taskService: taskService,
 		noteService: noteService,
+		storagePath: storePath,
+		storageType: storeType,
 		focus:       focusTasks,
 	}, nil
 }
@@ -1011,17 +1026,27 @@ func (t *Tui) recalcLayout() {
 	lw := t.listWidth() - 2
 	dw := t.detailWidth() - 2
 
-	taskH := availH / 2
-	noteH := availH - taskH
+	overviewH := 7 // pad + storage + pad + bar + pad + counts + pad
+	listH := availH - overviewH
+	taskH := listH / 2
+	noteH := listH - taskH
 
-	t.taskList.SetSize(lw, taskH-2-overviewHeight)
+	t.taskList.SetSize(lw, taskH-2)
 	t.noteList.SetSize(lw, noteH-2)
 	t.viewport.Width = dw
 	t.viewport.Height = availH - 2
 
 	t.layoutAvailH = availH
+	t.layoutOverviewH = overviewH
 	t.layoutTaskH = taskH
 	t.layoutNoteH = noteH
+}
+
+func shortenPath(p string) string {
+	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(p, home) {
+		return "~" + p[len(home):]
+	}
+	return p
 }
 
 func (t *Tui) renderOverview(w int) string {
@@ -1040,28 +1065,35 @@ func (t *Tui) renderOverview(w int) string {
 		}
 	}
 
-	// Counts line
-	counts := overviewCount.Render(fmt.Sprintf("%d", total)) +
-		overviewLabel.Render(" tasks  ") +
+	// Storage path with type tag
+	tag := storageTag.Render("[" + string(t.storageType) + "]")
+	storeLine := overviewLabel.Render(shortenPath(t.storagePath)) + "  " + tag
+
+	if total == 0 {
+		return "\n" + storeLine + "\n\n" + noTasksStyle.Render("no tasks yet") + "\n"
+	}
+
+	// Progress bar with percentage
+	pct := done * 100 / total
+	pctStr := overviewPct.Render(fmt.Sprintf(" %d%%", pct))
+	barW := w - 6 // room for " XX%"
+	if barW < 10 {
+		barW = 10
+	}
+	filled := done * barW / total
+	bar := progressFilled.Render(strings.Repeat("━", filled)) +
+		progressEmpty.Render(strings.Repeat("─", barW-filled)) +
+		pctStr
+
+	// Counts line: done/total + status breakdown
+	counts := overviewLabel.Render(fmt.Sprintf("Progress %d/%d  ", done, total)) +
 		statusTodo.Render(fmt.Sprintf("○ %d", todo)) +
 		overviewLabel.Render("  ") +
 		statusProgress.Render(fmt.Sprintf("● %d", inProg)) +
 		overviewLabel.Render("  ") +
 		statusDone.Render(fmt.Sprintf("✓ %d", done))
 
-	// Progress bar
-	barW := w - 2 // small padding
-	if barW < 10 {
-		barW = 10
-	}
-	filled := 0
-	if total > 0 {
-		filled = done * barW / total
-	}
-	bar := progressFilled.Render(strings.Repeat("█", filled)) +
-		progressEmpty.Render(strings.Repeat("░", barW-filled))
-
-	return counts + "\n" + bar + "\n"
+	return "\n" + storeLine + "\n\n" + bar + "\n\n" + counts + "\n"
 }
 
 func (t *Tui) View() string {
@@ -1093,7 +1125,7 @@ func (t *Tui) View() string {
 	}
 
 	overview := lipgloss.NewStyle().Width(lw).PaddingLeft(1).Render(t.renderOverview(lw))
-	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Render(fitHeight(t.taskList.View(), taskH-2-overviewHeight))
+	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Render(fitHeight(t.taskList.View(), taskH-2))
 	noteBox := bdr(t.focus == focusNotes).Width(lw - 2).Render(fitHeight(t.noteList.View(), noteH-2))
 
 	var detailContent string
