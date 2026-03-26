@@ -21,13 +21,14 @@ import (
 )
 
 const (
-	focusTasks       = 0
-	focusNotes       = 1
-	focusDetail      = 2
-	minListW         = 30
-	minWidth         = 80
-	minHeight        = 20
-	dialogWidth      = 50
+	focusTasks        = 0
+	focusNotes        = 1
+	focusDetail       = 2
+	minListW          = 30
+	minWidth          = 80
+	minHeight         = 20
+	dialogWidth       = 50
+	overviewH         = 7 // pad + storage + pad + bar + pad + counts + pad
 	detailPlaceholder = "Press enter or → to view details"
 )
 
@@ -108,7 +109,6 @@ type Tui struct {
 
 	// Cached layout dimensions, updated by recalcLayout.
 	layoutAvailH    int
-	layoutOverviewH int
 	layoutTaskH     int
 	layoutNoteH     int
 	cachedHelpH     int
@@ -1026,7 +1026,6 @@ func (t *Tui) recalcLayout() {
 	lw := t.listWidth() - 2
 	dw := t.detailWidth() - 2
 
-	overviewH := 7 // pad + storage + pad + bar + pad + counts + pad
 	listH := availH - overviewH
 	taskH := listH / 2
 	noteH := listH - taskH
@@ -1037,7 +1036,6 @@ func (t *Tui) recalcLayout() {
 	t.viewport.Height = availH - 2
 
 	t.layoutAvailH = availH
-	t.layoutOverviewH = overviewH
 	t.layoutTaskH = taskH
 	t.layoutNoteH = noteH
 }
@@ -1070,7 +1068,8 @@ func (t *Tui) renderOverview(w int) string {
 	storeLine := overviewLabel.Render(shortenPath(t.storagePath)) + "  " + tag
 
 	if total == 0 {
-		return "\n" + storeLine + "\n\n" + noTasksStyle.Render("no tasks yet") + "\n"
+		content := "\n" + storeLine + "\n\n" + noTasksStyle.Render("no tasks yet")
+		return fitHeight(content, overviewH)
 	}
 
 	// Progress bar with percentage
@@ -1093,7 +1092,8 @@ func (t *Tui) renderOverview(w int) string {
 		overviewLabel.Render("  ") +
 		statusDone.Render(fmt.Sprintf("✓ %d", done))
 
-	return "\n" + storeLine + "\n\n" + bar + "\n\n" + counts + "\n"
+	content := "\n" + storeLine + "\n\n" + bar + "\n\n" + counts
+	return fitHeight(content, overviewH)
 }
 
 func (t *Tui) View() string {
