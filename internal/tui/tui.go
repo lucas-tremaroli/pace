@@ -63,7 +63,15 @@ var (
 	priorityP1     = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	priorityP2     = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
 	priorityP3     = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
+
+	// Overview styles
+	overviewLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	overviewCount = lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Bold(true)
+	progressFilled = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	progressEmpty  = lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
 )
+
+const overviewHeight = 3 // border-less: counts line + progress bar + blank line
 
 type Tui struct {
 	taskList    list.Model
@@ -1006,7 +1014,7 @@ func (t *Tui) recalcLayout() {
 	taskH := availH / 2
 	noteH := availH - taskH
 
-	t.taskList.SetSize(lw, taskH-2)
+	t.taskList.SetSize(lw, taskH-2-overviewHeight)
 	t.noteList.SetSize(lw, noteH-2)
 	t.viewport.Width = dw
 	t.viewport.Height = availH - 2
@@ -1014,6 +1022,46 @@ func (t *Tui) recalcLayout() {
 	t.layoutAvailH = availH
 	t.layoutTaskH = taskH
 	t.layoutNoteH = noteH
+}
+
+func (t *Tui) renderOverview(w int) string {
+	var total, todo, inProg, done int
+	for _, item := range t.taskList.Items() {
+		if ti, ok := item.(TaskItem); ok {
+			total++
+			switch ti.Task.Status() {
+			case task.Todo:
+				todo++
+			case task.InProgress:
+				inProg++
+			case task.Done:
+				done++
+			}
+		}
+	}
+
+	// Counts line
+	counts := overviewCount.Render(fmt.Sprintf("%d", total)) +
+		overviewLabel.Render(" tasks  ") +
+		statusTodo.Render(fmt.Sprintf("○ %d", todo)) +
+		overviewLabel.Render("  ") +
+		statusProgress.Render(fmt.Sprintf("● %d", inProg)) +
+		overviewLabel.Render("  ") +
+		statusDone.Render(fmt.Sprintf("✓ %d", done))
+
+	// Progress bar
+	barW := w - 2 // small padding
+	if barW < 10 {
+		barW = 10
+	}
+	filled := 0
+	if total > 0 {
+		filled = done * barW / total
+	}
+	bar := progressFilled.Render(strings.Repeat("█", filled)) +
+		progressEmpty.Render(strings.Repeat("░", barW-filled))
+
+	return counts + "\n" + bar + "\n"
 }
 
 func (t *Tui) View() string {
@@ -1044,7 +1092,8 @@ func (t *Tui) View() string {
 		return blurredBorder
 	}
 
-	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Render(fitHeight(t.taskList.View(), taskH-2))
+	overview := lipgloss.NewStyle().Width(lw).PaddingLeft(1).Render(t.renderOverview(lw))
+	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Render(fitHeight(t.taskList.View(), taskH-2-overviewHeight))
 	noteBox := bdr(t.focus == focusNotes).Width(lw - 2).Render(fitHeight(t.noteList.View(), noteH-2))
 
 	var detailContent string
@@ -1056,7 +1105,7 @@ func (t *Tui) View() string {
 	}
 	detailBox := bdr(t.focus == focusDetail).Width(dw - 2).Render(detailContent)
 
-	left := lipgloss.JoinVertical(lipgloss.Left, taskBox, noteBox)
+	left := lipgloss.JoinVertical(lipgloss.Left, overview, taskBox, noteBox)
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, left, detailBox)
 	footer := helpStyle.Render(t.help.View(tuiKeys))
 
