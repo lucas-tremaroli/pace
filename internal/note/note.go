@@ -26,3 +26,8 @@ type Frontmatter struct {
 func (n Note) HasLabel(label string) bool {
 	return slices.Contains(n.Labels, label)
 }
+
+// DefaultTemplate returns the default content template for a new note.
+func DefaultTemplate(title string) string {
+	return "---\ndescription: \"\"\nlabels: []\n---\n\n# " + title + "\n\nYour content here...\n"
+}

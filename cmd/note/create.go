@@ -81,16 +81,7 @@ var createCmd = &cobra.Command{
 		}
 
 		// Write default frontmatter template for editor mode
-		defaultContent := `---
-description: ""
-labels: []
----
-
-# Title
-
-Your content here...
-`
-		if err := svc.WriteNote(filename, defaultContent); err != nil {
+		if err := svc.WriteNote(filename, note.DefaultTemplate("Title")); err != nil {
 			output.Error(err)
 		}
 		return svc.OpenInEditor(filename, editor)

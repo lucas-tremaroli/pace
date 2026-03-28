@@ -3,21 +3,20 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Tab         key.Binding
-	Enter       key.Binding
-	Left        key.Binding
-	Right       key.Binding
-	Delete      key.Binding
-	New         key.Binding
-	StatusNext  key.Binding
-	StatusPrev  key.Binding
-	StatusCycle key.Binding // display-only combined help entry
-	Quit        key.Binding
-	Filter      key.Binding
+	Tab      key.Binding
+	Right    key.Binding
+	Left     key.Binding
+	Space    key.Binding
+	Edit     key.Binding
+	OpenLink key.Binding
+	Delete   key.Binding
+	New      key.Binding
+	Quit     key.Binding
+	Filter   key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Tab, k.Enter, k.Left, k.Right, k.New, k.Delete, k.StatusCycle, k.Filter, k.Quit}
+	return []key.Binding{k.Tab, k.Left, k.Right, k.Filter, k.New, k.Delete, k.Edit, k.Space, k.OpenLink, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
@@ -29,17 +28,25 @@ var tuiKeys = keyMap{
 		key.WithKeys("tab"),
 		key.WithHelp("tab", "tasks/notes"),
 	),
-	Enter: key.NewBinding(
-		key.WithKeys("enter"),
-		key.WithHelp("enter", "detail/edit"),
-	),
-	Left: key.NewBinding(
-		key.WithKeys("left"),
-		key.WithHelp("←", "lists"),
-	),
 	Right: key.NewBinding(
 		key.WithKeys("right"),
 		key.WithHelp("→", "detail"),
+	),
+	Left: key.NewBinding(
+		key.WithKeys("left"),
+		key.WithHelp("←", "back"),
+	),
+	Space: key.NewBinding(
+		key.WithKeys(" "),
+		key.WithHelp("space", "cycle status"),
+	),
+	Edit: key.NewBinding(
+		key.WithKeys("e"),
+		key.WithHelp("e", "edit"),
+	),
+	OpenLink: key.NewBinding(
+		key.WithKeys("o"),
+		key.WithHelp("o", "open link"),
 	),
 	Delete: key.NewBinding(
 		key.WithKeys("backspace"),
@@ -47,17 +54,7 @@ var tuiKeys = keyMap{
 	),
 	New: key.NewBinding(
 		key.WithKeys("+"),
-		key.WithHelp("+", "new task"),
-	),
-	StatusNext: key.NewBinding(
-		key.WithKeys("shift+right"),
-	),
-	StatusPrev: key.NewBinding(
-		key.WithKeys("shift+left"),
-	),
-	StatusCycle: key.NewBinding(
-		key.WithKeys("shift+right", "shift+left"),
-		key.WithHelp("shift+←/→", "cycle status"),
+		key.WithHelp("+", "new"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
