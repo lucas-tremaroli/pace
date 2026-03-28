@@ -31,7 +31,7 @@ const (
 	minHeight         = 20
 	dialogWidth       = 50
 	overviewH         = 7 // pad + storage + pad + bar + pad + counts + pad
-	detailPlaceholder = "Press enter or → to view details"
+	detailPlaceholder = "Press → to view details"
 )
 
 var (
@@ -626,9 +626,14 @@ func (t *Tui) buildNoteForm() *huh.Form {
 					if s == "" {
 						return fmt.Errorf("filename is required")
 					}
+					if strings.Contains(s, "/") || strings.Contains(s, "\\") || strings.HasPrefix(s, ".") {
+						return fmt.Errorf("filename must not contain path separators or start with a dot")
+					}
 					path := noteSvc.GetNotePath(s)
 					if _, err := os.Stat(path); err == nil {
-						return fmt.Errorf("note %s.md already exists", s)
+						return fmt.Errorf("note %s already exists", s)
+					} else if !os.IsNotExist(err) {
+						return fmt.Errorf("unable to check note %s: %v", s, err)
 					}
 					return nil
 				}),
@@ -709,7 +714,7 @@ func (t *Tui) openLinkCmd() tea.Cmd {
 		default:
 			cmd = exec.Command("xdg-open", link)
 		}
-		cmd.Run()
+		cmd.Start()
 		return nil
 	}
 }
