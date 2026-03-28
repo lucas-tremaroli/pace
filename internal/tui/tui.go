@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 
@@ -106,6 +107,10 @@ type Tui struct {
 	formLink     string
 	formLabel    string
 	formPriority int
+
+	noteForm          *huh.Form
+	formNoteFilename  string
+	pendingNoteSelect string // filename to select after data reload (note create)
 
 	// Cached layout dimensions, updated by recalcLayout.
 	layoutAvailH    int
@@ -241,12 +246,47 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t, cmd
 	}
 
+	// Handle note form (create) when active
+	if t.noteForm != nil {
+		form, cmd := t.noteForm.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			t.noteForm = f
+			if t.noteForm.State == huh.StateCompleted {
+				openCmd := t.noteFormOpenEditorCmd()
+				t.noteForm = nil
+				return t, openCmd
+			}
+			if t.noteForm.State == huh.StateAborted {
+				t.noteForm = nil
+				t.formNoteFilename = ""
+				return t, nil
+			}
+		}
+		return t, cmd
+	}
+
 	switch msg := msg.(type) {
+	case editorFinishedMsg:
+		// Reload data to pick up any changes made in the editor.
+		// On error (e.g. editor not found), we still reload since the note
+		// file may have been created before the editor failed.
+		t.lastKey = "" // force detail re-render
+		return t, t.loadDataCmd()
+
 	case dataReloadedMsg:
 		noteIdx := t.noteList.Index()
 		t.taskList.SetItems(msg.tasks)
 		t.noteList.SetItems(msg.notes)
-		if noteIdx >= len(msg.notes) && len(msg.notes) > 0 {
+		if t.pendingNoteSelect != "" {
+			for i, item := range msg.notes {
+				if ni, ok := item.(NoteItem); ok && ni.Note.Filename == t.pendingNoteSelect {
+					t.noteList.Select(i)
+					noteIdx = i
+					break
+				}
+			}
+			t.pendingNoteSelect = ""
+		} else if noteIdx >= len(msg.notes) && len(msg.notes) > 0 {
 			t.noteList.Select(len(msg.notes) - 1)
 		}
 		// Re-sync list sizes so pagination is calculated with the new items
@@ -313,6 +353,9 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, tuiKeys.New):
 			if t.focus == focusTasks {
 				return t.startCreate()
+			}
+			if t.focus == focusNotes {
+				return t.startNoteCreate()
 			}
 
 		case key.Matches(msg, tuiKeys.Delete):
@@ -468,6 +511,9 @@ func (t *Tui) startCreate() (tea.Model, tea.Cmd) {
 }
 
 func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
+	if t.lastListFocus == focusNotes {
+		return t.startNoteEdit()
+	}
 	if t.lastListFocus != focusTasks {
 		return t, nil
 	}
@@ -532,6 +578,95 @@ func (t *Tui) taskFormSaveCmd() tea.Cmd {
 		taskSvc.SetLabel(taskID, label)
 		return fetchData(taskSvc, noteSvc)
 	}
+}
+
+// editorFinishedMsg is sent when an external editor process exits.
+type editorFinishedMsg struct{ err error }
+
+// resolveEditor returns the first available editor, preferring nvim.
+func resolveEditor() string {
+	candidates := []string{"nvim"}
+	if e := os.Getenv("EDITOR"); e != "" {
+		candidates = append(candidates, e)
+	}
+	candidates = append(candidates, "vim", "vi", "nano")
+	for _, e := range candidates {
+		if _, err := exec.LookPath(e); err == nil {
+			return e
+		}
+	}
+	return "vi"
+}
+
+func (t *Tui) buildNoteForm() *huh.Form {
+	noteSvc := t.noteService
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Filename").
+				Description("Without .md extension").
+				Value(&t.formNoteFilename).
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("filename is required")
+					}
+					path := noteSvc.GetNotePath(s)
+					if _, err := os.Stat(path); err == nil {
+						return fmt.Errorf("note %s.md already exists", s)
+					}
+					return nil
+				}),
+		),
+	).WithWidth(dialogWidth).WithShowHelp(true)
+}
+
+func (t *Tui) startNoteCreate() (tea.Model, tea.Cmd) {
+	t.formNoteFilename = ""
+	t.noteForm = t.buildNoteForm()
+	return t, t.noteForm.Init()
+}
+
+// noteFormOpenEditorCmd writes a template note and opens it in an editor.
+func (t *Tui) noteFormOpenEditorCmd() tea.Cmd {
+	filename := t.formNoteFilename
+	noteSvc := t.noteService
+	t.formNoteFilename = ""
+
+	editor := resolveEditor()
+	path := noteSvc.GetNotePath(filename)
+
+	// Track the filename so we can select it after data reload.
+	if !strings.HasSuffix(filename, ".md") {
+		t.pendingNoteSelect = filename + ".md"
+	} else {
+		t.pendingNoteSelect = filename
+	}
+
+	// Write template inside the Cmd closure (TEA: no I/O in Update),
+	// then return the exec message to launch the editor.
+	return func() tea.Msg {
+		if err := noteSvc.WriteNote(filename, note.DefaultTemplate(filename)); err != nil {
+			return editorFinishedMsg{err}
+		}
+		c := exec.Command(editor, path)
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		})()
+	}
+}
+
+func (t *Tui) startNoteEdit() (tea.Model, tea.Cmd) {
+	item, ok := t.noteList.SelectedItem().(NoteItem)
+	if !ok {
+		return t, nil
+	}
+	editor := resolveEditor()
+	filename := strings.TrimSuffix(item.Note.Filename, ".md")
+	path := t.noteService.GetNotePath(filename)
+	c := exec.Command(editor, path)
+	return t, tea.ExecProcess(c, func(err error) tea.Msg {
+		return editorFinishedMsg{err}
+	})
 }
 
 // taskStatusUpdatedMsg signals that a task's status was persisted.
@@ -1156,6 +1291,17 @@ func (t *Tui) View() string {
 
 	if t.taskForm != nil {
 		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.taskForm.View())
+		return lipgloss.Place(
+			t.width,
+			t.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			dialog,
+		)
+	}
+
+	if t.noteForm != nil {
+		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.noteForm.View())
 		return lipgloss.Place(
 			t.width,
 			t.height,

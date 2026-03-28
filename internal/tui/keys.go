@@ -47,7 +47,7 @@ var tuiKeys = keyMap{
 	),
 	New: key.NewBinding(
 		key.WithKeys("+"),
-		key.WithHelp("+", "new task"),
+		key.WithHelp("+", "new"),
 	),
 	StatusNext: key.NewBinding(
 		key.WithKeys("shift+right"),
