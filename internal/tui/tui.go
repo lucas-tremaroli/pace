@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -370,14 +371,13 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			t.syncFilterEnabled()
 			return t, nil
 
-		case key.Matches(msg, tuiKeys.Enter), key.Matches(msg, tuiKeys.Right):
-			if t.focus == focusDetail {
-				return t.startEdit()
+		case key.Matches(msg, tuiKeys.Right):
+			if t.focus != focusDetail {
+				t.lastListFocus = t.focus
+				cmd := t.refreshDetailCmd()
+				t.focus = focusDetail
+				return t, cmd
 			}
-			t.lastListFocus = t.focus
-			cmd := t.refreshDetailCmd()
-			t.focus = focusDetail
-			return t, cmd
 
 		case key.Matches(msg, tuiKeys.Left):
 			if t.focus == focusDetail {
@@ -386,13 +386,15 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return t, nil
 			}
 
-		case key.Matches(msg, tuiKeys.StatusNext):
-			if t.focus == focusTasks {
+		case key.Matches(msg, tuiKeys.Edit):
+			return t.startEdit()
+
+		case key.Matches(msg, tuiKeys.OpenLink):
+			return t, t.openLinkCmd()
+
+		case key.Matches(msg, tuiKeys.Space):
+			if t.focus == focusTasks || (t.focus == focusDetail && t.lastListFocus == focusTasks) {
 				return t, t.cycleTaskStatusCmd(true)
-			}
-		case key.Matches(msg, tuiKeys.StatusPrev):
-			if t.focus == focusTasks {
-				return t, t.cycleTaskStatusCmd(false)
 			}
 		}
 
@@ -510,11 +512,19 @@ func (t *Tui) startCreate() (tea.Model, tea.Cmd) {
 	return t, t.taskForm.Init()
 }
 
+func (t *Tui) editTarget() int {
+	if t.focus == focusDetail {
+		return t.lastListFocus
+	}
+	return t.focus
+}
+
 func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
-	if t.lastListFocus == focusNotes {
+	target := t.editTarget()
+	if target == focusNotes {
 		return t.startNoteEdit()
 	}
-	if t.lastListFocus != focusTasks {
+	if target != focusTasks {
 		return t, nil
 	}
 	item, ok := t.taskList.SelectedItem().(TaskItem)
@@ -667,6 +677,35 @@ func (t *Tui) startNoteEdit() (tea.Model, tea.Cmd) {
 	return t, tea.ExecProcess(c, func(err error) tea.Msg {
 		return editorFinishedMsg{err}
 	})
+}
+
+// openLinkCmd opens the selected task's link in the default browser.
+func (t *Tui) openLinkCmd() tea.Cmd {
+	target := t.editTarget()
+	if target != focusTasks {
+		return nil
+	}
+	item, ok := t.taskList.SelectedItem().(TaskItem)
+	if !ok {
+		return nil
+	}
+	link := item.Task.Link()
+	if link == "" {
+		return nil
+	}
+	return func() tea.Msg {
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("open", link)
+		case "windows":
+			cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", link)
+		default:
+			cmd = exec.Command("xdg-open", link)
+		}
+		cmd.Run()
+		return nil
+	}
 }
 
 // taskStatusUpdatedMsg signals that a task's status was persisted.

@@ -44,48 +44,43 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 
 	icon := ti.icon()
 	text := t.Title()
+	hasLink := t.Link() != ""
 
-	// For in-progress and done tasks, render icon with color separately from text
-	if !selected {
-		switch {
-		case t.IsBlocked():
-			line := prefix + taskBlockedIcon.Render(icon+" ") + taskBlockedText.Render(text)
-			fmt.Fprint(w, truncateText(line, m.Width()))
-			return
-		case t.Status() == task.InProgress:
-			line := prefix + taskInProgressIcon.Render(icon+" ") + text
-			fmt.Fprint(w, truncateText(line, m.Width()))
-			return
-		case t.Status() == task.Done:
-			line := prefix + taskDoneIcon.Render(icon+" ") + taskDoneText.Render(text)
-			fmt.Fprint(w, truncateText(line, m.Width()))
-			return
-		}
-	}
-
-	title := prefix + icon + " " + text
-
-	var style lipgloss.Style
+	var iconStyle, textStyle lipgloss.Style
 	if selected {
 		switch {
 		case t.IsBlocked():
-			style = taskSelected.Foreground(lipgloss.Color("196"))
+			iconStyle = taskSelected.Foreground(lipgloss.Color("196"))
+			textStyle = iconStyle.Underline(hasLink)
 		case t.Status() == task.InProgress:
-			style = taskSelected.Foreground(lipgloss.Color("226"))
+			iconStyle = taskSelected.Foreground(lipgloss.Color("226"))
+			textStyle = iconStyle.Underline(hasLink)
 		case t.Status() == task.Done:
-			iconStyle := taskSelected.Foreground(lipgloss.Color("42"))
-			textStyle := iconStyle.Strikethrough(true)
-			line := iconStyle.Render(prefix+icon+" ") + textStyle.Render(text)
-			fmt.Fprint(w, truncateText(line, m.Width()))
-			return
+			iconStyle = taskSelected.Foreground(lipgloss.Color("42"))
+			textStyle = iconStyle.Strikethrough(true).Underline(hasLink)
 		default:
-			style = taskSelected
+			iconStyle = taskSelected
+			textStyle = taskSelected.Underline(hasLink)
 		}
 	} else {
-		style = taskNormal
+		switch {
+		case t.IsBlocked():
+			iconStyle = taskBlockedIcon
+			textStyle = taskBlockedText.Underline(hasLink)
+		case t.Status() == task.InProgress:
+			iconStyle = taskInProgressIcon
+			textStyle = taskNormal.Underline(hasLink)
+		case t.Status() == task.Done:
+			iconStyle = taskDoneIcon
+			textStyle = taskDoneText.Underline(hasLink)
+		default:
+			iconStyle = taskNormal
+			textStyle = taskNormal.Underline(hasLink)
+		}
 	}
 
-	fmt.Fprint(w, truncateText(style.Render(title), m.Width()))
+	line := iconStyle.Render(prefix+icon+" ") + textStyle.Render(text)
+	fmt.Fprint(w, truncateText(line, m.Width()))
 }
 
 func truncateText(s string, maxW int) string {
