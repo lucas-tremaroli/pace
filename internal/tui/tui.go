@@ -47,7 +47,7 @@ var (
 	listTitleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("62"))
-	listTitleBarStyle = lipgloss.NewStyle()
+	listTitleBarStyle = lipgloss.NewStyle().MarginBottom(1)
 
 	// Detail panel styles
 	detailHeader   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).MarginBottom(1)
@@ -146,9 +146,6 @@ func NewTui() (*Tui, error) {
 		return nil, fmt.Errorf("failed to init note service: %w", err)
 	}
 
-	noteList := newList("Notes", nil, noteDelegate{})
-	noteList.SetFilteringEnabled(false)
-
 	vp := viewport.New(0, 0)
 	vp.SetContent(detailPlaceholder)
 
@@ -158,6 +155,9 @@ func NewTui() (*Tui, error) {
 		storePath = resolved.Path
 		storeType = resolved.Type
 	}
+
+	noteList := newList("Notes", nil, noteDelegate{})
+	noteList.SetFilteringEnabled(false)
 
 	return &Tui{
 		taskList:    newList("Tasks", nil, taskDelegate{}),
@@ -278,6 +278,8 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		noteIdx := t.noteList.Index()
 		t.taskList.SetItems(msg.tasks)
 		t.noteList.SetItems(msg.notes)
+		t.taskList.Title = fmt.Sprintf("Tasks (%d)", len(msg.tasks))
+		t.noteList.Title = fmt.Sprintf("Notes (%d)", len(msg.notes))
 		if t.pendingNoteSelect != "" {
 			for i, item := range msg.notes {
 				if ni, ok := item.(NoteItem); ok && ni.Note.Filename == t.pendingNoteSelect {
@@ -363,6 +365,9 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t.startDelete()
 
 		case key.Matches(msg, tuiKeys.Tab):
+			if t.focus == focusDetail {
+				return t, nil
+			}
 			if t.focus == focusTasks {
 				t.focus = focusNotes
 			} else {
@@ -471,6 +476,7 @@ func (t *Tui) buildTaskForm() *huh.Form {
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Title").
+				CharLimit(50).
 				Value(&t.formTitle).
 				Validate(huh.ValidateNotEmpty()),
 			huh.NewText().
@@ -799,7 +805,7 @@ func fetchData(taskSvc *task.Service, noteSvc *note.Service) dataReloadedMsg {
 	}
 
 	var noteItems []list.Item
-	if notes, err := noteSvc.ListNoteNames(); err == nil {
+	if notes, err := noteSvc.ListNotesWithMeta(false); err == nil {
 		noteItems = make([]list.Item, len(notes))
 		for i, n := range notes {
 			noteItems[i] = NoteItem{Note: n}
@@ -1303,8 +1309,24 @@ func (t *Tui) View() string {
 	}
 
 	overview := lipgloss.NewStyle().Width(lw).PaddingLeft(1).Render(t.renderOverview(lw))
-	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Render(fitHeight(t.taskList.View(), taskH-2))
-	noteBox := bdr(t.focus == focusNotes).Width(lw - 2).Render(fitHeight(t.noteList.View(), noteH-2))
+
+	var taskContent string
+	if len(t.taskList.Items()) == 0 {
+		title := listTitleStyle.Render(t.taskList.Title)
+		taskContent = fitHeight(title+"\n\n"+noTasksStyle.Render("  press + to create a task"), taskH-2)
+	} else {
+		taskContent = fitHeight(t.taskList.View(), taskH-2)
+	}
+	taskBox := bdr(t.focus == focusTasks).Width(lw - 2).Render(taskContent)
+
+	var noteContent string
+	if len(t.noteList.Items()) == 0 {
+		title := listTitleStyle.Render(t.noteList.Title)
+		noteContent = fitHeight(title+"\n\n"+noTasksStyle.Render("  press + to create a note"), noteH-2)
+	} else {
+		noteContent = fitHeight(t.noteList.View(), noteH-2)
+	}
+	noteBox := bdr(t.focus == focusNotes).Width(lw - 2).Render(noteContent)
 
 	var detailContent string
 	if t.lastKey == "" {
