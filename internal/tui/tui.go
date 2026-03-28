@@ -936,6 +936,10 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 		return nil
 	}
 
+	// Clear stale content immediately so the View shows the placeholder
+	// while the async render is in flight, instead of the previous item.
+	t.lastKey = ""
+
 	t.detailSeq++
 	seq := t.detailSeq
 	w := t.contentWidth()
