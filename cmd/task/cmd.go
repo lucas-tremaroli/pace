@@ -6,17 +6,15 @@ import (
 
 var TaskCmd = &cobra.Command{
 	Use:   "task",
-	Short: "Manage your tasks via subcommands or TUI",
-	Long:  `Manage your tasks via subcommands for programmatic access, or use 'pace task tui' to launch the Kanban board.`,
+	Short: "Manage your tasks via subcommands",
+	Long:  `Manage your tasks via subcommands for programmatic access, or use 'pace tui' to launch the interactive dashboard.`,
 }
 
 func init() {
 	TaskCmd.GroupID = "core"
-	TaskCmd.AddGroup(&cobra.Group{ID: "interactive", Title: "Interactive"})
 	TaskCmd.AddGroup(&cobra.Group{ID: "manage", Title: "Manage"})
 	TaskCmd.AddGroup(&cobra.Group{ID: "workflow", Title: "Workflow"})
 	TaskCmd.AddGroup(&cobra.Group{ID: "logging", Title: "Logging"})
-	TaskCmd.AddCommand(tuiCmd)
 	TaskCmd.AddCommand(listCmd)
 	TaskCmd.AddCommand(getCmd)
 	TaskCmd.AddCommand(createCmd)
