@@ -3,10 +3,10 @@ package joke
 import (
 	"context"
 	"fmt"
-	"os"
+	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/term"
 	"github.com/lucas-tremaroli/pace/internal/joke"
 	"github.com/spf13/cobra"
 )
@@ -24,29 +24,35 @@ var JokeCmd = &cobra.Command{
 			return err
 		}
 
-		// Get terminal width, default to 80 if unavailable
-		width := 80
-		if w, _, err := term.GetSize(os.Stdout.Fd()); err == nil && w > 0 {
-			width = w
+		style := lipgloss.NewStyle().Foreground(lipgloss.Color("#45B7D1")).Bold(true)
+
+		// Split into setup/punchline if the joke contains a question mark
+		if idx := strings.Index(jokeText, "?"); idx != -1 {
+			setup := jokeText[:idx+1]
+			punchline := strings.TrimSpace(jokeText[idx+1:])
+
+			typewrite(setup, style)
+			fmt.Println()
+
+			if punchline != "" {
+				time.Sleep(1500 * time.Millisecond)
+				typewrite(punchline, style)
+				fmt.Println()
+			}
+		} else {
+			typewrite(jokeText, style)
+			fmt.Println()
 		}
-
-		// Account for border (2) + padding (4) + margin
-		maxWidth := width - 10
-		if maxWidth < 20 {
-			maxWidth = 20
-		}
-
-		jokeStyle := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62")).
-			Padding(1, 2).
-			MarginTop(1).
-			Width(maxWidth)
-
-		fmt.Println(jokeStyle.Render(jokeText))
 
 		return nil
 	},
+}
+
+func typewrite(text string, style lipgloss.Style) {
+	for _, ch := range text {
+		fmt.Print(style.Render(string(ch)))
+		time.Sleep(30 * time.Millisecond)
+	}
 }
 
 func init() {
