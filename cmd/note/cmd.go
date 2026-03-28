@@ -6,8 +6,8 @@ import (
 
 var NoteCmd = &cobra.Command{
 	Use:   "note",
-	Short: "Manage your notes via subcommands or TUI",
-	Long:  `Manage your notes via subcommands for programmatic access, or use 'pace note tui' to launch the interactive note manager.`,
+	Short: "Manage your notes via subcommands",
+	Long:  `Manage your notes via subcommands for programmatic access, or use 'pace tui' to launch the interactive dashboard.`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
@@ -16,9 +16,7 @@ var NoteCmd = &cobra.Command{
 
 func init() {
 	NoteCmd.GroupID = "core"
-	NoteCmd.AddGroup(&cobra.Group{ID: "interactive", Title: "Interactive"})
 	NoteCmd.AddGroup(&cobra.Group{ID: "manage", Title: "Manage"})
-	NoteCmd.AddCommand(tuiCmd)
 	NoteCmd.AddCommand(listCmd)
 	NoteCmd.AddCommand(createCmd)
 	NoteCmd.AddCommand(readCmd)
