@@ -36,7 +36,6 @@ func SetVersionInfo(version, commit, date string) {
 
 func Execute() error {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	return nil
@@ -103,8 +102,8 @@ func styledHelp(cmd *cobra.Command, _ []string) {
 
 func init() {
 	rootCmd.AddGroup(&cobra.Group{ID: "core", Title: "Core"})
-	rootCmd.AddGroup(&cobra.Group{ID: "configuration", Title: "Configuration"})
 	rootCmd.AddGroup(&cobra.Group{ID: "recharge", Title: "Recharge"})
+	rootCmd.AddGroup(&cobra.Group{ID: "setup", Title: "Setup"})
 
 	rootCmd.AddCommand(tui.TuiCmd)
 	rootCmd.AddCommand(task.TaskCmd)

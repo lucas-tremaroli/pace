@@ -2,7 +2,6 @@ package tick
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -56,6 +55,11 @@ type keymap struct {
 }
 
 type flashDoneMsg struct{}
+type bellMsg struct{}
+
+func bellCmd() tea.Msg {
+	return bellMsg{}
+}
 
 func (m model) Init() tea.Cmd {
 	return m.timer.Init()
@@ -138,8 +142,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case timer.TimeoutMsg:
 		m.done = true
 		m.running = true
-		os.Stdout.WriteString("\a")
-		return m, m.overtime.Init()
+		return m, tea.Batch(m.overtime.Init(), bellCmd)
+	case bellMsg:
+		fmt.Print("\a")
+		return m, nil
 	case stopwatch.TickMsg:
 		var cmd tea.Cmd
 		m.overtime, cmd = m.overtime.Update(msg)
@@ -161,6 +167,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m model) helpBindings() keymap {
+	km := m.keymap
+	if m.done {
+		km.toggle.SetEnabled(false)
+	}
+	return km
+}
+
 func (k keymap) ShortHelp() []key.Binding {
 	return []key.Binding{k.startStop, k.reset, k.toggle, k.quit}
 }
@@ -171,46 +185,55 @@ func (k keymap) FullHelp() [][]key.Binding {
 	}
 }
 
-func (m model) View() string {
-	var color lipgloss.Color
-	var timeStr string
-	overtime := m.done
+func formatMmSs(d time.Duration) string {
+	mins := int(d.Minutes())
+	secs := int(d.Seconds()) % 60
+	return fmt.Sprintf("%02d:%02d", mins, secs)
+}
 
+func formatDuration(d time.Duration) string {
+	mins := int(d.Minutes())
+	secs := int(d.Seconds()) % 60
+	return fmt.Sprintf("%dm %ds", mins, secs)
+}
+
+func (m model) timerColor() lipgloss.Color {
+	if !m.running {
+		return pausedColor
+	}
+	if m.done {
+		if m.overtime.Elapsed() >= time.Second {
+			return overtimeColor
+		}
+		return doneColor
+	}
+	if m.flashing {
+		return resetColor
+	}
+	return runningColor
+}
+
+func (m model) View() string {
+	color := m.timerColor()
+
+	var timeStr string
 	if m.done {
 		ot := m.overtime.Elapsed()
 		if ot < time.Second {
-			color = doneColor
 			timeStr = "00:00"
 		} else {
-			color = overtimeColor
-			mins := int(ot.Minutes())
-			secs := int(ot.Seconds()) % 60
-			timeStr = fmt.Sprintf("+%02d:%02d", mins, secs)
+			timeStr = "+" + formatMmSs(ot)
 		}
+	} else if m.showElapsed {
+		timeStr = formatMmSs(m.initialTimeout - m.timer.Timeout)
 	} else {
-		if m.showElapsed {
-			elapsed := m.initialTimeout - m.timer.Timeout
-			mins := int(elapsed.Minutes())
-			secs := int(elapsed.Seconds()) % 60
-			timeStr = fmt.Sprintf("%02d:%02d", mins, secs)
-		} else {
-			remaining := m.timer.Timeout
-			mins := int(remaining.Minutes())
-			secs := int(remaining.Seconds()) % 60
-			timeStr = fmt.Sprintf("%02d:%02d", mins, secs)
-		}
-
-		if m.flashing {
-			color = resetColor
-		} else if m.running {
-			color = runningColor
-		} else {
-			color = pausedColor
-		}
+		timeStr = formatMmSs(m.timer.Timeout)
 	}
 
 	barW := 30
-	timeDisplay := timerBase.Foreground(color).Width(barW).Align(lipgloss.Center).Render(timeStr)
+	dimStyle := lipgloss.NewStyle().Foreground(dimColor)
+	durationLabel := dimStyle.Render(fmt.Sprintf("%dm", int(m.initialTimeout.Minutes())))
+	timeDisplay := timerBase.Foreground(color).Render(timeStr)
 
 	// Progress bar
 	elapsed := m.initialTimeout - m.timer.Timeout
@@ -221,18 +244,17 @@ func (m model) View() string {
 		filled = int(float64(elapsed) / float64(m.initialTimeout) * float64(barW))
 	}
 	filledStyle := progressFilled
-	if !m.running && !m.done {
+	if !m.running {
 		filledStyle = filledStyle.Foreground(pausedColor)
-	}
-	if overtime && m.overtime.Elapsed() >= time.Second {
+	} else if m.done && m.overtime.Elapsed() >= time.Second {
 		filledStyle = filledStyle.Foreground(overtimeColor)
 	}
 	bar := filledStyle.Render(strings.Repeat("━", filled)) +
 		progressEmpty.Render(strings.Repeat("─", barW-filled))
 
-	helpText := helpStyle.Render(m.help.View(m.keymap))
+	helpText := helpStyle.Render(m.help.View(m.helpBindings()))
 
-	parts := []string{timeDisplay, bar}
+	parts := []string{durationLabel, "", timeDisplay, bar}
 	if m.goal != "" {
 		parts = append(parts, "", goalStyle.Render(m.goal))
 	}
@@ -241,12 +263,6 @@ func (m model) View() string {
 	content := lipgloss.JoinVertical(lipgloss.Center, parts...)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
-}
-
-func formatDuration(d time.Duration) string {
-	mins := int(d.Minutes())
-	secs := int(d.Seconds()) % 60
-	return fmt.Sprintf("%dm %ds", mins, secs)
 }
 
 func (m model) Summary() string {
