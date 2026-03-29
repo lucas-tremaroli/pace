@@ -95,6 +95,6 @@ var contextCmd = &cobra.Command{
 }
 
 func init() {
-	contextCmd.GroupID = "configuration"
+	contextCmd.GroupID = "core"
 	rootCmd.AddCommand(contextCmd)
 }

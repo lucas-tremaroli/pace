@@ -251,7 +251,7 @@ func createOrUpdateAgentsMD(dir string) (string, error) {
 }
 
 func init() {
-	initCmd.GroupID = "configuration"
+	initCmd.GroupID = "setup"
 	initCmd.Flags().BoolVar(&noGitignore, "no-gitignore", false, "Skip adding .pace/ to .gitignore")
 	initCmd.Flags().BoolVar(&noAgentsMD, "no-agents-md", false, "Skip generating AGENTS.md")
 	rootCmd.AddCommand(initCmd)

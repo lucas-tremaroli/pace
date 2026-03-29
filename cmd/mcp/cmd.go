@@ -57,6 +57,7 @@ var uninstallCmd = &cobra.Command{
 }
 
 func init() {
+	McpCmd.GroupID = "setup"
 	McpCmd.AddCommand(installCmd)
 	McpCmd.AddCommand(uninstallCmd)
 }

@@ -11,7 +11,7 @@ var ConfigCmd = &cobra.Command{
 }
 
 func init() {
-	ConfigCmd.GroupID = "configuration"
+	ConfigCmd.GroupID = "setup"
 	ConfigCmd.AddCommand(setCmd)
 	ConfigCmd.AddCommand(getCmd)
 	ConfigCmd.AddCommand(listCmd)

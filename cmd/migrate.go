@@ -328,7 +328,7 @@ func copyFile(src, dst string) error {
 }
 
 func init() {
-	migrateCmd.GroupID = "configuration"
+	migrateCmd.GroupID = "setup"
 	migrateCmd.Flags().StringVar(&migrateFrom, "from", "", "Source storage (global or project)")
 	migrateCmd.Flags().StringVar(&migrateTo, "to", "", "Destination storage (global or project)")
 	migrateCmd.Flags().BoolVar(&migrateDryRun, "dry-run", false, "Preview migration without making changes")
