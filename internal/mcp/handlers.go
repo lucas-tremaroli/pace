@@ -140,6 +140,8 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 		return h.toolTaskClose(args)
 	case "pace_task_logs":
 		return h.toolTaskLogs(args)
+	case "pace_task_bulk_delete":
+		return h.toolTaskBulkDelete(args)
 	default:
 		return ToolCallResult{
 			Content: []ContentBlock{NewTextContent(fmt.Sprintf("unknown tool: %s", name))},
@@ -771,6 +773,75 @@ func (h *Handler) toolTaskLogs(args map[string]any) ToolCallResult {
 		"logs":    logs,
 		"count":   len(logs),
 	})
+}
+
+func (h *Handler) toolTaskBulkDelete(args map[string]any) ToolCallResult {
+	var ids []string
+
+	// Collect IDs from explicit list
+	if idsRaw, ok := args["ids"].([]any); ok {
+		for _, id := range idsRaw {
+			if s, ok := id.(string); ok && s != "" {
+				ids = append(ids, s)
+			}
+		}
+	}
+
+	// Collect IDs from status filter
+	if statusStr, ok := args["status"].(string); ok && statusStr != "" {
+		status, err := task.ParseStatus(statusStr)
+		if err != nil {
+			return codedError(output.ErrCodeInvalidStatus, err.Error(), "Valid values: todo, in-progress, done")
+		}
+
+		tasks, err := h.taskService.LoadAllTasks()
+		if err != nil {
+			return errorResult(fmt.Sprintf("failed to load tasks: %v", err))
+		}
+
+		filter := task.TaskFilter{Status: &status}
+		for _, t := range filter.Apply(tasks) {
+			ids = append(ids, t.ID())
+		}
+	}
+
+	if len(ids) == 0 {
+		return codedError(output.ErrCodeMissingField, "no tasks to delete", "Provide ids array and/or status filter")
+	}
+
+	// Deduplicate
+	seen := make(map[string]bool, len(ids))
+	unique := ids[:0]
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+
+	var deleted []string
+	var errs []string
+	for _, id := range unique {
+		if err := h.taskService.DeleteTask(id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				errs = append(errs, fmt.Sprintf("%s: not found", id))
+			} else {
+				errs = append(errs, fmt.Sprintf("%s: %v", id, err))
+			}
+			continue
+		}
+		deleted = append(deleted, id)
+	}
+
+	result := map[string]any{
+		"success":       len(errs) == 0,
+		"deleted":       deleted,
+		"deleted_count": len(deleted),
+	}
+	if len(errs) > 0 {
+		result["errors"] = errs
+	}
+	return jsonResult(result)
 }
 
 // Helper functions

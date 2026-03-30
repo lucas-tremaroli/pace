@@ -353,5 +353,26 @@ func GetToolDefinitions() []Tool {
 				Required: []string{"id"},
 			},
 		},
+		{
+			Name:        "pace_task_bulk_delete",
+			Description: "Delete multiple tasks at once by IDs or status filter",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"ids": {
+						Type:        "array",
+						Description: "List of task IDs to delete",
+						Items: &Property{
+							Type: "string",
+						},
+					},
+					"status": {
+						Type:        "string",
+						Description: "Delete all tasks with this status",
+						Enum:        []string{"todo", "in-progress", "done"},
+					},
+				},
+			},
+		},
 	}
 }

@@ -127,6 +127,7 @@ func runInstall() {
 		"pace_task_log",
 		"pace_task_close",
 		"pace_task_logs",
+		"pace_task_bulk_delete",
 	}
 
 	output.Success("Pace MCP server installed", map[string]any{
