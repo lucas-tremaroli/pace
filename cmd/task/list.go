@@ -231,9 +231,6 @@ func formatTaskPretty(t task.Task) string {
 	}
 
 	// Dependency indicators
-	if isBlocked {
-		parts = append(parts, depStyle.Render(fmt.Sprintf("(blocked:%d)", len(t.BlockedBy()))))
-	}
 	if len(t.Blocks()) > 0 {
 		parts = append(parts, depStyle.Render(fmt.Sprintf("(blocks:%d)", len(t.Blocks()))))
 	}

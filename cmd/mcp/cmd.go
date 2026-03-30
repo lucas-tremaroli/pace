@@ -102,7 +102,11 @@ func runInstall() {
 		return
 	}
 
-	// Use claude mcp add to register the server
+	// Remove existing registration first to make install idempotent
+	rmCmd := exec.Command(claudePath, "mcp", "remove", "pace")
+	rmCmd.Run() // ignore errors — may not be installed yet
+
+	// Register the server
 	cmd := exec.Command(claudePath, "mcp", "add", "pace", "--", pacePath, "mcp")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		output.ErrorMsg(fmt.Sprintf("failed to register MCP server with Claude Code: %s", strings.TrimSpace(string(out))))
@@ -127,6 +131,7 @@ func runInstall() {
 		"pace_task_log",
 		"pace_task_close",
 		"pace_task_logs",
+		"pace_task_bulk_delete",
 	}
 
 	output.Success("Pace MCP server installed", map[string]any{
