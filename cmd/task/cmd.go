@@ -21,7 +21,6 @@ func init() {
 	TaskCmd.AddCommand(updateCmd)
 	TaskCmd.AddCommand(deleteCmd)
 	TaskCmd.AddCommand(depCmd)
-	TaskCmd.AddCommand(readyCmd)
 	TaskCmd.AddCommand(searchCmd)
 	TaskCmd.AddCommand(logCmd)
 	TaskCmd.AddCommand(closeCmd)

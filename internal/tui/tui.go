@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -94,9 +95,11 @@ type Tui struct {
 	loaded      bool
 	quitting    bool
 	tooSmall    bool
-	lastKey       string
-	lastListFocus int // tracks which list was focused before entering detail
-	detailSeq     uint64
+	lastKey        string
+	lastListFocus  int // tracks which list was focused before entering detail
+	detailSeq      uint64
+	spinner        spinner.Model
+	detailLoading  bool
 	confirmForm   *huh.Form
 	confirmResult *bool
 	deleteTarget  string // "task" or "note"
@@ -156,6 +159,10 @@ func NewTui() (*Tui, error) {
 		storeType = resolved.Type
 	}
 
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+
 	noteList := newList("Notes", nil, noteDelegate{})
 	noteList.SetFilteringEnabled(false)
 
@@ -166,6 +173,7 @@ func NewTui() (*Tui, error) {
 		help:        help.New(),
 		taskService: taskService,
 		noteService: noteService,
+		spinner:     sp,
 		storagePath: storePath,
 		storageType: storeType,
 		focus:       focusTasks,
@@ -323,9 +331,18 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.seq != t.detailSeq {
 			return t, nil // stale render from an older request; discard
 		}
+		t.detailLoading = false
 		t.lastKey = msg.key
 		t.viewport.SetContent(msg.content)
 		t.viewport.GotoTop()
+		return t, nil
+
+	case spinner.TickMsg:
+		if t.detailLoading {
+			var cmd tea.Cmd
+			t.spinner, cmd = t.spinner.Update(msg)
+			return t, cmd
+		}
 		return t, nil
 
 	case tea.WindowSizeMsg:
@@ -947,9 +964,10 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 		return nil
 	}
 
-	// Clear stale content immediately so the View shows the placeholder
+	// Clear stale content immediately so the View shows the spinner
 	// while the async render is in flight, instead of the previous item.
 	t.lastKey = ""
+	t.detailLoading = true
 
 	t.detailSeq++
 	seq := t.detailSeq
@@ -957,7 +975,7 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 	taskSvc := t.taskService
 	noteSvc := t.noteService
 
-	return func() tea.Msg {
+	renderCmd := func() tea.Msg {
 		var content string
 		if tk != nil {
 			content = renderTaskDetail(*tk, w, taskSvc)
@@ -966,6 +984,8 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 		}
 		return detailRenderedMsg{seq: seq, key: itemKey, content: content}
 	}
+
+	return tea.Batch(renderCmd, t.spinner.Tick)
 }
 
 func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
@@ -1334,7 +1354,10 @@ func (t *Tui) View() string {
 	noteBox := bdr(t.focus == focusNotes).Width(lw - 2).Render(noteContent)
 
 	var detailContent string
-	if t.lastKey == "" {
+	if t.detailLoading {
+		detailContent = lipgloss.Place(dw-2, availH-2, lipgloss.Center, lipgloss.Center,
+			detailDim.Render(t.spinner.View()+" Loading..."))
+	} else if t.lastKey == "" {
 		detailContent = lipgloss.Place(dw-2, availH-2, lipgloss.Center, lipgloss.Center,
 			detailDim.Render(detailPlaceholder))
 	} else {

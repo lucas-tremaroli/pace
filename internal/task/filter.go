@@ -11,6 +11,7 @@ type TaskFilter struct {
 	Priority   *int    // Single priority, AND semantics (used by bulk ops)
 	Priorities []int   // Multiple priorities, OR semantics (used by list)
 	Label      *string // Filter by label
+	Ready      bool    // Only show tasks ready to work on (not done, all blockers done)
 }
 
 // ParseFilter parses a filter string in the format "key=value"
@@ -78,6 +79,33 @@ func (f *TaskFilter) Apply(tasks []Task) []Task {
 	if f == nil {
 		return tasks
 	}
+
+	// When Ready is set, build a status map and filter for unblocked non-done tasks
+	if f.Ready {
+		statusMap := make(map[string]Status)
+		for _, t := range tasks {
+			statusMap[t.ID()] = t.Status()
+		}
+
+		var result []Task
+		for _, t := range tasks {
+			if t.Status() == Done {
+				continue
+			}
+			allBlockersDone := true
+			for _, blockerID := range t.BlockedBy() {
+				if status, exists := statusMap[blockerID]; exists && status != Done {
+					allBlockersDone = false
+					break
+				}
+			}
+			if allBlockersDone && f.Matches(t) {
+				result = append(result, t)
+			}
+		}
+		return result
+	}
+
 	var result []Task
 	for _, t := range tasks {
 		if f.Matches(t) {

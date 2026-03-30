@@ -116,7 +116,6 @@ func runInstall() {
 		"pace_task_create",
 		"pace_task_update",
 		"pace_task_delete",
-		"pace_task_ready",
 		"pace_task_dep_add",
 		"pace_task_dep_remove",
 		"pace_task_note_link",

@@ -118,8 +118,6 @@ func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
 		return h.toolTaskUpdate(args)
 	case "pace_task_delete":
 		return h.toolTaskDelete(args)
-	case "pace_task_ready":
-		return h.toolTaskReady()
 	case "pace_task_dep_add":
 		return h.toolTaskDepAdd(args)
 	case "pace_task_dep_remove":
@@ -253,6 +251,9 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 	}
 	if label, ok := args["label"].(string); ok && label != "" {
 		filter.Label = &label
+	}
+	if ready, ok := args["ready"].(bool); ok && ready {
+		filter.Ready = true
 	}
 	tasks = filter.Apply(tasks)
 
@@ -476,20 +477,6 @@ func (h *Handler) toolTaskDelete(args map[string]any) ToolCallResult {
 		"success": true,
 		"message": fmt.Sprintf("deleted task %s", id),
 	})
-}
-
-func (h *Handler) toolTaskReady() ToolCallResult {
-	tasks, err := h.taskService.GetReadyTasks()
-	if err != nil {
-		return errorResult(fmt.Sprintf("failed to get ready tasks: %v", err))
-	}
-
-	taskList := make([]task.TaskJSON, 0, len(tasks))
-	for _, t := range tasks {
-		taskList = append(taskList, t.ToJSON())
-	}
-
-	return jsonResult(map[string]any{"tasks": taskList})
 }
 
 func (h *Handler) toolTaskDepAdd(args map[string]any) ToolCallResult {

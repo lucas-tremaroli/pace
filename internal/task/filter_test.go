@@ -353,6 +353,65 @@ func TestTaskFilter_Apply(t *testing.T) {
 	})
 }
 
+func TestTaskFilter_Apply_Ready(t *testing.T) {
+	// t1: todo, no blockers → ready
+	task1 := NewTaskComplete("t1", Todo, "Task 1", "", 1, "")
+	// t2: todo, blocked by t3 (not done) → not ready
+	task2 := NewTaskComplete("t2", Todo, "Task 2", "", 2, "")
+	task2.SetBlockedBy([]string{"t3"})
+	// t3: in-progress → ready (no blockers)
+	task3 := NewTaskComplete("t3", InProgress, "Task 3", "", 3, "")
+	// t4: done → excluded
+	task4 := NewTaskComplete("t4", Done, "Task 4", "", 1, "")
+	// t5: todo, blocked by t4 (done) → ready
+	task5 := NewTaskComplete("t5", Todo, "Task 5", "", 2, "")
+	task5.SetBlockedBy([]string{"t4"})
+
+	all := []Task{task1, task2, task3, task4, task5}
+
+	t.Run("ready filter returns unblocked non-done tasks", func(t *testing.T) {
+		f := &TaskFilter{Ready: true}
+		got := f.Apply(all)
+		if len(got) != 3 {
+			t.Errorf("Apply() len = %d, want 3", len(got))
+		}
+		ids := make(map[string]bool)
+		for _, tk := range got {
+			ids[tk.ID()] = true
+		}
+		for _, id := range []string{"t1", "t3", "t5"} {
+			if !ids[id] {
+				t.Errorf("expected task %s in results", id)
+			}
+		}
+	})
+
+	t.Run("ready with status filter", func(t *testing.T) {
+		f := &TaskFilter{Ready: true, Status: ptr(Todo)}
+		got := f.Apply(all)
+		if len(got) != 2 {
+			t.Errorf("Apply() len = %d, want 2", len(got))
+		}
+		ids := make(map[string]bool)
+		for _, tk := range got {
+			ids[tk.ID()] = true
+		}
+		for _, id := range []string{"t1", "t5"} {
+			if !ids[id] {
+				t.Errorf("expected task %s in results", id)
+			}
+		}
+	})
+
+	t.Run("ready false behaves normally", func(t *testing.T) {
+		f := &TaskFilter{Ready: false}
+		got := f.Apply(all)
+		if len(got) != 5 {
+			t.Errorf("Apply() len = %d, want 5", len(got))
+		}
+	})
+}
+
 // Helper functions for creating pointers
 func ptr(s Status) *Status {
 	return &s

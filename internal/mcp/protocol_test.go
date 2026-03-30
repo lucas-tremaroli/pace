@@ -67,7 +67,6 @@ func TestGetToolDefinitions(t *testing.T) {
 		"pace_task_create",
 		"pace_task_update",
 		"pace_task_delete",
-		"pace_task_ready",
 		"pace_task_dep_add",
 		"pace_task_dep_remove",
 		"pace_note_list",

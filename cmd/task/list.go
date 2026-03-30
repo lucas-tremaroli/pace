@@ -37,6 +37,7 @@ var (
 	listFilterLabel    string
 	listFields         string
 	listHead           int
+	listReady          bool
 )
 
 type taskListResponse struct {
@@ -59,6 +60,11 @@ var listCmd = &cobra.Command{
 		tasks, err := svc.LoadAllTasks()
 		if err != nil {
 			output.Error(err)
+		}
+
+		if listPretty && listFields != "" {
+			output.ErrorMsg("--pretty and --fields cannot be used together")
+			return nil
 		}
 
 		// Build and apply filter
@@ -86,6 +92,7 @@ var listCmd = &cobra.Command{
 			}
 			filter.Priorities = append(filter.Priorities, pri)
 		}
+		filter.Ready = listReady
 		tasks = filter.Apply(tasks)
 
 		// Sort by priority (P1 first, P4 last)
@@ -137,6 +144,7 @@ func init() {
 	listCmd.Flags().StringVar(&listFilterLabel, "label", "", "Filter by label")
 	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")
+	listCmd.Flags().BoolVar(&listReady, "ready", false, "Only show tasks ready to work on (not blocked, not done)")
 }
 
 // printTasksPretty prints tasks in a human-readable format

@@ -44,6 +44,10 @@ func GetToolDefinitions() []Tool {
 						Type:        "integer",
 						Description: "Limit output to first N tasks",
 					},
+					"ready": {
+						Type:        "boolean",
+						Description: "Only show tasks ready to work on (not blocked, not done)",
+					},
 				},
 			},
 		},
@@ -152,14 +156,6 @@ func GetToolDefinitions() []Tool {
 					},
 				},
 				Required: []string{"id"},
-			},
-		},
-		{
-			Name:        "pace_task_ready",
-			Description: "Get tasks that are ready to work on (not blocked by other tasks)",
-			InputSchema: ToolInputSchema{
-				Type:       "object",
-				Properties: map[string]Property{},
 			},
 		},
 		{
