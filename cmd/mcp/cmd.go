@@ -19,10 +19,16 @@ var McpCmd = &cobra.Command{
 
 Use 'pace mcp install' to configure Claude Code to use Pace.
 Use 'pace mcp uninstall' to remove the configuration.
+Use 'pace mcp run' to start the server manually.
 
 The server is started automatically by Claude Code once installed.`,
+}
+
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Start the MCP server",
+	Long:  `Starts the Pace MCP server over stdio. This is invoked automatically by Claude Code after installation.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// If run without subcommand, start the server (for Claude to invoke)
 		server, err := mcp.NewServer()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to start MCP server: %v\n", err)
@@ -58,6 +64,7 @@ var uninstallCmd = &cobra.Command{
 
 func init() {
 	McpCmd.GroupID = "setup"
+	McpCmd.AddCommand(runCmd)
 	McpCmd.AddCommand(installCmd)
 	McpCmd.AddCommand(uninstallCmd)
 }
@@ -107,7 +114,7 @@ func runInstall() {
 	rmCmd.Run() // ignore errors — may not be installed yet
 
 	// Register the server
-	cmd := exec.Command(claudePath, "mcp", "add", "pace", "--", pacePath, "mcp")
+	cmd := exec.Command(claudePath, "mcp", "add", "pace", "--", pacePath, "mcp", "run")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		output.ErrorMsg(fmt.Sprintf("failed to register MCP server with Claude Code: %s", strings.TrimSpace(string(out))))
 		return

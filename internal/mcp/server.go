@@ -41,15 +41,17 @@ func (s *Server) Close() error {
 func (s *Server) Run() error {
 	defer s.Close()
 
-	dec := json.NewDecoder(s.reader)
-
 	for {
-		var req JSONRPCRequest
-		if err := dec.Decode(&req); err != nil {
+		line, err := s.reader.ReadBytes('\n')
+		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
-			// Send parse error response and continue on decode errors
+			return fmt.Errorf("reading stdin: %w", err)
+		}
+
+		var req JSONRPCRequest
+		if err := json.Unmarshal(line, &req); err != nil {
 			resp := NewErrorResponse(nil, ParseError, "parse error")
 			s.writeResponse(resp)
 			continue
