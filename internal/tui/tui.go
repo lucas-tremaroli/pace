@@ -1351,7 +1351,7 @@ func (t *Tui) renderOverview(w int) string {
 	}
 
 	// Storage path with type tag
-	tag := storageTag.Render("[" + string(t.storageType) + "]")
+	tag := storageTag.Render(strings.ToUpper(string(t.storageType)))
 	storeLine := overviewLabel.Render(shortenPath(t.storagePath)) + "  " + tag
 
 	if total == 0 {
