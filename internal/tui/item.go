@@ -114,7 +114,10 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		lblStyle = lblStyle.Faint(true)
 		priStyle = priStyle.Faint(true)
 	}
-	lblTag := " " + lblStyle.Render("["+lbl+"]")
+	var lblTag string
+	if lbl != "task" {
+		lblTag = " " + lblStyle.Render("["+lbl+"]")
+	}
 	line1 := truncateText(iconStyle.Render(prefix+icon+" ")+textStyle.Render(text), maxW)
 	line1 += lblTag + priStyle.Render(suffix)
 	fmt.Fprint(w, line1)
