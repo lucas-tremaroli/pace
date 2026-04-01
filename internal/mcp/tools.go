@@ -93,7 +93,7 @@ func GetToolDefinitions() []Tool {
 					"label": {
 						Type:        "string",
 						Description: "Task label",
-						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
+						Enum:        []string{"task", "bug", "feature", "docs"},
 						Default:     "task",
 					},
 					"link": {
@@ -134,7 +134,7 @@ func GetToolDefinitions() []Tool {
 					"label": {
 						Type:        "string",
 						Description: "New task label",
-						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
+						Enum:        []string{"task", "bug", "feature", "docs"},
 					},
 					"link": {
 						Type:        "string",

@@ -325,7 +325,7 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	label := "task"
 	if l, ok := args["label"].(string); ok && l != "" {
 		if err := task.ValidateLabel(l); err != nil {
-			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, chore, docs")
+			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, docs")
 		}
 		label = l
 	}
@@ -442,7 +442,7 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	// Set label if provided
 	if l, ok := args["label"].(string); ok {
 		if err := task.ValidateLabel(l); err != nil {
-			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, chore, docs")
+			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, docs")
 		}
 		if err := h.taskService.SetLabel(id, l); err != nil {
 			return errorResult(fmt.Sprintf("task updated but failed to set label: %v", err))

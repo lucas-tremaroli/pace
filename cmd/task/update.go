@@ -105,7 +105,7 @@ For batch updates, use --filter with update flags:
 		// Set label if specified
 		if cmd.Flags().Changed("label") {
 			if err := task.ValidateLabel(updateLabel); err != nil {
-				output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, chore, docs")
+				output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
 			}
 			if err := svc.SetLabel(taskID, updateLabel); err != nil {
 				output.Error(err)
@@ -163,7 +163,7 @@ func handleBatchUpdate(cmd *cobra.Command) error {
 	}
 	if cmd.Flags().Changed("label") {
 		if err := task.ValidateLabel(updateLabel); err != nil {
-			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, chore, docs")
+			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
 		}
 	}
 
@@ -277,7 +277,7 @@ func init() {
 	updateCmd.Flags().StringVar(&updateDescription, "description", "", "Task description")
 	updateCmd.Flags().StringVar(&updateStatus, "status", "", "Task status (todo, in-progress, done)")
 	updateCmd.Flags().StringVar(&updatePriority, "priority", "", "Task priority (high, medium, low or 1-3)")
-	updateCmd.Flags().StringVar(&updateLabel, "label", "", "Set task label (task, bug, feature, chore, docs)")
+	updateCmd.Flags().StringVar(&updateLabel, "label", "", "Set task label (task, bug, feature, docs)")
 	updateCmd.Flags().StringVar(&updateLink, "url", "", "URL associated with the task (e.g., google.com)")
 	updateCmd.Flags().StringArrayVar(&updateFilters, "filter", nil, "Filter tasks to update (status=X, priority=X, label=X)")
 	updateCmd.Flags().BoolVar(&updateDryRun, "dry-run", false, "Preview changes without applying them")

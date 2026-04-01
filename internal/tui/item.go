@@ -28,7 +28,6 @@ var (
 	labelTask          = lipgloss.NewStyle().Foreground(lipgloss.Color("75"))
 	labelBug           = lipgloss.NewStyle().Foreground(lipgloss.Color("167"))
 	labelFeature       = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
-	labelChore         = lipgloss.NewStyle().Foreground(lipgloss.Color("179"))
 	labelDocs          = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
 )
 
@@ -131,8 +130,6 @@ func labelStyle(lbl string) lipgloss.Style {
 		return labelBug
 	case "feature":
 		return labelFeature
-	case "chore":
-		return labelChore
 	case "docs":
 		return labelDocs
 	default:

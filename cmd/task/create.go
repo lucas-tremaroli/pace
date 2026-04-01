@@ -47,7 +47,7 @@ For bulk creation, use --bulk with a JSON array or '-' for stdin:
 		}
 
 		if err := task.ValidateLabel(createLabel); err != nil {
-			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, chore, docs")
+			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
 		}
 
 		priority, err := task.ParsePriority(createPriority)
@@ -192,7 +192,7 @@ func init() {
 	createCmd.Flags().StringVar(&createDescription, "description", "", "Task description")
 	createCmd.Flags().StringVar(&createStatus, "status", "todo", "Task status (todo, in-progress, done)")
 	createCmd.Flags().StringVar(&createPriority, "priority", "medium", "Task priority (high, medium, low or 1-3)")
-	createCmd.Flags().StringVar(&createLabel, "label", "task", "Task label (task, bug, feature, chore, docs)")
+	createCmd.Flags().StringVar(&createLabel, "label", "task", "Task label (task, bug, feature, docs)")
 	createCmd.Flags().StringVar(&createLink, "url", "", "URL associated with the task (e.g., google.com)")
 	createCmd.Flags().StringVar(&createBulk, "bulk", "", "JSON array of tasks to create, or '-' for stdin")
 }

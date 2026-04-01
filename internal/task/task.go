@@ -346,7 +346,6 @@ const (
 	TypeTask TaskType = iota
 	TypeBug
 	TypeFeature
-	TypeChore
 	TypeDocs
 )
 
@@ -359,8 +358,6 @@ func (t TaskType) String() string {
 		return "bug"
 	case TypeFeature:
 		return "feature"
-	case TypeChore:
-		return "chore"
 	case TypeDocs:
 		return "docs"
 	default:
@@ -375,8 +372,6 @@ func (t TaskType) Symbol() string {
 		return "B"
 	case TypeFeature:
 		return "F"
-	case TypeChore:
-		return "C"
 	case TypeDocs:
 		return "D"
 	default:
@@ -393,17 +388,15 @@ func ParseTaskType(s string) (TaskType, error) {
 		return TypeBug, nil
 	case "feature":
 		return TypeFeature, nil
-	case "chore":
-		return TypeChore, nil
 	case "docs":
 		return TypeDocs, nil
 	default:
-		return TypeTask, fmt.Errorf("invalid label: %s (valid: task, bug, feature, chore, docs)", s)
+		return TypeTask, fmt.Errorf("invalid label: %s (valid: task, bug, feature, docs)", s)
 	}
 }
 
 // ValidLabels lists the label strings that are valid task labels
-var ValidLabels = []string{"task", "bug", "feature", "chore", "docs"}
+var ValidLabels = []string{"task", "bug", "feature", "docs"}
 
 // ValidateLabel checks if a label string is valid
 func ValidateLabel(s string) error {
