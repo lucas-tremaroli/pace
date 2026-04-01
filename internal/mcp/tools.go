@@ -88,7 +88,7 @@ func GetToolDefinitions() []Tool {
 					"priority": {
 						Type:        "string",
 						Description: "Priority level: high (1), medium (2), low (3). Accepts names or numbers",
-						Default:     "medium",
+						Default:     "low",
 					},
 					"label": {
 						Type:        "string",

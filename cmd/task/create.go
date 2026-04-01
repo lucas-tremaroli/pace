@@ -191,7 +191,7 @@ func init() {
 	createCmd.Flags().StringVar(&createTitle, "title", "", "Task title (required for single task creation)")
 	createCmd.Flags().StringVar(&createDescription, "description", "", "Task description")
 	createCmd.Flags().StringVar(&createStatus, "status", "todo", "Task status (todo, in-progress, done)")
-	createCmd.Flags().StringVar(&createPriority, "priority", "medium", "Task priority (high, medium, low or 1-3)")
+	createCmd.Flags().StringVar(&createPriority, "priority", "low", "Task priority (high, medium, low or 1-3)")
 	createCmd.Flags().StringVar(&createLabel, "label", "task", "Task label (task, bug, feature, docs)")
 	createCmd.Flags().StringVar(&createLink, "url", "", "URL associated with the task (e.g., google.com)")
 	createCmd.Flags().StringVar(&createBulk, "bulk", "", "JSON array of tasks to create, or '-' for stdin")

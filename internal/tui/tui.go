@@ -69,8 +69,7 @@ var (
 	fieldBoxLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
 	chipBracket     = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
 	chipText        = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	chipLabel       = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
-	detailLinkLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
+	detailMetaLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
 	detailLinkURL   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	statusTodo      = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	statusProgress  = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
@@ -1168,7 +1167,7 @@ func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 		const metaLabelW = 13
 		metaRow := func(label, value string) {
 			padded := label + ":" + strings.Repeat(" ", metaLabelW-len(label)-1)
-			b.WriteString(detailLinkLabel.Render(padded))
+			b.WriteString(detailMetaLabel.Render(padded))
 			b.WriteString(value)
 			b.WriteString("\n")
 		}
@@ -1212,18 +1211,23 @@ func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 	b.WriteString("\n")
 	b.WriteString(detailLabel.Render(fmt.Sprintf("Logs (%d):", len(logEntries))))
 	b.WriteString("\n")
-	for _, entry := range logEntries {
-		styledPrefix := detailLogTime.Render(entry.time + " ")
-		prefixW := len(entry.time) + 1
-		if entry.isOutcome {
-			styledPrefix += detailOutcome.Render("[outcome] ")
-			prefixW += len("[outcome] ")
-		}
-		indent := 2 + prefixW
-		b.WriteString("  ")
-		b.WriteString(styledPrefix)
-		b.WriteString(wrapIndent(entry.message, indent, detailValue))
+	if len(logEntries) == 0 {
+		b.WriteString(detailDim.Render("  No logs yet"))
 		b.WriteString("\n")
+	} else {
+		for _, entry := range logEntries {
+			styledPrefix := detailLogTime.Render(entry.time + " ")
+			prefixW := len(entry.time) + 1
+			if entry.isOutcome {
+				styledPrefix += detailOutcome.Render("[outcome] ")
+				prefixW += len("[outcome] ")
+			}
+			indent := 2 + prefixW
+			b.WriteString("  ")
+			b.WriteString(styledPrefix)
+			b.WriteString(wrapIndent(entry.message, indent, detailValue))
+			b.WriteString("\n")
+		}
 	}
 
 	return b.String()
