@@ -14,29 +14,14 @@
        \/__/       \/__/         \/__/         \/__/
 
    -----------------------------------------------------
-                  Built for humans and AI
+          A productivity CLI for humans and Claude
    -----------------------------------------------------
 ```
 
-Manage tasks with a Kanban board, take Markdown notes, or read a dad joke while the AI does the work.
+A terminal-based productivity tool designed to work hand-in-hand with [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Manage tasks, take Markdown notes, and let your AI assistant track its own work through a built-in MCP server.
 
-## Why Pace?
-
-Most productivity tools are built for humans clicking through GUIs. Pace is different—it's built CLI-first with structured JSON output, making it equally useful for:
-
-- **Developers** who prefer terminal workflows and keyboard-driven interfaces
-- **AI coding assistants** (Claude Code, Cursor, Copilot) that need to track work programmatically
-
-## Features
-
-- **JSON by default** — All commands output structured JSON, no flags needed
-- **Project-specific storage** — Each repo gets its own `.pace/` directory
-- **Task dependencies** — Model blocking relationships between tasks
-- **Multiple task types** — `task`, `bug`, `feature`, `chore`, `docs`
-- **Priority levels** — Urgent (1) through Low (4)
-- **Markdown notes** — Store specs, ADRs, and documentation alongside tasks
-- **Interactive TUI** — Kanban board and note picker for humans
-- **Focus timer** — Pomodoro-style timer in the terminal
+> [!NOTE]
+> **Opinionated by design** — Pace is built specifically for Claude Code integration. It prioritizes structured MCP communication over raw CLI usage, and keeps everything local in a `.pace/` directory alongside your code.
 
 ## Installation
 
@@ -52,149 +37,64 @@ brew install lucas-tremaroli/tap/pace
 go install github.com/lucas-tremaroli/pace@latest
 ```
 
----
-
-## For AI Coding Assistants
-
-*This section is written from the perspective of Claude, an AI that uses Pace during coding sessions.*
-
-### Why I Like Using Pace
-
-When I work on a codebase, I need to track what I'm doing, what's blocked, and what decisions were made. Most humans use Linear, Jira, or GitHub Issues—but those require API tokens, network requests, and complex authentication. Pace gives me something simpler: a local SQLite database I can read and write with shell commands.
-
-**What makes it work for me:**
-
-1. **JSON output I can parse** — When I run `pace task list`, I get structured data back. No scraping terminal colors or parsing ASCII tables.
-
-2. **Project-scoped context** — The `.pace/` directory travels with the repo. When I'm dropped into a new session, I run `pace context` and immediately understand the project state.
-
-3. **Dependency tracking** — `pace task ready` shows me only unblocked tasks. I don't waste tokens figuring out what I can actually work on.
-
-4. **Notes for specs** — I can write an ADR or spec to `pace note create`, then reference it later. This persists across sessions better than conversation context.
-
-### My Typical Workflow
+## Getting Started
 
 ```bash
-# First thing: understand the project state
-pace context
+# Initialize project-specific storage (creates .pace/ in your repo)
+pace init
 
-# See what's ready to work on
-pace task ready
-
-# Before starting work, create or update a task
-pace task create --title "Implement auth middleware" --type feature --priority 2
-
-# Document decisions in notes
-pace note create auth-approach -c "# Auth Approach\n\nUsing JWT because..."
-
-# When blocked by something else
-pace task dep add <blocker-id> <my-task-id>
-
-# Mark progress
-pace task update <id> --status in-progress
-pace task update <id> --status done
+# Install the MCP server into Claude Code
+pace mcp install
 ```
 
-### Example: Reading Project Context
+That's it. Claude Code can now manage tasks and notes for your project through MCP tools automatically.
+
+## How It Works
+
+Pace exposes an **MCP server** (`pace mcp run`) that Claude Code uses to manage tasks and notes. When you run `pace mcp install`, it registers the server with Claude Code, giving it access to 18 structured tools for task management, note-taking, dependency tracking, and more.
+
+This means Claude Code can:
+- **Track its own work** — create tasks, update status, log progress, and mark things done
+- **Manage dependencies** — model blocking relationships so it knows what's actionable
+- **Write and reference notes** — persist specs, ADRs, and decisions across sessions
+- **Understand project context** — run `pace_context` to immediately grasp the project state
+
+All data lives in `.pace/` inside your repo — no external services, no API tokens, no network requests.
+
+## For Humans: The TUI
+
+While Claude Code interacts with Pace through MCP, you get an interactive terminal UI to see and manage everything.
 
 ```bash
-$ pace context
-{
-  "success": true,
-  "data": {
-    "storage": { "type": "project", "path": "/repo/.pace" },
-    "tasks": { "todo": [...], "in_progress": [...] },
-    "notes": [...],
-    "summary": { "tasks": { "total": 19, "todo": 5, "in_progress": 2, "done": 12 }, "notes": 4 }
-  }
-}
+pace tui
 ```
 
-In one command, I know: this is a project with active work, what's in progress, what's queued, and what notes exist.
+A unified dashboard showing your tasks and notes side by side with a detail panel. Create, edit, and move tasks, browse notes, and manage your project — all from one screen.
 
-### Example: Finding Actionable Work
+## Recharge
 
-```bash
-$ pace task ready
-[
-  {
-    "id": "AUTH-23",
-    "title": "Add rate limiting to login endpoint",
-    "status": "todo",
-    "type": "feature",
-    "priority": 2,
-    "labels": ["security"]
-  }
-]
-```
-
-These tasks have no unresolved blockers—I can pick one and start.
-
-### What's Coming Next
-
-There are some features in the works that will make this even better for AI workflows.
-
----
-
-## For Humans
-
-*This section is written from my perspective as a human developer using Pace.*
-
-I prefer to have everything on my terminal to minimize context switching, and Pace helps me stay organized whithout leaving the terminal. I can quickly jot down tasks and notes through the interactive TUI, and know that my AI coding assistant will be able to pick up where I left off later.
-
-### Task Board
-
-Launch an interactive Kanban board:
-
-```bash
-pace task tui
-```
-
-![Task Demo](./.github/assets/task.demo.gif)
-
-### Notes
-
-Create and manage markdown notes:
-
-```bash
-# Browse notes in TUI
-pace note
-
-# Create with editor
-pace note create meeting-notes
-
-# Create with content directly
-pace note create todo -c "Review PRs"
-```
-
-![Notes Demo](./.github/assets/note.demo.gif)
-
-### Recharging
-
-I also believe that, to be productive, humans need breaks. We are not machines! Take advantage of Pace's focus timer and some truly terrible jokes:
+Pace also believes in breaks. Take advantage of the focus timer and some truly terrible jokes:
 
 ```bash
 # Start a 25-minute focus session
 pace tick
 
-# Take a quick 5-minute break to stretch
+# Take a quick 5-minute break
 pace tick -m 5
 
 # Read a joke while you rest
 pace joke
 ```
 
----
-
 ## Project Storage
 
-Pace supports per-project storage, keeping tasks and notes isolated to each repository.
+Pace uses per-project storage to keep tasks and notes isolated to each repository.
 
 ```bash
 # Initialize in current directory (creates .pace/)
 pace init
 
-# Check storage and project state
+# Check storage location and project state
 pace context
 
 # Migrate between global and project storage
@@ -203,46 +103,15 @@ pace migrate --from global --to project
 
 **Storage resolution:** Pace searches upward from your current directory for `.pace/`. If not found, it falls back to `~/.config/pace/` (global storage).
 
----
-
-## CLI Reference
-
-### Core Commands
-
-| Command | Description |
-|---------|-------------|
-| `pace task tui` | Launch Kanban TUI |
-| `pace task list` | List all tasks (JSON) |
-| `pace task create --title "..." --type feature` | Create a task |
-| `pace task update <id> --status done` | Update task |
-| `pace task ready` | Show unblocked tasks |
-| `pace task dep add <blocker> <blocked>` | Add dependency |
-| `pace note tui` | Launch note picker TUI |
-| `pace note create <name> -c "content"` | Create note |
-| `pace note read <name>` | Read note content |
-| `pace context` | Dump storage info, active tasks, and notes |
-
-### Task Flags
-
-- `--status`: `todo`, `in-progress`, `done`
-- `--type`: `task`, `bug`, `feature`, `chore`, `docs`
-- `--link`: URL/link associated with task (e.g., PR, issue, documentation)
-- `--priority`: `1` (urgent), `2` (high), `3` (normal), `4` (low)
-- `--label`: string tag (repeatable)
-
----
-
 ## Configuration
 
 ```bash
-# Set custom task ID prefix
+# Set custom task ID prefix (e.g., "AUTH" -> AUTH-1, AUTH-2, ...)
 pace config set id_prefix "AUTH"
 
 # View config
 pace config list
 ```
-
----
 
 ## Contributing
 
