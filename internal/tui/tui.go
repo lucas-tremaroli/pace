@@ -287,7 +287,7 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// On error (e.g. editor not found), we still reload since the note
 		// file may have been created before the editor failed.
 		t.lastKey = "" // force detail re-render
-		return t, t.loadDataCmd()
+		return t, tea.Batch(tea.ClearScreen, t.loadDataCmd())
 
 	case dataReloadedMsg:
 		noteIdx := t.noteList.Index()
