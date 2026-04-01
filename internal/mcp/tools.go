@@ -88,12 +88,12 @@ func GetToolDefinitions() []Tool {
 					"priority": {
 						Type:        "string",
 						Description: "Priority level: high (1), medium (2), low (3). Accepts names or numbers",
-						Default:     "medium",
+						Default:     "low",
 					},
 					"label": {
 						Type:        "string",
 						Description: "Task label",
-						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
+						Enum:        []string{"task", "bug", "feature", "docs"},
 						Default:     "task",
 					},
 					"link": {
@@ -134,7 +134,7 @@ func GetToolDefinitions() []Tool {
 					"label": {
 						Type:        "string",
 						Description: "New task label",
-						Enum:        []string{"task", "bug", "feature", "chore", "docs"},
+						Enum:        []string{"task", "bug", "feature", "docs"},
 					},
 					"link": {
 						Type:        "string",
