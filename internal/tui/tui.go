@@ -55,13 +55,23 @@ var (
 	detailTitle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255"))
 	detailID       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	detailDesc     = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	detailDescNone = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
 	detailLabel    = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
 	detailValue    = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	detailDim      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	detailSection  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
 	detailLogTime  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	detailOutcome  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+
+	// Section headers
+	detailSection = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
+
+	// Field box styles
+	fieldBoxBorder = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	fieldBoxLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
+	chipBracket    = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
+	chipText       = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	chipLabel      = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
+	detailLinkLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
+	detailLinkURL   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	statusTodo     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	statusProgress = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
 	statusDone     = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
@@ -988,6 +998,110 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 	return tea.Batch(renderCmd, t.spinner.Tick)
 }
 
+// renderFieldBox builds a bordered box for a single field:
+//
+//	┌ Label ─────┐
+//	│ value      │
+//	└────────────┘
+func renderFieldBox(label, value string, valueStyle lipgloss.Style, boxWidth int) string {
+	innerW := boxWidth - 2 // subtract left+right border chars
+
+	// Top border: ┌ Label ───┐
+	topLabel := " " + label + " "
+	fillLen := innerW - len(topLabel)
+	if fillLen < 0 {
+		fillLen = 0
+	}
+	top := fieldBoxBorder.Render("┌") + fieldBoxLabel.Render(topLabel) + fieldBoxBorder.Render(strings.Repeat("─", fillLen)+"┐")
+
+	// Middle: │ styled_value   │
+	styledVal := valueStyle.Render(value)
+	valVisualW := lipgloss.Width(styledVal)
+	padLen := innerW - 1 - valVisualW // 1 for leading space
+	if padLen < 0 {
+		padLen = 0
+	}
+	mid := fieldBoxBorder.Render("│") + " " + styledVal + strings.Repeat(" ", padLen) + fieldBoxBorder.Render("│")
+
+	// Bottom: └────────────┘
+	bot := fieldBoxBorder.Render("└" + strings.Repeat("─", innerW) + "┘")
+
+	return top + "\n" + mid + "\n" + bot
+}
+
+// renderFieldBoxes renders the Status, Priority, and Label boxes side-by-side.
+func renderFieldBoxes(tk task.Task, w int) string {
+	const boxW = 14
+	const gap = 2
+
+	// Status
+	var statusText string
+	var statusStyle lipgloss.Style
+	if tk.IsBlocked() {
+		statusText = "⊘ blocked"
+		statusStyle = statusBlocked
+	} else {
+		switch tk.Status() {
+		case task.Todo:
+			statusText = "○ todo"
+			statusStyle = statusTodo
+		case task.InProgress:
+			statusText = "● active"
+			statusStyle = statusProgress
+		case task.Done:
+			statusText = "● done"
+			statusStyle = statusDone
+		default:
+			statusText = tk.Status().String()
+			statusStyle = detailValue
+		}
+	}
+
+	// Priority
+	var priText string
+	var priStyle lipgloss.Style
+	switch tk.Priority() {
+	case 1:
+		priText = "! high"
+		priStyle = priorityP1
+	case 2:
+		priText = "~ medium"
+		priStyle = priorityP2
+	case 3:
+		priText = "· low"
+		priStyle = priorityP3
+	default:
+		priText = task.PriorityName(tk.Priority())
+		priStyle = detailValue
+	}
+
+	// Label
+	lbl := tk.Label()
+	if lbl == "" {
+		lbl = "task"
+	}
+
+	box1 := renderFieldBox("Status", statusText, statusStyle, boxW)
+	box2 := renderFieldBox("Priority", priText, priStyle, boxW)
+	box3 := renderFieldBox("Label", lbl, detailValue, boxW)
+
+	if w < 46 {
+		return box1 + "\n" + box2 + "\n" + box3
+	}
+
+	spacer := strings.Repeat(" ", gap)
+	return lipgloss.JoinHorizontal(lipgloss.Top, box1, spacer, box2, spacer, box3)
+}
+
+// renderChips renders items as [item1] [item2] with styled brackets.
+func renderChips(items []string) string {
+	parts := make([]string, len(items))
+	for i, item := range items {
+		parts[i] = chipBracket.Render("[") + chipText.Render(item) + chipBracket.Render("]")
+	}
+	return strings.Join(parts, " ")
+}
+
 func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 	// wrapStyled wraps plain text to width, then applies a style to each line
 	// so ANSI codes don't interfere with the wrap calculation.
@@ -1020,37 +1134,65 @@ func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 
 	var b strings.Builder
 
-	// --- Title (prominent) ---
+	// Title
 	b.WriteString(wrapStyled(tk.Title(), detailTitle))
 	b.WriteString("\n")
 
-	// --- ID ---
+	// ID
 	b.WriteString(detailID.Render(tk.ID()))
 	b.WriteString("\n\n")
 
-	// --- Status · Priority · Label on one line ---
-	label := tk.Label()
-	if label == "" {
-		label = "task"
-	}
-	dot := detailDim.Render(" · ")
-	meta := renderStatus(tk) + dot + renderPriority(tk) + dot + detailValue.Render(label)
-	b.WriteString(meta)
-	b.WriteString("\n\n")
+	// Field boxes (Status, Priority, Label)
+	b.WriteString(renderFieldBoxes(tk, w))
+	b.WriteString("\n")
 
-	// --- Description section ---
-	b.WriteString(detailSection.Render("─── Description"))
+	// Description section
+	b.WriteString("\n")
+	b.WriteString(detailSection.Render("Description"))
 	b.WriteString("\n\n")
 	if desc := tk.Description(); desc != "" {
 		b.WriteString(wrapStyled(desc, detailDesc))
 	} else {
-		b.WriteString(detailDescNone.Render("No description"))
+		b.WriteString(detailDim.Render("No description"))
 	}
 	b.WriteString("\n")
 
-	// --- Metadata section ---
-	hasMetadata := tk.Link() != "" || len(tk.BlockedBy()) > 0 || len(tk.Blocks()) > 0 || len(tk.Notes()) > 0
+	// Metadata section
+	b.WriteString("\n")
+	b.WriteString(detailSection.Render("Metadata"))
+	b.WriteString("\n\n")
 
+	hasLink := tk.Link() != ""
+	hasBlockedBy := len(tk.BlockedBy()) > 0
+	hasBlocks := len(tk.Blocks()) > 0
+	hasNotes := len(tk.Notes()) > 0
+	if hasLink || hasBlockedBy || hasBlocks || hasNotes {
+		const metaLabelW = 13
+		metaRow := func(label, value string) {
+			padded := label + ":" + strings.Repeat(" ", metaLabelW-len(label)-1)
+			b.WriteString(detailLinkLabel.Render(padded))
+			b.WriteString(value)
+			b.WriteString("\n")
+		}
+
+		if hasLink {
+			metaRow("Link", wrapIndent(tk.Link(), metaLabelW, detailLinkURL))
+		}
+		if hasBlockedBy {
+			metaRow("Blocked by", renderChips(tk.BlockedBy()))
+		}
+		if hasBlocks {
+			metaRow("Blocks", renderChips(tk.Blocks()))
+		}
+		if hasNotes {
+			metaRow("Notes", renderChips(tk.Notes()))
+		}
+	} else {
+		b.WriteString(detailDim.Render("No metadata"))
+		b.WriteString("\n")
+	}
+
+	// Logs
 	type logEntry struct {
 		time      string
 		isOutcome bool
@@ -1066,90 +1208,29 @@ func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 					message:   l.Message,
 				})
 			}
-			hasMetadata = true
 		}
 	}
 
-	if hasMetadata {
+	b.WriteString("\n")
+	b.WriteString(detailLabel.Render(fmt.Sprintf("Logs (%d):", len(logEntries))))
+	b.WriteString("\n")
+	for _, entry := range logEntries {
+		styledPrefix := detailLogTime.Render(entry.time + " ")
+		prefixW := len(entry.time) + 1
+		if entry.isOutcome {
+			styledPrefix += detailOutcome.Render("[outcome] ")
+			prefixW += len("[outcome] ")
+		}
+		indent := 2 + prefixW
+		b.WriteString("  ")
+		b.WriteString(styledPrefix)
+		b.WriteString(wrapIndent(entry.message, indent, detailValue))
 		b.WriteString("\n")
-		b.WriteString(detailSection.Render("─── Metadata"))
-		b.WriteString("\n\n")
-
-		const labelW = 12 // "Blocked by  " width for alignment
-		if tk.Link() != "" {
-			b.WriteString(detailLabel.Render("Link        "))
-			b.WriteString(wrapIndent(tk.Link(), labelW, detailValue))
-			b.WriteString("\n")
-		}
-		if len(tk.BlockedBy()) > 0 {
-			b.WriteString(detailLabel.Render("Blocked by  "))
-			b.WriteString(wrapIndent(strings.Join(tk.BlockedBy(), ", "), labelW, detailValue))
-			b.WriteString("\n")
-		}
-		if len(tk.Blocks()) > 0 {
-			b.WriteString(detailLabel.Render("Blocks      "))
-			b.WriteString(wrapIndent(strings.Join(tk.Blocks(), ", "), labelW, detailValue))
-			b.WriteString("\n")
-		}
-		if len(tk.Notes()) > 0 {
-			b.WriteString(detailLabel.Render("Notes       "))
-			b.WriteString(wrapIndent(strings.Join(tk.Notes(), ", "), labelW, detailValue))
-			b.WriteString("\n")
-		}
-
-		if len(logEntries) > 0 {
-			if len(tk.BlockedBy()) > 0 || len(tk.Blocks()) > 0 || len(tk.Notes()) > 0 {
-				b.WriteString("\n")
-			}
-			b.WriteString(detailLabel.Render(fmt.Sprintf("Logs (%d):", len(logEntries))))
-			b.WriteString("\n")
-			for _, entry := range logEntries {
-				styledPrefix := detailLogTime.Render(entry.time + " ")
-				prefixW := len(entry.time) + 1
-				if entry.isOutcome {
-					styledPrefix += detailOutcome.Render("[outcome] ")
-					prefixW += len("[outcome] ")
-				}
-				indent := 2 + prefixW // 2 for list indent
-				b.WriteString("  ")
-				b.WriteString(styledPrefix)
-				b.WriteString(wrapIndent(entry.message, indent, detailValue))
-				b.WriteString("\n")
-			}
-		}
 	}
 
 	return b.String()
 }
 
-func renderStatus(tk task.Task) string {
-	if tk.IsBlocked() {
-		return statusBlocked.Render("⊘ blocked")
-	}
-	switch tk.Status() {
-	case task.Todo:
-		return statusTodo.Render("○ todo")
-	case task.InProgress:
-		return statusProgress.Render("● in-progress")
-	case task.Done:
-		return statusDone.Render("● done")
-	default:
-		return detailValue.Render(tk.Status().String())
-	}
-}
-
-func renderPriority(tk task.Task) string {
-	switch tk.Priority() {
-	case 1:
-		return priorityP1.Render("High")
-	case 2:
-		return priorityP2.Render("Medium")
-	case 3:
-		return priorityP3.Render("Low")
-	default:
-		return detailValue.Render(task.PriorityName(tk.Priority()))
-	}
-}
 
 func renderNoteDetail(n note.Note, w int, noteSvc *note.Service) string {
 	// Lazy-load full note metadata (content, tasks, labels) when viewing detail.
