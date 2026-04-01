@@ -31,6 +31,7 @@ var JokeCmd = &cobra.Command{
 			setup := jokeText[:idx+1]
 			punchline := strings.TrimSpace(jokeText[idx+1:])
 
+			fmt.Println()
 			typewrite(setup, style)
 			fmt.Println()
 
@@ -40,6 +41,7 @@ var JokeCmd = &cobra.Command{
 				fmt.Println()
 			}
 		} else {
+			fmt.Println()
 			typewrite(jokeText, style)
 			fmt.Println()
 		}
