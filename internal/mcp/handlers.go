@@ -331,7 +331,7 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	}
 
 	// Parse priority
-	priority := 2
+	priority := 3
 	if p, ok := args["priority"]; ok {
 		switch v := p.(type) {
 		case string:

@@ -17,12 +17,19 @@ var (
 	taskNormal         = lipgloss.NewStyle()
 	taskInProgressIcon = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
 	taskDoneIcon       = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	taskDoneText       = lipgloss.NewStyle().Faint(true).Strikethrough(true)
+	taskDoneText       = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Strikethrough(true)
 	taskBlockedIcon    = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	taskBlockedText    = lipgloss.NewStyle().Faint(true)
+	taskBlockedText    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	taskSelected       = lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true)
 	taskMeta           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	taskPriorityHigh   = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	taskPriorityMedium = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
+	taskPriorityLow    = lipgloss.NewStyle().Foreground(lipgloss.Color("146"))
+	labelTask          = lipgloss.NewStyle().Foreground(lipgloss.Color("75"))
+	labelBug           = lipgloss.NewStyle().Foreground(lipgloss.Color("167"))
+	labelFeature       = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
+	labelChore         = lipgloss.NewStyle().Foreground(lipgloss.Color("179"))
+	labelDocs          = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
 )
 
 // taskDelegate renders task items with status-based styling.
@@ -82,27 +89,55 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		}
 	}
 
-	// Line 1: icon + title + priority indicator
+	// Line 1: icon + title + priority indicator + label
 	// Reserve space for the priority indicator so truncation doesn't push it off-screen.
-	maxW := m.Width()
-	suffix := ""
-	if t.Priority() == 1 {
+	maxW := m.Width() - 2
+	var suffix string
+	var priStyle lipgloss.Style
+	switch t.Priority() {
+	case 1:
 		suffix = " !"
-		maxW -= 2 // visual width of " !"
+		priStyle = taskPriorityHigh
+	case 2:
+		suffix = " ~"
+		priStyle = taskPriorityMedium
+	case 3:
+		suffix = ""
+		priStyle = taskPriorityLow
 	}
+	lbl := t.Label()
+	if lbl == "" {
+		lbl = "task"
+	}
+	isDone := t.Status() == task.Done
+	lblStyle := labelStyle(lbl)
+	if isDone {
+		lblStyle = lblStyle.Faint(true)
+		priStyle = priStyle.Faint(true)
+	}
+	lblTag := " " + lblStyle.Render("["+lbl+"]")
 	line1 := truncateText(iconStyle.Render(prefix+icon+" ")+textStyle.Render(text), maxW)
-	if suffix != "" {
-		line1 += taskPriorityHigh.Render(suffix)
-	}
+	line1 += lblTag + priStyle.Render(suffix)
 	fmt.Fprint(w, line1)
 
-	// Line 2: ID · priority · label
-	label := t.Label()
-	if label == "" {
-		label = "task"
-	}
-	meta := fmt.Sprintf("    %s · %s · %s", t.ID(), strings.ToLower(task.PriorityName(t.Priority())), label)
+	// Line 2: ID
+	meta := fmt.Sprintf("    %s", t.ID())
 	fmt.Fprint(w, "\n"+truncateText(taskMeta.Render(meta), m.Width()))
+}
+
+func labelStyle(lbl string) lipgloss.Style {
+	switch lbl {
+	case "bug":
+		return labelBug
+	case "feature":
+		return labelFeature
+	case "chore":
+		return labelChore
+	case "docs":
+		return labelDocs
+	default:
+		return labelTask
+	}
 }
 
 func truncateText(s string, maxW int) string {
@@ -162,13 +197,6 @@ func (d noteDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	// Line 1: filename without .md
 	name := strings.TrimSuffix(ni.Note.Filename, ".md")
 	fmt.Fprint(w, truncateText(style.Render(prefix+name), m.Width()))
-
-	// Line 2: description (indented to align under the name after prefix)
-	desc := ni.Note.Description
-	if desc == "" {
-		desc = " "
-	}
-	fmt.Fprint(w, "\n"+truncateText(taskMeta.Render("  "+desc), m.Width()))
 }
 
 // NoteItem wraps a note for use in a bubbles list.

@@ -51,34 +51,34 @@ var (
 	listTitleBarStyle = lipgloss.NewStyle().MarginBottom(1)
 
 	// Detail panel styles
-	detailHeader   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).MarginBottom(1)
-	detailTitle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255"))
-	detailID       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	detailDesc     = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	detailLabel    = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
-	detailValue    = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	detailDim      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	detailLogTime  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	detailOutcome  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	detailHeader  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).MarginBottom(1)
+	detailTitle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255"))
+	detailID      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	detailDesc    = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	detailLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
+	detailValue   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	detailDim     = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	detailLogTime = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	detailOutcome = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
 
 	// Section headers
 	detailSection = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
 
 	// Field box styles
-	fieldBoxBorder = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	fieldBoxLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
-	chipBracket    = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
-	chipText       = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	chipLabel      = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
+	fieldBoxBorder  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	fieldBoxLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
+	chipBracket     = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
+	chipText        = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	chipLabel       = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
 	detailLinkLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Bold(true)
 	detailLinkURL   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	statusTodo     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	statusProgress = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
-	statusDone     = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	statusBlocked  = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	priorityP1     = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
-	priorityP2     = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
-	priorityP3     = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
+	statusTodo      = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	statusProgress  = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
+	statusDone      = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	statusBlocked   = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	priorityP1      = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	priorityP2      = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
+	priorityP3      = lipgloss.NewStyle().Foreground(lipgloss.Color("146"))
 
 	// Overview styles
 	overviewLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
@@ -89,27 +89,26 @@ var (
 	noTasksStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
 )
 
-
 type Tui struct {
-	taskList    list.Model
-	noteList    list.Model
-	viewport    viewport.Model
-	help        help.Model
-	taskService *task.Service
-	noteService *note.Service
-	storagePath string
-	storageType storage.StorageType
-	focus       int
-	width       int
-	height      int
-	loaded      bool
-	quitting    bool
-	tooSmall    bool
-	lastKey        string
-	lastListFocus  int // tracks which list was focused before entering detail
-	detailSeq      uint64
-	spinner        spinner.Model
-	detailLoading  bool
+	taskList      list.Model
+	noteList      list.Model
+	viewport      viewport.Model
+	help          help.Model
+	taskService   *task.Service
+	noteService   *note.Service
+	storagePath   string
+	storageType   storage.StorageType
+	focus         int
+	width         int
+	height        int
+	loaded        bool
+	quitting      bool
+	tooSmall      bool
+	lastKey       string
+	lastListFocus int // tracks which list was focused before entering detail
+	detailSeq     uint64
+	spinner       spinner.Model
+	detailLoading bool
 	confirmForm   *huh.Form
 	confirmResult *bool
 	deleteTarget  string // "task" or "note"
@@ -132,7 +131,6 @@ type Tui struct {
 	layoutNoteH     int
 	cachedHelpH     int
 	cachedHelpWidth int
-
 }
 
 func newList(title string, items []list.Item, delegate list.ItemDelegate) list.Model {
@@ -483,7 +481,7 @@ func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
 	t.confirmForm = huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
-				Title("Delete \""+title+"\"?").
+				Title("Delete \"" + title + "\"?").
 				Description(description).
 				Affirmative("Yes").
 				Negative("No").
@@ -539,7 +537,7 @@ func (t *Tui) startCreate() (tea.Model, tea.Cmd) {
 	t.formDesc = ""
 	t.formLink = ""
 	t.formLabel = "task"
-	t.formPriority = 2
+	t.formPriority = 3
 
 	t.taskForm = t.buildTaskForm()
 	return t, t.taskForm.Init()
@@ -1082,8 +1080,8 @@ func renderFieldBoxes(tk task.Task, w int) string {
 	}
 
 	box1 := renderFieldBox("Status", statusText, statusStyle, boxW)
-	box2 := renderFieldBox("Priority", priText, priStyle, boxW)
-	box3 := renderFieldBox("Label", lbl, detailValue, boxW)
+	box2 := renderFieldBox("Label", lbl, labelStyle(lbl), boxW)
+	box3 := renderFieldBox("Priority", priText, priStyle, boxW)
 
 	if w < 46 {
 		return box1 + "\n" + box2 + "\n" + box3
@@ -1230,7 +1228,6 @@ func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 
 	return b.String()
 }
-
 
 func renderNoteDetail(n note.Note, w int, noteSvc *note.Service) string {
 	// Lazy-load full note metadata (content, tasks, labels) when viewing detail.

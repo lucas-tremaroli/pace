@@ -147,10 +147,10 @@ func handleBulkCreate(bulkInput string) error {
 			continue
 		}
 
-		// Default priority to 2 (medium) if not specified; validate range
+		// Default priority to 3 (low) if not specified; validate range
 		priority := input.Priority
 		if priority == 0 {
-			priority = 2
+			priority = 3
 		}
 		if priority < 1 || priority > 3 {
 			result.Failed = append(result.Failed, output.BulkItem{
