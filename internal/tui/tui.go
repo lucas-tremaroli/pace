@@ -77,7 +77,7 @@ var (
 	statusBlocked   = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	priorityP1      = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	priorityP2      = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
-	priorityP3      = lipgloss.NewStyle().Foreground(lipgloss.Color("146"))
+	priorityP3      = lipgloss.NewStyle().Foreground(lipgloss.Color("109"))
 
 	// Overview styles
 	overviewLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
