@@ -27,7 +27,13 @@ var (
 	// Priority styles
 	p1Style = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	p2Style = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
-	p3Style = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
+	p3Style = lipgloss.NewStyle().Foreground(lipgloss.Color("146"))
+
+	// Label styles
+	labelTaskStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("75"))
+	labelBugStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("167"))
+	labelFeatureStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
+	labelDocsStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
 )
 
 var (
@@ -169,12 +175,6 @@ func printLegend() {
 		doneStyle.Render("●") + countStyle.Render(" done  ") +
 		blockedStyle.Render("⊘") + countStyle.Render(" blocked")
 	fmt.Println(status)
-
-	priority := countStyle.Render("Priority: ") +
-		p1Style.Render("High") + countStyle.Render("  ") +
-		p2Style.Render("Med") + countStyle.Render("  ") +
-		p3Style.Render("Low")
-	fmt.Println(priority)
 }
 
 // formatTaskPretty formats a single task for pretty printing
@@ -201,6 +201,25 @@ func formatTaskPretty(t task.Task) string {
 	// ID
 	parts = append(parts, idStyle.Render(t.ID()))
 
+	// Title
+	parts = append(parts, titleStyle.Render(t.Title()))
+
+	// Label
+	if label := t.Label(); label != "" {
+		var lStyle lipgloss.Style
+		switch label {
+		case "bug":
+			lStyle = labelBugStyle
+		case "feature":
+			lStyle = labelFeatureStyle
+		case "docs":
+			lStyle = labelDocsStyle
+		default:
+			lStyle = labelTaskStyle
+		}
+		parts = append(parts, lStyle.Render(fmt.Sprintf("[%s]", label)))
+	}
+
 	// Priority with color coding
 	if p := t.Priority(); p > 0 {
 		var pStyle lipgloss.Style
@@ -215,14 +234,6 @@ func formatTaskPretty(t task.Task) string {
 			pStyle = priorityStyle
 		}
 		parts = append(parts, pStyle.Render(task.PriorityName(p)))
-	}
-
-	// Title
-	parts = append(parts, titleStyle.Render(t.Title()))
-
-	// Label
-	if label := t.Label(); label != "" {
-		parts = append(parts, labelStyle.Render(fmt.Sprintf("[%s]", label)))
 	}
 
 	// Linked notes

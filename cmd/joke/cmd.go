@@ -35,7 +35,7 @@ var JokeCmd = &cobra.Command{
 			typewrite(setup, style)
 			fmt.Println()
 
-			if punchline != "" {
+			if punchline != "" && len(punchline) > 1 {
 				time.Sleep(1500 * time.Millisecond)
 				typewrite(punchline, style)
 				fmt.Println()
