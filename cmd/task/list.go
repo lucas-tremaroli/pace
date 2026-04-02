@@ -160,6 +160,7 @@ func printTasksPretty(tasks []task.Task) {
 		return
 	}
 
+	fmt.Println()
 	for _, t := range tasks {
 		fmt.Println(formatTaskPretty(t))
 	}
