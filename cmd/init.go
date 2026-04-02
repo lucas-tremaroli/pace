@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	content "github.com/lucas-tremaroli/pace/internal/embed"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/spf13/cobra"
@@ -13,30 +14,15 @@ import (
 
 var (
 	noGitignore bool
-	noAgentsMD  bool
+	noClaudeMD  bool
 )
 
 const paceSectionHeader = "## Pace"
 
-const paceSectionContent = `## Pace
-
-Pace gives you persistent memory across sessions. Your context resets each conversation, but pace preserves what matters.
-
-**Session start:** Run ` + "`pace context`" + ` to recall state, ` + "`pace task ready`" + ` to see what's unblocked.
-
-**While working:**
-- ` + "`pace task create --title \"...\"`" + ` - track work items that survive session end
-- ` + "`pace task update <id> --status done`" + ` - mark progress
-- ` + "`pace note create <name> -c \"...\"`" + ` - save decisions, specs, context you'll need later
-
-**Why this matters:** Without pace, each session starts from zero. With pace, you can pick up exactly where you stopped.
-
-**Usage:** All commands output JSON. Run ` + "`pace --help`" + ` for all commands.
-`
-
-const agentsMDContent = `# AGENTS.md
-
-` + paceSectionContent
+var (
+	paceSectionContent = content.PaceSection
+	claudeMDContent    = "# CLAUDE.md\n\n" + content.PaceSection
+)
 
 var initCmd = &cobra.Command{
 	Use:   "init",
@@ -50,7 +36,7 @@ The command will:
   - Create .pace/ directory in the current directory
   - Create .pace/notes/ subdirectory for project notes
   - Add .pace/ to .gitignore if present (skip with --no-gitignore)
-  - Generate AGENTS.md for AI coding assistants (skip with --no-agents-md)
+  - Generate CLAUDE.md for Claude Code (skip with --no-claude-md)
   - Report if already initialized (searches upward for existing .pace/)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
@@ -61,20 +47,20 @@ The command will:
 		// Check if already initialized (search upward)
 		existing := storage.FindExistingProjectDir(cwd)
 		if existing != "" {
-			// Already initialized, but still try to create/update AGENTS.md
-			agentsMDStatus := ""
-			if !noAgentsMD {
-				status, err := createOrUpdateAgentsMD(cwd)
+			// Already initialized, but still try to create/update CLAUDE.md
+			claudeMDStatus := ""
+			if !noClaudeMD {
+				status, err := createOrUpdateClaudeMD(cwd)
 				if err == nil {
-					agentsMDStatus = status
+					claudeMDStatus = status
 				}
 			}
 
 			data := map[string]any{
 				"path": existing,
 			}
-			if agentsMDStatus != "" {
-				data["agents_md"] = agentsMDStatus
+			if claudeMDStatus != "" {
+				data["claude_md"] = claudeMDStatus
 			}
 
 			output.Success("already initialized", data)
@@ -96,12 +82,12 @@ The command will:
 			}
 		}
 
-		// Handle AGENTS.md
-		agentsMDStatus := ""
-		if !noAgentsMD {
-			status, err := createOrUpdateAgentsMD(cwd)
+		// Handle CLAUDE.md
+		claudeMDStatus := ""
+		if !noClaudeMD {
+			status, err := createOrUpdateClaudeMD(cwd)
 			if err == nil {
-				agentsMDStatus = status
+				claudeMDStatus = status
 			}
 		}
 
@@ -109,8 +95,8 @@ The command will:
 			"path":              paceDir,
 			"gitignore_updated": gitignoreUpdated,
 		}
-		if agentsMDStatus != "" {
-			data["agents_md"] = agentsMDStatus
+		if claudeMDStatus != "" {
+			data["claude_md"] = claudeMDStatus
 		}
 
 		output.Success("initialized project storage", data)
@@ -191,16 +177,16 @@ func addToGitignore(dir, pattern string) (bool, error) {
 	return true, nil
 }
 
-// createOrUpdateAgentsMD creates or updates AGENTS.md with the Pace section.
+// createOrUpdateClaudeMD creates or updates CLAUDE.md with the Pace section.
 // Returns "created", "updated", or "" (unchanged).
-func createOrUpdateAgentsMD(dir string) (string, error) {
-	agentsMDPath := filepath.Join(dir, "AGENTS.md")
+func createOrUpdateClaudeMD(dir string) (string, error) {
+	claudeMDPath := filepath.Join(dir, "CLAUDE.md")
 
-	// Check if AGENTS.md exists
-	content, err := os.ReadFile(agentsMDPath)
+	// Check if CLAUDE.md exists
+	content, err := os.ReadFile(claudeMDPath)
 	if os.IsNotExist(err) {
 		// Create new file
-		if err := os.WriteFile(agentsMDPath, []byte(agentsMDContent), 0644); err != nil {
+		if err := os.WriteFile(claudeMDPath, []byte(claudeMDContent), 0644); err != nil {
 			return "", err
 		}
 		return "created", nil
@@ -220,7 +206,7 @@ func createOrUpdateAgentsMD(dir string) (string, error) {
 		}
 		newContent += "\n" + paceSectionContent
 
-		if err := os.WriteFile(agentsMDPath, []byte(newContent), 0644); err != nil {
+		if err := os.WriteFile(claudeMDPath, []byte(newContent), 0644); err != nil {
 			return "", err
 		}
 		return "updated", nil
@@ -244,7 +230,7 @@ func createOrUpdateAgentsMD(dir string) (string, error) {
 		return "", nil
 	}
 
-	if err := os.WriteFile(agentsMDPath, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(claudeMDPath, []byte(newContent), 0644); err != nil {
 		return "", err
 	}
 	return "updated", nil
@@ -253,6 +239,6 @@ func createOrUpdateAgentsMD(dir string) (string, error) {
 func init() {
 	initCmd.GroupID = "setup"
 	initCmd.Flags().BoolVar(&noGitignore, "no-gitignore", false, "Skip adding .pace/ to .gitignore")
-	initCmd.Flags().BoolVar(&noAgentsMD, "no-agents-md", false, "Skip generating AGENTS.md")
+	initCmd.Flags().BoolVar(&noClaudeMD, "no-claude-md", false, "Skip generating CLAUDE.md")
 	rootCmd.AddCommand(initCmd)
 }
