@@ -1,7 +1,7 @@
 package config
 
 import (
-	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/lucas-tremaroli/pace/internal/output"
@@ -22,7 +22,7 @@ var unsetCmd = &cobra.Command{
 		defer db.Close()
 
 		key := args[0]
-		if err := db.DeleteConfig(key); err == sql.ErrNoRows {
+		if err := db.DeleteConfig(key); errors.Is(err, storage.ErrNotFound) {
 			output.ErrorMsg(fmt.Sprintf("config key '%s' not found", key))
 		} else if err != nil {
 			output.Error(err)

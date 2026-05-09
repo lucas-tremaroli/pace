@@ -1,7 +1,7 @@
 package config
 
 import (
-	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/lucas-tremaroli/pace/internal/output"
@@ -23,7 +23,7 @@ var getCmd = &cobra.Command{
 
 		key := args[0]
 		value, err := db.GetConfig(key)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, storage.ErrNotFound) {
 			output.ErrorMsg(fmt.Sprintf("config key '%s' not found", key))
 		} else if err != nil {
 			output.Error(err)

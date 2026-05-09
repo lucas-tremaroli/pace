@@ -1,6 +1,8 @@
 package task
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -150,6 +152,9 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	record, err := s.db.GetTaskByID(taskID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
 		return nil, err
 	}
 

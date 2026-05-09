@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -290,7 +289,7 @@ func (h *Handler) toolTaskGet(args map[string]any) ToolCallResult {
 
 	t, err := h.taskService.GetTaskByID(id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to get task: %v", err), "")
@@ -385,7 +384,7 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	// Load existing task
 	existingTask, err := h.taskService.GetTaskByID(id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to load task %s: %v", id, err), "")
@@ -469,7 +468,7 @@ func (h *Handler) toolTaskDelete(args map[string]any) ToolCallResult {
 	}
 
 	if err := h.taskService.DeleteTask(id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to delete task: %v", err), "")
@@ -540,7 +539,7 @@ func (h *Handler) toolTaskNoteLink(args map[string]any) ToolCallResult {
 	}
 
 	if err := h.taskService.LinkNote(taskID, noteFilename); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", taskID), "Use pace_task_list to see available task IDs")
 		}
 		return errorResult(fmt.Sprintf("failed to link note: %v", err))
@@ -721,7 +720,7 @@ func (h *Handler) toolTaskLog(args map[string]any) ToolCallResult {
 	}
 
 	if err := h.taskService.LogEntry(id, message); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return errorResult(fmt.Sprintf("failed to add log: %v", err))
@@ -742,7 +741,7 @@ func (h *Handler) toolTaskClose(args map[string]any) ToolCallResult {
 	outcome, _ := args["outcome"].(string)
 
 	if err := h.taskService.CloseTask(id, outcome); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return errorResult(fmt.Sprintf("failed to close task: %v", err))
@@ -762,7 +761,7 @@ func (h *Handler) toolTaskLogs(args map[string]any) ToolCallResult {
 
 	logs, err := h.taskService.GetTaskLogs(id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return errorResult(fmt.Sprintf("failed to get logs: %v", err))
@@ -823,7 +822,7 @@ func (h *Handler) toolTaskBulkDelete(args map[string]any) ToolCallResult {
 	var errs []string
 	for _, id := range unique {
 		if err := h.taskService.DeleteTask(id); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, task.ErrTaskNotFound) {
 				errs = append(errs, fmt.Sprintf("%s: not found", id))
 			} else {
 				errs = append(errs, fmt.Sprintf("%s: %v", id, err))

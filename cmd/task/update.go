@@ -1,7 +1,6 @@
 package task
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 
@@ -50,7 +49,7 @@ For batch updates, use --filter with update flags:
 
 			existingTask, err := svc.GetTaskByID(taskID)
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
+				if errors.Is(err, task.ErrTaskNotFound) {
 					output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
 				}
 				output.Error(err)

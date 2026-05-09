@@ -1,7 +1,6 @@
 package task
 
 import (
-	"database/sql"
 	"errors"
 
 	"github.com/lucas-tremaroli/pace/internal/cmdutil"
@@ -21,7 +20,7 @@ var getCmd = &cobra.Command{
 		return cmdutil.WithTaskService(func(svc *task.Service) error {
 			t, err := svc.GetTaskByID(taskID)
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
+				if errors.Is(err, task.ErrTaskNotFound) {
 					output.ErrorMsgWithCode(
 						"task not found: "+taskID,
 						output.ErrCodeTaskNotFound,
