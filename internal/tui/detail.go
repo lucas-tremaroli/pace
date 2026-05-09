@@ -10,6 +10,13 @@ import (
 	"github.com/muesli/reflow/wrap"
 )
 
+// LogEntry holds a single task log entry for rendering.
+type LogEntry struct {
+	Time      string
+	IsOutcome bool
+	Message   string
+}
+
 // renderFieldBox builds a bordered box for a single field.
 func renderFieldBox(label, value string, valueStyle lipgloss.Style, boxWidth int) string {
 	innerW := boxWidth - 2
@@ -104,7 +111,7 @@ func renderChips(items []string) string {
 	return strings.Join(parts, " ")
 }
 
-func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
+func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 	wrapStyled := func(s string, style lipgloss.Style) string {
 		lines := strings.Split(wrap.String(s, w), "\n")
 		for i, line := range lines {
@@ -183,42 +190,24 @@ func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 		b.WriteString("\n")
 	}
 
-	type logEntry struct {
-		time      string
-		isOutcome bool
-		message   string
-	}
-	var logEntries []logEntry
-	if taskSvc != nil {
-		if logs, err := taskSvc.GetTaskLogs(tk.ID()); err == nil && len(logs) > 0 {
-			for _, l := range logs {
-				logEntries = append(logEntries, logEntry{
-					time:      l.CreatedAt,
-					isOutcome: l.Type == "outcome",
-					message:   l.Message,
-				})
-			}
-		}
-	}
-
 	b.WriteString("\n")
-	b.WriteString(detailLabel.Render(fmt.Sprintf("Logs (%d):", len(logEntries))))
+	b.WriteString(detailLabel.Render(fmt.Sprintf("Logs (%d):", len(logs))))
 	b.WriteString("\n")
-	if len(logEntries) == 0 {
+	if len(logs) == 0 {
 		b.WriteString(detailDim.Render("  No logs yet"))
 		b.WriteString("\n")
 	} else {
-		for _, entry := range logEntries {
-			styledPrefix := detailLogTime.Render(entry.time + " ")
-			prefixW := len(entry.time) + 1
-			if entry.isOutcome {
+		for _, entry := range logs {
+			styledPrefix := detailLogTime.Render(entry.Time + " ")
+			prefixW := len(entry.Time) + 1
+			if entry.IsOutcome {
 				styledPrefix += detailOutcome.Render("[outcome] ")
 				prefixW += len("[outcome] ")
 			}
 			indent := 2 + prefixW
 			b.WriteString("  ")
 			b.WriteString(styledPrefix)
-			b.WriteString(wrapIndent(entry.message, indent, detailValue))
+			b.WriteString(wrapIndent(entry.Message, indent, detailValue))
 			b.WriteString("\n")
 		}
 	}
@@ -226,13 +215,7 @@ func renderTaskDetail(tk task.Task, w int, taskSvc *task.Service) string {
 	return b.String()
 }
 
-func renderNoteDetail(n note.Note, w int, noteSvc *note.Service) string {
-	if noteSvc != nil {
-		if full, err := noteSvc.ReadNoteWithMeta(n.Filename); err == nil {
-			n = *full
-		}
-	}
-
+func renderNoteDetail(n note.Note, w int) string {
 	var b strings.Builder
 	b.WriteString(detailHeader.Render(wrap.String(n.Filename, w)))
 	b.WriteString("\n")

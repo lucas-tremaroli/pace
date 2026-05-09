@@ -239,9 +239,20 @@ func (t *Tui) refreshDetailCmd() tea.Cmd {
 	renderCmd := func() tea.Msg {
 		var content string
 		if tk != nil {
-			content = renderTaskDetail(*tk, w, taskSvc)
+			var logs []LogEntry
+			if rawLogs, err := taskSvc.GetTaskLogs(tk.ID()); err == nil {
+				logs = make([]LogEntry, len(rawLogs))
+				for i, l := range rawLogs {
+					logs[i] = LogEntry{Time: l.CreatedAt, IsOutcome: l.Type == "outcome", Message: l.Message}
+				}
+			}
+			content = renderTaskDetail(*tk, w, logs)
 		} else if nt != nil {
-			content = renderNoteDetail(*nt, w, noteSvc)
+			n := *nt
+			if full, err := noteSvc.ReadNoteWithMeta(n.Filename); err == nil {
+				n = *full
+			}
+			content = renderNoteDetail(n, w)
 		}
 		return detailRenderedMsg{seq: seq, key: itemKey, content: content}
 	}
