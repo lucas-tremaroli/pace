@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/lucas-tremaroli/pace/internal/cmdutil"
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/spf13/cobra"
@@ -26,69 +27,59 @@ type noteListResponse struct {
 var listCmd = &cobra.Command{
 	Use:     "list",
 	GroupID: "manage",
-	Short: "List all notes",
-	Long:  `List all notes in JSON format. Use --sort to change the order, --include-content to include full content, and --filter to filter by label.`,
+	Short:   "List all notes",
+	Long:    `List all notes in JSON format. Use --sort to change the order, --include-content to include full content, and --filter to filter by label.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		svc, err := note.NewService()
-		if err != nil {
-			output.Error(err)
-			return nil
-		}
-
-		notes, err := svc.ListNotesWithMeta(listIncludeContent)
-		if err != nil {
-			output.Error(err)
-			return nil
-		}
-
-		// Parse and apply filters
-		if len(listFilters) > 0 {
-			var filters []*note.NoteFilter
-			for _, filterStr := range listFilters {
-				f, err := note.ParseFilter(filterStr)
-				if err != nil {
-					output.ErrorWithCode(err, output.ErrCodeInvalidParams, "Filter format: key=value (e.g. label=design)")
-					return nil
-				}
-				filters = append(filters, f)
-			}
-
-			merged := note.MergeFilters(filters)
-			var filtered []note.Note
-			for _, n := range notes {
-				if merged.Matches(n) {
-					filtered = append(filtered, n)
-				}
-			}
-			notes = filtered
-		}
-
-		sortNotesWithMeta(notes, listSort)
-
-		// Apply head truncation
-		if listHead > 0 && listHead < len(notes) {
-			notes = notes[:listHead]
-		}
-
-		if listFields != "" {
-			maps, err := output.ToMapSlice(notes)
+		return cmdutil.WithNoteService(func(svc *note.Service) error {
+			notes, err := svc.ListNotesWithMeta(listIncludeContent)
 			if err != nil {
-				output.ErrorMsgWithCode(fmt.Sprintf("failed to filter fields: %v", err), output.ErrCodeInvalidParams, "")
+				output.Error(err)
 				return nil
 			}
-			fields := strings.Split(listFields, ",")
-			output.JSON(map[string]any{
-				"notes": output.FilterFields(maps, fields),
-				"count": len(notes),
-			})
-			return nil
-		}
 
-		output.JSON(noteListResponse{
-			Notes: notes,
-			Count: len(notes),
+			if len(listFilters) > 0 {
+				var filters []*note.NoteFilter
+				for _, filterStr := range listFilters {
+					f, err := note.ParseFilter(filterStr)
+					if err != nil {
+						output.ErrorWithCode(err, output.ErrCodeInvalidParams, "Filter format: key=value (e.g. label=design)")
+						return nil
+					}
+					filters = append(filters, f)
+				}
+				merged := note.MergeFilters(filters)
+				var filtered []note.Note
+				for _, n := range notes {
+					if merged.Matches(n) {
+						filtered = append(filtered, n)
+					}
+				}
+				notes = filtered
+			}
+
+			sortNotesWithMeta(notes, listSort)
+
+			if listHead > 0 && listHead < len(notes) {
+				notes = notes[:listHead]
+			}
+
+			if listFields != "" {
+				maps, err := output.ToMapSlice(notes)
+				if err != nil {
+					output.ErrorMsgWithCode(fmt.Sprintf("failed to filter fields: %v", err), output.ErrCodeInvalidParams, "")
+					return nil
+				}
+				fields := strings.Split(listFields, ",")
+				output.JSON(map[string]any{
+					"notes": output.FilterFields(maps, fields),
+					"count": len(notes),
+				})
+				return nil
+			}
+
+			output.JSON(noteListResponse{Notes: notes, Count: len(notes)})
+			return nil
 		})
-		return nil
 	},
 }
 
@@ -103,12 +94,10 @@ func init() {
 func sortNotesWithMeta(notes []note.Note, sortBy string) {
 	switch sortBy {
 	case "modified", "created":
-		// Sort by modification time (newest first)
 		slices.SortFunc(notes, func(a, b note.Note) int {
 			return b.ModTime.Compare(a.ModTime)
 		})
-	default: // "name"
-		// Sort alphabetically by filename
+	default:
 		slices.SortFunc(notes, func(a, b note.Note) int {
 			return strings.Compare(a.Filename, b.Filename)
 		})

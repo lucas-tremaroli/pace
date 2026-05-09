@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/lucas-tremaroli/pace/internal/cmdutil"
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/spf13/cobra"
@@ -23,22 +24,17 @@ Content is concatenated with --- separators.`,
 		if mergeOutputFile == "" {
 			output.ErrorMsgWithCode("output filename required (use -o flag)", output.ErrCodeMissingField, "")
 		}
-
-		svc, err := note.NewService()
-		if err != nil {
-			output.Error(err)
-		}
-
-		mergedNote, err := svc.MergeNotes(args, mergeOutputFile)
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				output.ErrorWithCode(err, output.ErrCodeNoteNotFound, "Use pace note list to see available notes")
+		return cmdutil.WithNoteService(func(svc *note.Service) error {
+			mergedNote, err := svc.MergeNotes(args, mergeOutputFile)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					output.ErrorWithCode(err, output.ErrCodeNoteNotFound, "Use pace note list to see available notes")
+				}
+				output.ErrorWithCode(err, output.ErrCodeStorageError, "")
 			}
-			output.ErrorWithCode(err, output.ErrCodeStorageError, "")
-		}
-
-		output.Success(fmt.Sprintf("Merged %d notes into %s", len(args), mergedNote.Filename), mergedNote)
-		return nil
+			output.Success(fmt.Sprintf("Merged %d notes into %s", len(args), mergedNote.Filename), mergedNote)
+			return nil
+		})
 	},
 }
 
