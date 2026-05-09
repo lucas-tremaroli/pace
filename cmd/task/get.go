@@ -21,13 +21,13 @@ var getCmd = &cobra.Command{
 			t, err := svc.GetTaskByID(taskID)
 			if err != nil {
 				if errors.Is(err, task.ErrTaskNotFound) {
-					output.ErrorMsgWithCode(
+					return output.ErrorMsgWithCode(
 						"task not found: "+taskID,
 						output.ErrCodeTaskNotFound,
 						"Use pace task list to see available task IDs",
 					)
 				}
-				output.Error(err)
+				return output.Error(err)
 			}
 			output.JSON(t.ToJSON())
 			return nil

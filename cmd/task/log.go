@@ -16,7 +16,7 @@ var logCmd = &cobra.Command{
 		taskID, message := args[0], args[1]
 		return cmdutil.WithTaskService(func(svc *task.Service) error {
 			if err := svc.LogEntry(taskID, message); err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 			output.Success("log entry added", map[string]any{"task_id": taskID})
 			return nil

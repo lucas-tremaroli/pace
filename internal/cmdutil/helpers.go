@@ -7,22 +7,20 @@ import (
 )
 
 // WithTaskService initializes a task service, runs fn, then closes the service.
-// If initialization fails the process exits via output.Error.
 func WithTaskService(fn func(*task.Service) error) error {
 	svc, err := task.NewService()
 	if err != nil {
-		output.Error(err)
+		return output.Error(err)
 	}
 	defer svc.Close()
 	return fn(svc)
 }
 
 // WithNoteService initializes a note service, runs fn, then closes the service.
-// If initialization fails the process exits via output.Error.
 func WithNoteService(fn func(*note.Service) error) error {
 	svc, err := note.NewService()
 	if err != nil {
-		output.Error(err)
+		return output.Error(err)
 	}
 	defer svc.Close()
 	return fn(svc)

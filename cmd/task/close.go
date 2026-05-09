@@ -18,7 +18,7 @@ var closeCmd = &cobra.Command{
 		taskID := args[0]
 		return cmdutil.WithTaskService(func(svc *task.Service) error {
 			if err := svc.CloseTask(taskID, closeOutcome); err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 			output.Success("task closed", map[string]any{"task_id": taskID})
 			return nil

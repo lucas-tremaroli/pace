@@ -19,10 +19,6 @@ var (
 	listHead           int
 )
 
-type noteListResponse struct {
-	Notes []note.Note `json:"notes"`
-	Count int         `json:"count"`
-}
 
 var listCmd = &cobra.Command{
 	Use:     "list",
@@ -33,8 +29,7 @@ var listCmd = &cobra.Command{
 		return cmdutil.WithNoteService(func(svc *note.Service) error {
 			notes, err := svc.ListNotesWithMeta(listIncludeContent)
 			if err != nil {
-				output.Error(err)
-				return nil
+				return output.Error(err)
 			}
 
 			if len(listFilters) > 0 {
@@ -42,8 +37,7 @@ var listCmd = &cobra.Command{
 				for _, filterStr := range listFilters {
 					f, err := note.ParseFilter(filterStr)
 					if err != nil {
-						output.ErrorWithCode(err, output.ErrCodeInvalidParams, "Filter format: key=value (e.g. label=design)")
-						return nil
+						return output.ErrorWithCode(err, output.ErrCodeInvalidParams, "Filter format: key=value (e.g. label=design)")
 					}
 					filters = append(filters, f)
 				}
@@ -66,8 +60,7 @@ var listCmd = &cobra.Command{
 			if listFields != "" {
 				maps, err := output.ToMapSlice(notes)
 				if err != nil {
-					output.ErrorMsgWithCode(fmt.Sprintf("failed to filter fields: %v", err), output.ErrCodeInvalidParams, "")
-					return nil
+					return output.ErrorMsgWithCode(fmt.Sprintf("failed to filter fields: %v", err), output.ErrCodeInvalidParams, "")
 				}
 				fields := strings.Split(listFields, ",")
 				output.JSON(map[string]any{
@@ -77,7 +70,7 @@ var listCmd = &cobra.Command{
 				return nil
 			}
 
-			output.JSON(noteListResponse{Notes: notes, Count: len(notes)})
+			output.JSON(output.NoteListResponse{Notes: notes, Count: len(notes)})
 			return nil
 		})
 	},

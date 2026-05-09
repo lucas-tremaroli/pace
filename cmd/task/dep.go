@@ -29,12 +29,12 @@ var depAddCmd = &cobra.Command{
 
 		svc, err := task.NewService()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		defer svc.Close()
 
 		if err := svc.AddDependency(blockerID, blockedID); err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		output.Success("dependency added", map[string]any{
@@ -56,12 +56,12 @@ var depRemoveCmd = &cobra.Command{
 
 		svc, err := task.NewService()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		defer svc.Close()
 
 		if err := svc.RemoveDependency(blockerID, blockedID); err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		output.Success("dependency removed", map[string]any{
@@ -82,16 +82,16 @@ var depListCmd = &cobra.Command{
 
 		svc, err := task.NewService()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		defer svc.Close()
 
 		t, err := svc.GetTaskByID(taskID)
 		if err != nil {
 			if errors.Is(err, task.ErrTaskNotFound) {
-				output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
+				return output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
 			}
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		output.JSON(map[string]any{
@@ -131,7 +131,7 @@ Examples:
 
 		// Validate direction flag
 		if treeDirection != "down" && treeDirection != "up" && treeDirection != "both" {
-			output.ErrorMsgWithCode(
+			return output.ErrorMsgWithCode(
 				fmt.Sprintf("invalid direction: %s (valid: down, up, both)", treeDirection),
 				output.ErrCodeInvalidParams,
 				"Valid values: up, down, both",
@@ -143,21 +143,21 @@ Examples:
 		if treeStatus != "" {
 			s, err := task.ParseStatus(treeStatus)
 			if err != nil {
-				output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
+				return output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 			}
 			filterStatus = &s
 		}
 
 		svc, err := task.NewService()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		defer svc.Close()
 
 		// Load all tasks to build the full dependency graph
 		tasks, err := svc.LoadAllTasks()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		// Build task map for quick lookup
@@ -169,7 +169,7 @@ Examples:
 		// Verify the target task exists
 		rootTask, exists := taskMap[taskID]
 		if !exists {
-			output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
+			return output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
 		}
 
 		opts := treeOptions{
@@ -196,7 +196,7 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		svc, err := task.NewService()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		defer svc.Close()
 
@@ -219,7 +219,7 @@ Example:
 		}
 
 		if len(errors) > 0 && len(dependencies) == 0 {
-			output.ErrorMsg(strings.Join(errors, "; "))
+			return output.ErrorMsg(strings.Join(errors, "; "))
 		}
 
 		data := map[string]any{

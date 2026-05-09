@@ -21,13 +21,13 @@ var deleteCmd = &cobra.Command{
 		return cmdutil.WithNoteService(func(svc *note.Service) error {
 			if err := svc.DeleteNote(filename); err != nil {
 				if errors.Is(err, os.ErrNotExist) {
-					output.ErrorMsgWithCode(
+					return output.ErrorMsgWithCode(
 						"note not found: "+filename,
 						output.ErrCodeNoteNotFound,
 						"Use pace note list to see available notes",
 					)
 				}
-				output.Error(err)
+				return output.Error(err)
 			}
 			output.Success("note deleted", map[string]string{"filename": filename})
 			return nil

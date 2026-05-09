@@ -15,13 +15,13 @@ var contextCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		taskSvc, err := task.NewService()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		defer taskSvc.Close()
 
 		tasks, err := taskSvc.LoadAllTasks()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		// Filter to active tasks (todo + in-progress)
@@ -48,12 +48,12 @@ var contextCmd = &cobra.Command{
 		// Load notes
 		noteSvc, err := note.NewService()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		notes, err := noteSvc.ListNotesWithMeta(false)
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		noteList := make([]map[string]any, 0, len(notes))
@@ -67,7 +67,7 @@ var contextCmd = &cobra.Command{
 
 		resolved, err := storage.ResolvePaceDir()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		output.Success("context loaded", map[string]any{

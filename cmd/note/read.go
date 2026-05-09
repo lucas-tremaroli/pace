@@ -16,10 +16,6 @@ var (
 	readAll bool
 )
 
-type readAllResponse struct {
-	Notes []note.Note `json:"notes"`
-	Count int         `json:"count"`
-}
 
 var readCmd = &cobra.Command{
 	Use:     "read [filename]",
@@ -33,7 +29,7 @@ var readCmd = &cobra.Command{
 			if readAll {
 				notes, err := svc.ReadAllNotes()
 				if err != nil {
-					output.Error(err)
+					return output.Error(err)
 				}
 				if readRaw {
 					for i, n := range notes {
@@ -45,21 +41,21 @@ var readCmd = &cobra.Command{
 					}
 					return nil
 				}
-				output.JSON(readAllResponse{Notes: notes, Count: len(notes)})
+				output.JSON(output.NoteListResponse{Notes: notes, Count: len(notes)})
 				return nil
 			}
 
 			if len(args) == 0 {
-				output.ErrorMsgWithCode("filename required (or use --all to read all notes)", output.ErrCodeMissingField, "")
+				return output.ErrorMsgWithCode("filename required (or use --all to read all notes)", output.ErrCodeMissingField, "")
 			}
 
 			filename := args[0]
 			n, err := svc.ReadNoteWithMeta(filename)
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
-					output.ErrorMsgWithCode("note not found: "+filename, output.ErrCodeNoteNotFound, "Use pace note list to see available notes")
+					return output.ErrorMsgWithCode("note not found: "+filename, output.ErrCodeNoteNotFound, "Use pace note list to see available notes")
 				}
-				output.Error(err)
+				return output.Error(err)
 			}
 
 			if readRaw {

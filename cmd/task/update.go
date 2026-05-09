@@ -34,10 +34,10 @@ For batch updates, use --filter with update flags:
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(updateFilters) > 0 && len(args) > 0 {
-			output.ErrorMsgWithCode("cannot use both task ID and --filter (use one or the other)", output.ErrCodeInvalidParams, "")
+			return output.ErrorMsgWithCode("cannot use both task ID and --filter (use one or the other)", output.ErrCodeInvalidParams, "")
 		}
 		if len(updateFilters) == 0 && len(args) == 0 {
-			output.ErrorMsgWithCode("task ID required (or use --filter for batch updates)", output.ErrCodeMissingField, "")
+			return output.ErrorMsgWithCode("task ID required (or use --filter for batch updates)", output.ErrCodeMissingField, "")
 		}
 
 		return cmdutil.WithTaskService(func(svc *task.Service) error {
@@ -50,9 +50,9 @@ For batch updates, use --filter with update flags:
 			existingTask, err := svc.GetTaskByID(taskID)
 			if err != nil {
 				if errors.Is(err, task.ErrTaskNotFound) {
-					output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
+					return output.ErrorMsgWithCode("task not found: "+taskID, output.ErrCodeTaskNotFound, "Use pace task list to see available task IDs")
 				}
-				output.Error(err)
+				return output.Error(err)
 			}
 
 			title := existingTask.Title()
@@ -70,14 +70,14 @@ For batch updates, use --filter with update flags:
 			if cmd.Flags().Changed("status") {
 				parsedStatus, err := task.ParseStatus(updateStatus)
 				if err != nil {
-					output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
+					return output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 				}
 				status = parsedStatus
 			}
 			if cmd.Flags().Changed("priority") {
 				parsedPriority, err := task.ParsePriority(updatePriority)
 				if err != nil {
-					output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
+					return output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
 				}
 				priority = parsedPriority
 			}
@@ -87,21 +87,21 @@ For batch updates, use --filter with update flags:
 
 			updatedTask := task.NewTaskComplete(taskID, status, title, description, priority, link)
 			if err := svc.UpdateTask(updatedTask); err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 
 			if cmd.Flags().Changed("label") {
 				if err := task.ValidateLabel(updateLabel); err != nil {
-					output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
+					return output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
 				}
 				if err := svc.SetLabel(taskID, updateLabel); err != nil {
-					output.Error(err)
+					return output.Error(err)
 				}
 			}
 
 			finalTask, err := svc.GetTaskByID(taskID)
 			if err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 			output.Success("task updated", finalTask.ToJSON())
 			return nil
@@ -111,20 +111,20 @@ For batch updates, use --filter with update flags:
 
 func handleBatchUpdate(svc *task.Service, cmd *cobra.Command) error {
 	if cmd.Flags().Changed("title") || cmd.Flags().Changed("description") || cmd.Flags().Changed("url") {
-		output.ErrorMsgWithCode("--title, --description, and --url cannot be used with --filter (would set same value for all matched tasks)", output.ErrCodeInvalidParams, "")
+		return output.ErrorMsgWithCode("--title, --description, and --url cannot be used with --filter (would set same value for all matched tasks)", output.ErrCodeInvalidParams, "")
 	}
 
 	var filters []*task.TaskFilter
 	for _, f := range updateFilters {
 		filter, err := task.ParseFilter(f)
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		filters = append(filters, filter)
 	}
 	mergedFilter, err := task.MergeFilters(filters)
 	if err != nil {
-		output.Error(err)
+		return output.Error(err)
 	}
 
 	var batchStatus *task.Status
@@ -133,30 +133,30 @@ func handleBatchUpdate(svc *task.Service, cmd *cobra.Command) error {
 	if cmd.Flags().Changed("status") {
 		parsedStatus, err := task.ParseStatus(updateStatus)
 		if err != nil {
-			output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
+			return output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 		}
 		batchStatus = &parsedStatus
 	}
 	if cmd.Flags().Changed("priority") {
 		parsedPriority, err := task.ParsePriority(updatePriority)
 		if err != nil {
-			output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
+			return output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
 		}
 		batchPriority = &parsedPriority
 	}
 	if cmd.Flags().Changed("label") {
 		if err := task.ValidateLabel(updateLabel); err != nil {
-			output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
+			return output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
 		}
 	}
 
 	if batchStatus == nil && batchPriority == nil && !cmd.Flags().Changed("label") {
-		output.ErrorMsgWithCode("no updates specified (use --status, --priority, or --label)", output.ErrCodeInvalidParams, "")
+		return output.ErrorMsgWithCode("no updates specified (use --status, --priority, or --label)", output.ErrCodeInvalidParams, "")
 	}
 
 	tasks, err := svc.LoadAllTasks()
 	if err != nil {
-		output.Error(err)
+		return output.Error(err)
 	}
 
 	var matchingTasks []task.Task

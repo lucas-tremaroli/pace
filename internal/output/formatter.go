@@ -2,6 +2,7 @@ package output
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 )
@@ -80,44 +81,44 @@ func Success(message string, data any) {
 	})
 }
 
-// Error prints an error response and exits with code 1
-func Error(err error) {
+// Error prints a JSON error response and returns err.
+func Error(err error) error {
 	JSON(Response{
 		Success: false,
 		Error:   err.Error(),
 	})
-	os.Exit(1)
+	return err
 }
 
-// ErrorMsg prints an error message response and exits with code 1
-func ErrorMsg(message string) {
+// ErrorMsg prints a JSON error response and returns an error with the given message.
+func ErrorMsg(message string) error {
 	JSON(Response{
 		Success: false,
 		Error:   message,
 	})
-	os.Exit(1)
+	return errors.New(message)
 }
 
-// ErrorWithCode prints an error response with a machine-readable code and exits with code 1
-func ErrorWithCode(err error, code, suggestion string) {
+// ErrorWithCode prints a JSON error response with a machine-readable code and returns err.
+func ErrorWithCode(err error, code, suggestion string) error {
 	JSON(Response{
 		Success:    false,
 		Error:      err.Error(),
 		ErrorCode:  code,
 		Suggestion: suggestion,
 	})
-	os.Exit(1)
+	return err
 }
 
-// ErrorMsgWithCode prints an error message response with a machine-readable code and exits with code 1
-func ErrorMsgWithCode(message, code, suggestion string) {
+// ErrorMsgWithCode prints a JSON error response with a machine-readable code and returns an error.
+func ErrorMsgWithCode(message, code, suggestion string) error {
 	JSON(Response{
 		Success:    false,
 		Error:      message,
 		ErrorCode:  code,
 		Suggestion: suggestion,
 	})
-	os.Exit(1)
+	return errors.New(message)
 }
 
 // BulkResult represents the result of a bulk operation

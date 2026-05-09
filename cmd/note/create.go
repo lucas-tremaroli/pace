@@ -34,7 +34,7 @@ var createCmd = &cobra.Command{
 				if (stat.Mode() & os.ModeCharDevice) == 0 {
 					stdinBytes, err := io.ReadAll(os.Stdin)
 					if err != nil {
-						output.Error(err)
+						return output.Error(err)
 					}
 					content = string(stdinBytes)
 				}
@@ -42,7 +42,7 @@ var createCmd = &cobra.Command{
 
 			if content != "" {
 				if err := svc.WriteNote(filename, content); err != nil {
-					output.Error(err)
+					return output.Error(err)
 				}
 				if cmd.Flags().Changed("editor") {
 					return svc.OpenInEditor(filename, editor)
@@ -58,7 +58,7 @@ var createCmd = &cobra.Command{
 						}
 						for _, id := range taskIDs {
 							if err := taskSvc.LinkNote(id, noteFilename); err != nil {
-								output.Error(err)
+								return output.Error(err)
 							}
 						}
 						return nil
@@ -75,7 +75,7 @@ var createCmd = &cobra.Command{
 			}
 
 			if err := svc.WriteNote(filename, note.DefaultTemplate("Title")); err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 			return svc.OpenInEditor(filename, editor)
 		})

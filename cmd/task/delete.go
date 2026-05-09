@@ -29,10 +29,10 @@ Delete by filter:
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(deleteFilters) > 0 && len(args) > 0 {
-			output.ErrorMsgWithCode("cannot use both task IDs and --filter (use one or the other)", output.ErrCodeInvalidParams, "")
+			return output.ErrorMsgWithCode("cannot use both task IDs and --filter (use one or the other)", output.ErrCodeInvalidParams, "")
 		}
 		if len(deleteFilters) == 0 && len(args) == 0 {
-			output.ErrorMsgWithCode("task ID required (or use --filter for filter-based deletion)", output.ErrCodeMissingField, "")
+			return output.ErrorMsgWithCode("task ID required (or use --filter for filter-based deletion)", output.ErrCodeMissingField, "")
 		}
 
 		return cmdutil.WithTaskService(func(svc *task.Service) error {
@@ -43,7 +43,7 @@ Delete by filter:
 			if len(args) == 1 {
 				taskID := args[0]
 				if err := svc.DeleteTask(taskID); err != nil {
-					output.Error(err)
+					return output.Error(err)
 				}
 				output.Success("task deleted", map[string]string{"id": taskID})
 				return nil
@@ -68,18 +68,18 @@ func handleFilterDelete(svc *task.Service) error {
 	for _, f := range deleteFilters {
 		filter, err := task.ParseFilter(f)
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		filters = append(filters, filter)
 	}
 	mergedFilter, err := task.MergeFilters(filters)
 	if err != nil {
-		output.Error(err)
+		return output.Error(err)
 	}
 
 	tasks, err := svc.LoadAllTasks()
 	if err != nil {
-		output.Error(err)
+		return output.Error(err)
 	}
 
 	var matchingTasks []task.Task

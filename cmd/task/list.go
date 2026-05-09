@@ -45,10 +45,6 @@ var (
 	listReady          bool
 )
 
-type taskListResponse struct {
-	Tasks []task.TaskJSON `json:"tasks"`
-	Count int             `json:"count"`
-}
 
 var listCmd = &cobra.Command{
 	Use:     "list",
@@ -59,12 +55,11 @@ var listCmd = &cobra.Command{
 		return cmdutil.WithTaskService(func(svc *task.Service) error {
 			tasks, err := svc.LoadAllTasks()
 			if err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 
 			if listPretty && listFields != "" {
-				output.ErrorMsg("--pretty and --fields cannot be used together")
-				return nil
+				return output.ErrorMsg("--pretty and --fields cannot be used together")
 			}
 
 			filter := task.TaskFilter{}
@@ -74,20 +69,18 @@ var listCmd = &cobra.Command{
 			if listFilterStatus != "" {
 				status, err := task.ParseStatus(listFilterStatus)
 				if err != nil {
-					output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
-					return nil
+					return output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 				}
 				filter.Status = &status
 			}
 			for _, p := range listFilterPriority {
 				pri, err := task.ParsePriority(p)
 				if err != nil {
-					output.ErrorMsgWithCode(
+					return output.ErrorMsgWithCode(
 						err.Error(),
 						output.ErrCodeInvalidPriority,
 						task.ValidPriorityHelp,
 					)
-					return nil
 				}
 				filter.Priorities = append(filter.Priorities, pri)
 			}
@@ -115,8 +108,7 @@ var listCmd = &cobra.Command{
 			if listFields != "" {
 				maps, err := output.ToMapSlice(taskJSONs)
 				if err != nil {
-					output.ErrorMsg(fmt.Sprintf("failed to filter fields: %v", err))
-					return nil
+					return output.ErrorMsg(fmt.Sprintf("failed to filter fields: %v", err))
 				}
 				fields := strings.Split(listFields, ",")
 				output.JSON(map[string]any{
@@ -126,7 +118,7 @@ var listCmd = &cobra.Command{
 				return nil
 			}
 
-			output.JSON(taskListResponse{Tasks: taskJSONs, Count: len(taskJSONs)})
+			output.JSON(output.TaskListResponse{Tasks: taskJSONs, Count: len(taskJSONs)})
 			return nil
 		})
 	},

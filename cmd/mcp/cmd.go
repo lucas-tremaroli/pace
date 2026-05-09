@@ -49,16 +49,16 @@ var installCmd = &cobra.Command{
 
 This command registers the Pace MCP server with Claude Code CLI,
 making pace tools available in your Claude conversations.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		runInstall()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runInstall()
 	},
 }
 
 var uninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "Remove Pace from Claude Code's MCP server configuration",
-	Run: func(cmd *cobra.Command, args []string) {
-		runUninstall()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runUninstall()
 	},
 }
 
@@ -96,17 +96,15 @@ func findClaudeCLI() (string, error) {
 	return path, nil
 }
 
-func runInstall() {
+func runInstall() error {
 	claudePath, err := findClaudeCLI()
 	if err != nil {
-		output.Error(err)
-		return
+		return output.Error(err)
 	}
 
 	pacePath, err := getPacePath()
 	if err != nil {
-		output.Error(err)
-		return
+		return output.Error(err)
 	}
 
 	// Remove existing registration first to make install idempotent
@@ -116,8 +114,7 @@ func runInstall() {
 	// Register the server
 	cmd := exec.Command(claudePath, "mcp", "add", "pace", "--", pacePath, "mcp", "run")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		output.ErrorMsg(fmt.Sprintf("failed to register MCP server with Claude Code: %s", strings.TrimSpace(string(out))))
-		return
+		return output.ErrorMsg(fmt.Sprintf("failed to register MCP server with Claude Code: %s", strings.TrimSpace(string(out))))
 	}
 
 	tools := []string{
@@ -145,13 +142,13 @@ func runInstall() {
 		"command": pacePath,
 		"tools":   tools,
 	})
+	return nil
 }
 
-func runUninstall() {
+func runUninstall() error {
 	claudePath, err := findClaudeCLI()
 	if err != nil {
-		output.Error(err)
-		return
+		return output.Error(err)
 	}
 
 	cmd := exec.Command(claudePath, "mcp", "remove", "pace")
@@ -161,11 +158,11 @@ func runUninstall() {
 		// Check if it's just "not found" - that's okay
 		if exitErr, ok := cmdErr.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
 			output.Success("Pace MCP server is not currently installed", nil)
-			return
+			return nil
 		}
-		output.ErrorMsg(fmt.Sprintf("failed to remove MCP server from Claude Code: %s", strings.TrimSpace(string(out))))
-		return
+		return output.ErrorMsg(fmt.Sprintf("failed to remove MCP server from Claude Code: %s", strings.TrimSpace(string(out))))
 	}
 
 	output.Success("Pace MCP server uninstalled", nil)
+	return nil
 }

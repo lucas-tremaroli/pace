@@ -278,7 +278,7 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 		return jsonResult(map[string]any{"tasks": filtered, "count": len(filtered)})
 	}
 
-	return jsonResult(map[string]any{"tasks": taskList, "count": len(taskList)})
+	return jsonResult(output.TaskListResponse{Tasks: taskList, Count: len(taskList)})
 }
 
 func (h *Handler) toolTaskGet(args map[string]any) ToolCallResult {
@@ -588,23 +588,17 @@ func (h *Handler) toolNoteList(args map[string]any) ToolCallResult {
 		notes = notes[:head]
 	}
 
-	noteList := make([]map[string]any, 0, len(notes))
-	for _, n := range notes {
-		noteList = append(noteList, map[string]any{
-			"filename":    n.Filename,
-			"description": n.Description,
-			"labels":      n.Labels,
-			"modTime":    n.ModTime,
-		})
-	}
-
 	// Apply field filtering
 	if fields := parseFields(args); len(fields) > 0 {
-		filtered := output.FilterFields(noteList, fields)
+		maps, err := output.ToMapSlice(notes)
+		if err != nil {
+			return errorResult(fmt.Sprintf("failed to filter fields: %v", err))
+		}
+		filtered := output.FilterFields(maps, fields)
 		return jsonResult(map[string]any{"notes": filtered, "count": len(filtered)})
 	}
 
-	return jsonResult(map[string]any{"notes": noteList, "count": len(noteList)})
+	return jsonResult(output.NoteListResponse{Notes: notes, Count: len(notes)})
 }
 
 func (h *Handler) toolNoteCreate(args map[string]any) ToolCallResult {

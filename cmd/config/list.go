@@ -13,13 +13,13 @@ var listCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		db, err := storage.NewDB()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		defer db.Close()
 
 		config, err := db.GetAllConfig()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		output.Success("config list", map[string]any{

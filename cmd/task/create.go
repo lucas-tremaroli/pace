@@ -38,31 +38,31 @@ For bulk creation, use --bulk with a JSON array or '-' for stdin:
 			}
 
 			if createTitle == "" {
-				output.ErrorMsgWithCode("title is required", output.ErrCodeMissingField, "Provide a --title flag")
+				return output.ErrorMsgWithCode("title is required", output.ErrCodeMissingField, "Provide a --title flag")
 			}
 
 			status, err := task.ParseStatus(createStatus)
 			if err != nil {
-				output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
+				return output.ErrorWithCode(err, output.ErrCodeInvalidStatus, "Valid values: todo, in-progress, done")
 			}
 
 			if err := task.ValidateLabel(createLabel); err != nil {
-				output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
+				return output.ErrorWithCode(err, output.ErrCodeInvalidType, "Valid values: task, bug, feature, docs")
 			}
 
 			priority, err := task.ParsePriority(createPriority)
 			if err != nil {
-				output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
+				return output.ErrorWithCode(err, output.ErrCodeInvalidPriority, task.ValidPriorityHelp)
 			}
 
 			newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, createTitle, createDescription, priority, createLink)
 
 			if err := svc.CreateTask(newTask); err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 
 			if err := svc.SetLabel(newTask.ID(), createLabel); err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 
 			output.Success("task created", map[string]any{"id": newTask.ID()})
@@ -78,7 +78,7 @@ func handleBulkCreate(svc *task.Service, bulkInput string) error {
 	if bulkInput == "-" {
 		jsonData, err = io.ReadAll(os.Stdin)
 		if err != nil {
-			output.ErrorMsg("failed to read from stdin: " + err.Error())
+			return output.ErrorMsg("failed to read from stdin: " + err.Error())
 		}
 	} else {
 		jsonData = []byte(bulkInput)
@@ -86,11 +86,11 @@ func handleBulkCreate(svc *task.Service, bulkInput string) error {
 
 	var inputs []task.TaskInput
 	if err := json.Unmarshal(jsonData, &inputs); err != nil {
-		output.ErrorMsg("invalid JSON: " + err.Error())
+		return output.ErrorMsg("invalid JSON: " + err.Error())
 	}
 
 	if len(inputs) == 0 {
-		output.ErrorMsg("no tasks provided")
+		return output.ErrorMsg("no tasks provided")
 	}
 
 	result := output.BulkResult{Total: len(inputs)}

@@ -17,7 +17,7 @@ var logsCmd = &cobra.Command{
 		return cmdutil.WithTaskService(func(svc *task.Service) error {
 			logs, err := svc.GetTaskLogs(taskID)
 			if err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 			output.JSON(map[string]any{
 				"task_id": taskID,
