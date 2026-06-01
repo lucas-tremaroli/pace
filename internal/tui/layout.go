@@ -99,31 +99,31 @@ func (t *Tui) renderOverview(w int) string {
 		}
 	}
 
-	tag := storageTag.Render(strings.ToUpper(string(t.storageType)))
-	storeLine := overviewLabel.Render(shortenPath(t.storagePath)) + "  " + tag
+	tag := theme.StorageTag.Render(strings.ToUpper(string(t.storageType)))
+	storeLine := theme.OverviewLabel.Render(shortenPath(t.storagePath)) + "  " + tag
 
 	if total == 0 {
-		content := "\n" + storeLine + "\n\n" + noTasksStyle.Render("no tasks yet")
+		content := "\n" + storeLine + "\n\n" + theme.NoTasks.Render("no tasks yet")
 		return fitHeight(content, overviewH)
 	}
 
 	pct := done * 100 / total
-	pctStr := overviewPct.Render(fmt.Sprintf(" %d%%", pct))
+	pctStr := theme.OverviewPct.Render(fmt.Sprintf(" %d%%", pct))
 	barW := w - 6
 	if barW < 10 {
 		barW = 10
 	}
 	filled := done * barW / total
-	bar := progressFilled.Render(strings.Repeat("━", filled)) +
-		progressEmpty.Render(strings.Repeat("─", barW-filled)) +
+	bar := theme.ProgressFilled.Render(strings.Repeat("━", filled)) +
+		theme.ProgressEmpty.Render(strings.Repeat("─", barW-filled)) +
 		pctStr
 
-	counts := overviewLabel.Render(fmt.Sprintf("Progress %d/%d  ", done, total)) +
-		statusTodo.Render(fmt.Sprintf("○ %d", todo)) +
-		overviewLabel.Render("  ") +
-		statusProgress.Render(fmt.Sprintf("● %d", inProg)) +
-		overviewLabel.Render("  ") +
-		statusDone.Render(fmt.Sprintf("✓ %d", done))
+	counts := theme.OverviewLabel.Render(fmt.Sprintf("Progress %d/%d  ", done, total)) +
+		theme.StatusTodo.Render(fmt.Sprintf("○ %d", todo)) +
+		theme.OverviewLabel.Render("  ") +
+		theme.StatusInProgress.Render(fmt.Sprintf("● %d", inProg)) +
+		theme.OverviewLabel.Render("  ") +
+		theme.StatusDone.Render(fmt.Sprintf("✓ %d", done))
 
 	content := "\n" + storeLine + "\n\n" + bar + "\n\n" + counts
 	return fitHeight(content, overviewH)

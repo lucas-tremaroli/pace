@@ -17,6 +17,7 @@ var (
 	listFilters        []string
 	listFields         string
 	listHead           int
+	listPretty         bool
 )
 
 
@@ -57,6 +58,11 @@ var listCmd = &cobra.Command{
 				notes = notes[:listHead]
 			}
 
+			if listPretty {
+				printNotesPretty(notes)
+				return nil
+			}
+
 			if listFields != "" {
 				maps, err := output.ToMapSlice(notes)
 				if err != nil {
@@ -82,6 +88,29 @@ func init() {
 	listCmd.Flags().StringArrayVar(&listFilters, "filter", nil, "Filter notes (e.g., label=design). Can be repeated for AND semantics")
 	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: filename, description, labels, modTime")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N notes")
+	listCmd.Flags().BoolVar(&listPretty, "pretty", false, "Human-readable formatted output")
+}
+
+func printNotesPretty(notes []note.Note) {
+	fmt.Println()
+	if len(notes) == 0 {
+		fmt.Println(dimStyle.Render("No notes found."))
+		fmt.Println()
+		return
+	}
+	for _, n := range notes {
+		name := strings.TrimSuffix(n.Filename, ".md")
+		line := titleStyle.Render(name)
+		if n.Description != "" {
+			line += " " + dimStyle.Render("— "+n.Description)
+		}
+		if len(n.Labels) > 0 {
+			line += " " + labelStyle.Render("["+strings.Join(n.Labels, ", ")+"]")
+		}
+		fmt.Println(line)
+	}
+	fmt.Println()
+	fmt.Println(dimStyle.Render(fmt.Sprintf("%d note(s)", len(notes))))
 }
 
 func sortNotesWithMeta(notes []note.Note, sortBy string) {

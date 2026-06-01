@@ -53,7 +53,7 @@ func sortTasks(tasks []task.Task) {
 	})
 }
 
-func fetchData(taskSvc *task.Service, noteSvc *note.Service) dataReloadedMsg {
+func fetchData(taskSvc TaskService, noteSvc NoteService) dataReloadedMsg {
 	var taskItems []list.Item
 	if tasks, err := taskSvc.LoadAllTasks(); err == nil {
 		sortTasks(tasks)

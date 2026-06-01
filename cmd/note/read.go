@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/lucas-tremaroli/pace/internal/cmdutil"
 	"github.com/lucas-tremaroli/pace/internal/note"
@@ -12,17 +13,17 @@ import (
 )
 
 var (
-	readRaw bool
-	readAll bool
+	readRaw    bool
+	readAll    bool
+	readPretty bool
 )
-
 
 var readCmd = &cobra.Command{
 	Use:     "read [filename]",
 	GroupID: "manage",
 	Aliases: []string{"cat"},
 	Short:   "Read a note's content (alias: cat)",
-	Long:    `Reads and outputs a note's content. Use --raw for raw markdown output. Use --all to read all notes. Alias: 'pace note cat'`,
+	Long:    `Reads and outputs a note's content. Use --raw for raw markdown, --pretty for a human-readable summary, or --all to read every note. Alias: 'pace note cat'`,
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdutil.WithNoteService(func(svc *note.Service) error {
@@ -38,6 +39,15 @@ var readCmd = &cobra.Command{
 						}
 						fmt.Printf("# %s\n\n", n.Filename)
 						fmt.Print(n.Content)
+					}
+					return nil
+				}
+				if readPretty {
+					for i, n := range notes {
+						if i > 0 {
+							fmt.Println(dimStyle.Render(strings.Repeat("─", 40)))
+						}
+						printNotePretty(n)
 					}
 					return nil
 				}
@@ -63,13 +73,35 @@ var readCmd = &cobra.Command{
 				return nil
 			}
 
+			if readPretty {
+				printNotePretty(*n)
+				return nil
+			}
+
 			output.JSON(n)
 			return nil
 		})
 	},
 }
 
+func printNotePretty(n note.Note) {
+	fmt.Println()
+	fmt.Println(headingStyle.Render(strings.TrimSuffix(n.Filename, ".md")))
+	if n.Description != "" {
+		fmt.Println(dimStyle.Render(n.Description))
+	}
+	if len(n.Labels) > 0 {
+		fmt.Println(labelStyle.Render("labels: " + strings.Join(n.Labels, ", ")))
+	}
+	if len(n.Tasks) > 0 {
+		fmt.Println(dimStyle.Render("tasks: " + strings.Join(n.Tasks, ", ")))
+	}
+	fmt.Println()
+	fmt.Println(n.Content)
+}
+
 func init() {
 	readCmd.Flags().BoolVar(&readRaw, "raw", false, "Output raw markdown content without JSON wrapper")
 	readCmd.Flags().BoolVar(&readAll, "all", false, "Read all notes with full content")
+	readCmd.Flags().BoolVar(&readPretty, "pretty", false, "Human-readable formatted output with metadata header")
 }

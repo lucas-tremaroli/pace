@@ -26,7 +26,7 @@ func renderFieldBox(label, value string, valueStyle lipgloss.Style, boxWidth int
 	if fillLen < 0 {
 		fillLen = 0
 	}
-	top := fieldBoxBorder.Render("┌") + fieldBoxLabel.Render(topLabel) + fieldBoxBorder.Render(strings.Repeat("─", fillLen)+"┐")
+	top := theme.FieldBoxBorder.Render("┌") + theme.FieldBoxLabel.Render(topLabel) + theme.FieldBoxBorder.Render(strings.Repeat("─", fillLen)+"┐")
 
 	styledVal := valueStyle.Render(value)
 	valVisualW := lipgloss.Width(styledVal)
@@ -34,9 +34,9 @@ func renderFieldBox(label, value string, valueStyle lipgloss.Style, boxWidth int
 	if padLen < 0 {
 		padLen = 0
 	}
-	mid := fieldBoxBorder.Render("│") + " " + styledVal + strings.Repeat(" ", padLen) + fieldBoxBorder.Render("│")
+	mid := theme.FieldBoxBorder.Render("│") + " " + styledVal + strings.Repeat(" ", padLen) + theme.FieldBoxBorder.Render("│")
 
-	bot := fieldBoxBorder.Render("└" + strings.Repeat("─", innerW) + "┘")
+	bot := theme.FieldBoxBorder.Render("└" + strings.Repeat("─", innerW) + "┘")
 
 	return top + "\n" + mid + "\n" + bot
 }
@@ -50,21 +50,21 @@ func renderFieldBoxes(tk task.Task, w int) string {
 	var statusStyle lipgloss.Style
 	if tk.IsBlocked() {
 		statusText = "⊘ blocked"
-		statusStyle = statusBlocked
+		statusStyle = theme.StatusBlocked
 	} else {
 		switch tk.Status() {
 		case task.Todo:
 			statusText = "○ todo"
-			statusStyle = statusTodo
+			statusStyle = theme.StatusTodo
 		case task.InProgress:
 			statusText = "● active"
-			statusStyle = statusProgress
+			statusStyle = theme.StatusInProgress
 		case task.Done:
 			statusText = "● done"
-			statusStyle = statusDone
+			statusStyle = theme.StatusDone
 		default:
 			statusText = tk.Status().String()
-			statusStyle = detailValue
+			statusStyle = theme.DetailValue
 		}
 	}
 
@@ -73,16 +73,16 @@ func renderFieldBoxes(tk task.Task, w int) string {
 	switch tk.Priority() {
 	case 1:
 		priText = "! high"
-		priStyle = priorityP1
+		priStyle = theme.PriorityHigh
 	case 2:
 		priText = "~ medium"
-		priStyle = priorityP2
+		priStyle = theme.PriorityMedium
 	case 3:
 		priText = "· low"
-		priStyle = priorityP3
+		priStyle = theme.PriorityLow
 	default:
 		priText = task.PriorityName(tk.Priority())
-		priStyle = detailValue
+		priStyle = theme.DetailValue
 	}
 
 	lbl := tk.Label()
@@ -106,7 +106,7 @@ func renderFieldBoxes(tk task.Task, w int) string {
 func renderChips(items []string) string {
 	parts := make([]string, len(items))
 	for i, item := range items {
-		parts[i] = chipBracket.Render("[") + chipText.Render(item) + chipBracket.Render("]")
+		parts[i] = theme.ChipBracket.Render("[") + theme.ChipText.Render(item) + theme.ChipBracket.Render("]")
 	}
 	return strings.Join(parts, " ")
 }
@@ -139,25 +139,25 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 
 	var b strings.Builder
 
-	b.WriteString(wrapStyled(tk.Title(), detailTitle))
+	b.WriteString(wrapStyled(tk.Title(), theme.DetailTitle))
 	b.WriteString("\n")
-	b.WriteString(detailID.Render(tk.ID()))
+	b.WriteString(theme.DetailID.Render(tk.ID()))
 	b.WriteString("\n\n")
 	b.WriteString(renderFieldBoxes(tk, w))
 	b.WriteString("\n")
 
 	b.WriteString("\n")
-	b.WriteString(detailSection.Render("Description"))
+	b.WriteString(theme.DetailSection.Render("Description"))
 	b.WriteString("\n\n")
 	if desc := tk.Description(); desc != "" {
-		b.WriteString(wrapStyled(desc, detailDesc))
+		b.WriteString(wrapStyled(desc, theme.DetailDesc))
 	} else {
-		b.WriteString(detailDim.Render("No description"))
+		b.WriteString(theme.DetailDim.Render("No description"))
 	}
 	b.WriteString("\n")
 
 	b.WriteString("\n")
-	b.WriteString(detailSection.Render("Metadata"))
+	b.WriteString(theme.DetailSection.Render("Metadata"))
 	b.WriteString("\n\n")
 
 	hasLink := tk.Link() != ""
@@ -168,13 +168,13 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 		const metaLabelW = 13
 		metaRow := func(label, value string) {
 			padded := label + ":" + strings.Repeat(" ", metaLabelW-len(label)-1)
-			b.WriteString(detailMetaLabel.Render(padded))
+			b.WriteString(theme.DetailMetaLabel.Render(padded))
 			b.WriteString(value)
 			b.WriteString("\n")
 		}
 
 		if hasLink {
-			metaRow("Link", wrapIndent(tk.Link(), metaLabelW, detailLinkURL))
+			metaRow("Link", wrapIndent(tk.Link(), metaLabelW, theme.DetailLinkURL))
 		}
 		if hasBlockedBy {
 			metaRow("Blocked by", renderChips(tk.BlockedBy()))
@@ -186,28 +186,28 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 			metaRow("Notes", renderChips(tk.Notes()))
 		}
 	} else {
-		b.WriteString(detailDim.Render("No metadata"))
+		b.WriteString(theme.DetailDim.Render("No metadata"))
 		b.WriteString("\n")
 	}
 
 	b.WriteString("\n")
-	b.WriteString(detailLabel.Render(fmt.Sprintf("Logs (%d):", len(logs))))
+	b.WriteString(theme.DetailLabel.Render(fmt.Sprintf("Logs (%d):", len(logs))))
 	b.WriteString("\n")
 	if len(logs) == 0 {
-		b.WriteString(detailDim.Render("  No logs yet"))
+		b.WriteString(theme.DetailDim.Render("  No logs yet"))
 		b.WriteString("\n")
 	} else {
 		for _, entry := range logs {
-			styledPrefix := detailLogTime.Render(entry.Time + " ")
+			styledPrefix := theme.DetailLogTime.Render(entry.Time + " ")
 			prefixW := len(entry.Time) + 1
 			if entry.IsOutcome {
-				styledPrefix += detailOutcome.Render("[outcome] ")
+				styledPrefix += theme.DetailOutcome.Render("[outcome] ")
 				prefixW += len("[outcome] ")
 			}
 			indent := 2 + prefixW
 			b.WriteString("  ")
 			b.WriteString(styledPrefix)
-			b.WriteString(wrapIndent(entry.Message, indent, detailValue))
+			b.WriteString(wrapIndent(entry.Message, indent, theme.DetailValue))
 			b.WriteString("\n")
 		}
 	}
@@ -217,17 +217,17 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 
 func renderNoteDetail(n note.Note, w int) string {
 	var b strings.Builder
-	b.WriteString(detailHeader.Render(wrap.String(n.Filename, w)))
+	b.WriteString(theme.DetailHeader.Render(wrap.String(n.Filename, w)))
 	b.WriteString("\n")
 
 	if n.Description != "" {
-		b.WriteString(detailLabel.Render(wrap.String(n.Description, w)))
+		b.WriteString(theme.DetailLabel.Render(wrap.String(n.Description, w)))
 		b.WriteString("\n\n")
 	}
 
 	if len(n.Tasks) > 0 {
-		b.WriteString(detailLabel.Render("Linked tasks: "))
-		b.WriteString(detailValue.Render(wrap.String(strings.Join(n.Tasks, ", "), w)))
+		b.WriteString(theme.DetailLabel.Render("Linked tasks: "))
+		b.WriteString(theme.DetailValue.Render(wrap.String(strings.Join(n.Tasks, ", "), w)))
 		b.WriteString("\n\n")
 	}
 

@@ -33,8 +33,8 @@ type Tui struct {
 	noteList      list.Model
 	viewport      viewport.Model
 	help          help.Model
-	taskService   *task.Service
-	noteService   *note.Service
+	taskService   TaskService
+	noteService   NoteService
 	storagePath   string
 	storageType   storage.StorageType
 	focus         int
@@ -48,20 +48,11 @@ type Tui struct {
 	detailSeq     uint64
 	spinner       spinner.Model
 	detailLoading bool
-	confirmForm   *huh.Form
-	confirmResult *bool
-	deleteTarget  string
 
-	taskForm     *huh.Form
-	formTaskID   string
-	formTitle    string
-	formDesc     string
-	formLink     string
-	formLabel    string
-	formPriority int
+	confirm  *ConfirmFormState
+	taskForm *TaskFormState
+	noteForm *NoteFormState
 
-	noteForm          *huh.Form
-	formNoteFilename  string
 	pendingNoteSelect string
 
 	layoutAvailH    int
@@ -74,8 +65,8 @@ type Tui struct {
 func newList(title string, items []list.Item, delegate list.ItemDelegate) list.Model {
 	l := list.New(items, delegate, 0, 0)
 	l.Title = title
-	l.Styles.Title = listTitleStyle
-	l.Styles.TitleBar = listTitleBarStyle
+	l.Styles.Title = theme.ListTitle
+	l.Styles.TitleBar = theme.ListTitleBar
 	l.SetShowStatusBar(false)
 	l.SetShowHelp(false)
 	l.SetFilteringEnabled(true)
@@ -107,7 +98,7 @@ func NewTui() (*Tui, error) {
 
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
-	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	sp.Style = theme.Spinner
 
 	noteList := newList("Notes", nil, noteDelegate{})
 	noteList.SetFilteringEnabled(false)
@@ -152,25 +143,21 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.loaded = true
 	}
 
-	if t.confirmForm != nil {
-		form, cmd := t.confirmForm.Update(msg)
+	if t.confirm != nil {
+		form, cmd := t.confirm.form.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
-			t.confirmForm = f
-			if t.confirmForm.State == huh.StateCompleted {
-				t.confirmForm = nil
-				confirmed := t.confirmResult != nil && *t.confirmResult
-				t.confirmResult = nil
-				target := t.deleteTarget
-				t.deleteTarget = ""
+			t.confirm.form = f
+			if t.confirm.form.State == huh.StateCompleted {
+				confirmed := t.confirm.result
+				target := t.confirm.target
+				t.confirm = nil
 				if confirmed {
 					return t, t.deleteCmd(target)
 				}
 				return t, nil
 			}
-			if t.confirmForm.State == huh.StateAborted {
-				t.confirmForm = nil
-				t.confirmResult = nil
-				t.deleteTarget = ""
+			if t.confirm.form.State == huh.StateAborted {
+				t.confirm = nil
 				return t, nil
 			}
 		}
@@ -178,18 +165,16 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if t.taskForm != nil {
-		form, cmd := t.taskForm.Update(msg)
+		form, cmd := t.taskForm.form.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
-			t.taskForm = f
-			if t.taskForm.State == huh.StateCompleted {
+			t.taskForm.form = f
+			if t.taskForm.form.State == huh.StateCompleted {
 				saveCmd := t.taskFormSaveCmd()
 				t.taskForm = nil
-				t.formTaskID = ""
 				return t, saveCmd
 			}
-			if t.taskForm.State == huh.StateAborted {
+			if t.taskForm.form.State == huh.StateAborted {
 				t.taskForm = nil
-				t.formTaskID = ""
 				return t, nil
 			}
 		}
@@ -197,17 +182,16 @@ func (t *Tui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if t.noteForm != nil {
-		form, cmd := t.noteForm.Update(msg)
+		form, cmd := t.noteForm.form.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
-			t.noteForm = f
-			if t.noteForm.State == huh.StateCompleted {
+			t.noteForm.form = f
+			if t.noteForm.form.State == huh.StateCompleted {
 				openCmd := t.noteFormOpenEditorCmd()
 				t.noteForm = nil
 				return t, openCmd
 			}
-			if t.noteForm.State == huh.StateAborted {
+			if t.noteForm.form.State == huh.StateAborted {
 				t.noteForm = nil
-				t.formNoteFilename = ""
 				return t, nil
 			}
 		}
@@ -397,17 +381,17 @@ func (t *Tui) View() string {
 
 	bdr := func(focused bool) lipgloss.Style {
 		if focused {
-			return focusedBorder
+			return theme.BorderFocused
 		}
-		return blurredBorder
+		return theme.BorderBlurred
 	}
 
 	overview := lipgloss.NewStyle().Width(lw).PaddingLeft(1).Render(t.renderOverview(lw))
 
 	var taskContent string
 	if len(t.taskList.Items()) == 0 {
-		title := listTitleStyle.Render(t.taskList.Title)
-		taskContent = fitHeight(title+"\n\n"+noTasksStyle.Render("  press + to create a task"), taskH-2)
+		title := theme.ListTitle.Render(t.taskList.Title)
+		taskContent = fitHeight(title+"\n\n"+theme.NoTasks.Render("  press + to create a task"), taskH-2)
 	} else {
 		taskContent = fitHeight(t.taskList.View(), taskH-2)
 	}
@@ -415,8 +399,8 @@ func (t *Tui) View() string {
 
 	var noteContent string
 	if len(t.noteList.Items()) == 0 {
-		title := listTitleStyle.Render(t.noteList.Title)
-		noteContent = fitHeight(title+"\n\n"+noTasksStyle.Render("  press + to create a note"), noteH-2)
+		title := theme.ListTitle.Render(t.noteList.Title)
+		noteContent = fitHeight(title+"\n\n"+theme.NoTasks.Render("  press + to create a note"), noteH-2)
 	} else {
 		noteContent = fitHeight(t.noteList.View(), noteH-2)
 	}
@@ -425,10 +409,10 @@ func (t *Tui) View() string {
 	var detailContent string
 	if t.detailLoading {
 		detailContent = lipgloss.Place(dw-2, availH-2, lipgloss.Center, lipgloss.Center,
-			detailDim.Render(t.spinner.View()+" Loading..."))
+			theme.DetailDim.Render(t.spinner.View()+" Loading..."))
 	} else if t.lastKey == "" {
 		detailContent = lipgloss.Place(dw-2, availH-2, lipgloss.Center, lipgloss.Center,
-			detailDim.Render(detailPlaceholder))
+			theme.DetailDim.Render(detailPlaceholder))
 	} else {
 		detailContent = fitHeight(t.viewport.View(), availH-2)
 	}
@@ -436,22 +420,22 @@ func (t *Tui) View() string {
 
 	left := lipgloss.JoinVertical(lipgloss.Left, overview, taskBox, noteBox)
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, left, detailBox)
-	footer := helpStyle.Render(t.help.View(tuiKeys))
+	footer := theme.Help.Render(t.help.View(tuiKeys))
 
 	view := lipgloss.JoinVertical(lipgloss.Left, panels, footer)
 
-	if t.confirmForm != nil {
-		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.confirmForm.View())
+	if t.confirm != nil {
+		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.confirm.form.View())
 		return lipgloss.Place(t.width, t.height, lipgloss.Center, lipgloss.Center, dialog)
 	}
 
 	if t.taskForm != nil {
-		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.taskForm.View())
+		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.taskForm.form.View())
 		return lipgloss.Place(t.width, t.height, lipgloss.Center, lipgloss.Center, dialog)
 	}
 
 	if t.noteForm != nil {
-		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.noteForm.View())
+		dialog := lipgloss.NewStyle().Width(dialogWidth).Render(t.noteForm.form.View())
 		return lipgloss.Place(t.width, t.height, lipgloss.Center, lipgloss.Center, dialog)
 	}
 

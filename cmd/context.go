@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/storage"
@@ -8,10 +12,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var contextPretty bool
+
+var (
+	ctxHeading = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	ctxDim     = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	ctxLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true)
+	ctxID      = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	ctxTitle   = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+)
+
 var contextCmd = &cobra.Command{
 	Use:   "context",
 	Short: "Dump active tasks and notes for agent consumption",
-	Long:  `Displays storage info, active tasks (todo and in-progress), and notes as structured data.`,
+	Long:  `Displays storage info, active tasks (todo and in-progress), and notes as structured data. Use --pretty for human-readable output.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		taskSvc, err := task.NewService()
 		if err != nil {
@@ -24,7 +38,6 @@ var contextCmd = &cobra.Command{
 			return output.Error(err)
 		}
 
-		// Filter to active tasks (todo + in-progress)
 		todoStatus := task.Todo
 		inProgressStatus := task.InProgress
 
@@ -34,18 +47,6 @@ var contextCmd = &cobra.Command{
 		todoTasks := todoFilter.Apply(tasks)
 		inProgressTasks := inProgressFilter.Apply(tasks)
 
-		// Build task JSON lists
-		todoList := make([]task.TaskJSON, 0, len(todoTasks))
-		for _, t := range todoTasks {
-			todoList = append(todoList, t.ToJSON())
-		}
-
-		inProgressList := make([]task.TaskJSON, 0, len(inProgressTasks))
-		for _, t := range inProgressTasks {
-			inProgressList = append(inProgressList, t.ToJSON())
-		}
-
-		// Load notes
 		noteSvc, err := note.NewService()
 		if err != nil {
 			return output.Error(err)
@@ -56,6 +57,24 @@ var contextCmd = &cobra.Command{
 			return output.Error(err)
 		}
 
+		resolved, err := storage.ResolvePaceDir()
+		if err != nil {
+			return output.Error(err)
+		}
+
+		if contextPretty {
+			printContextPretty(resolved, tasks, todoTasks, inProgressTasks, notes)
+			return nil
+		}
+
+		todoList := make([]task.TaskJSON, 0, len(todoTasks))
+		for _, t := range todoTasks {
+			todoList = append(todoList, t.ToJSON())
+		}
+		inProgressList := make([]task.TaskJSON, 0, len(inProgressTasks))
+		for _, t := range inProgressTasks {
+			inProgressList = append(inProgressList, t.ToJSON())
+		}
 		noteList := make([]map[string]any, 0, len(notes))
 		for _, n := range notes {
 			noteList = append(noteList, map[string]any{
@@ -63,11 +82,6 @@ var contextCmd = &cobra.Command{
 				"description": n.Description,
 				"labels":      n.Labels,
 			})
-		}
-
-		resolved, err := storage.ResolvePaceDir()
-		if err != nil {
-			return output.Error(err)
 		}
 
 		output.Success("context loaded", map[string]any{
@@ -94,7 +108,44 @@ var contextCmd = &cobra.Command{
 	},
 }
 
+func printContextPretty(resolved storage.ResolvedPath, all, todo, inProgress []task.Task, notes []note.Note) {
+	done := len(all) - len(todo) - len(inProgress)
+	fmt.Println()
+	fmt.Println(ctxHeading.Render("Storage"))
+	fmt.Printf("  %s %s %s\n", ctxLabel.Render("path:"), ctxTitle.Render(resolved.Path), ctxDim.Render("("+string(resolved.Type)+")"))
+	fmt.Println()
+
+	fmt.Println(ctxHeading.Render("Tasks"))
+	fmt.Printf("  %s %d total, %d in-progress, %d todo, %d done\n", ctxDim.Render("›"), len(all), len(inProgress), len(todo), done)
+	if len(inProgress) > 0 {
+		fmt.Println("  " + ctxLabel.Render("in-progress:"))
+		for _, t := range inProgress {
+			fmt.Println("    " + ctxID.Render(t.ID()) + " " + ctxTitle.Render(t.Title()))
+		}
+	}
+	if len(todo) > 0 {
+		fmt.Println("  " + ctxLabel.Render("todo:"))
+		for _, t := range todo {
+			fmt.Println("    " + ctxID.Render(t.ID()) + " " + ctxTitle.Render(t.Title()))
+		}
+	}
+	fmt.Println()
+
+	fmt.Println(ctxHeading.Render("Notes"))
+	fmt.Printf("  %s %d total\n", ctxDim.Render("›"), len(notes))
+	for _, n := range notes {
+		name := strings.TrimSuffix(n.Filename, ".md")
+		line := "    " + ctxTitle.Render(name)
+		if n.Description != "" {
+			line += " " + ctxDim.Render("— "+n.Description)
+		}
+		fmt.Println(line)
+	}
+	fmt.Println()
+}
+
 func init() {
 	contextCmd.GroupID = "setup"
+	contextCmd.Flags().BoolVar(&contextPretty, "pretty", false, "Human-readable formatted output")
 	rootCmd.AddCommand(contextCmd)
 }
