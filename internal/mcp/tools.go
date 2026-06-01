@@ -1,5 +1,7 @@
 package mcp
 
+import "github.com/lucas-tremaroli/pace/internal/task"
+
 // GetToolDefinitions returns all available MCP tools
 func GetToolDefinitions() []Tool {
 	return []Tool{
@@ -93,8 +95,8 @@ func GetToolDefinitions() []Tool {
 					"label": {
 						Type:        "string",
 						Description: "Task label",
-						Enum:        []string{"task", "bug", "feature", "docs"},
-						Default:     "task",
+						Enum:        task.ValidLabels,
+						Default:     task.LabelTask,
 					},
 					"link": {
 						Type:        "string",
@@ -134,7 +136,7 @@ func GetToolDefinitions() []Tool {
 					"label": {
 						Type:        "string",
 						Description: "New task label",
-						Enum:        []string{"task", "bug", "feature", "docs"},
+						Enum:        task.ValidLabels,
 					},
 					"link": {
 						Type:        "string",

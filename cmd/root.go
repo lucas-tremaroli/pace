@@ -23,8 +23,10 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:  "pace",
-	Long: `A simple CLI productivity tool for both humans and machines.`,
+	Use:           "pace",
+	Long:          `A simple CLI productivity tool for both humans and machines.`,
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -36,6 +38,7 @@ func SetVersionInfo(version, commit, date string) {
 
 func Execute() error {
 	if err := rootCmd.Execute(); err != nil {
+		// Error already printed as JSON by the command; just exit non-zero.
 		os.Exit(1)
 	}
 	return nil

@@ -2,12 +2,16 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
+
+// ErrNotFound is returned when a requested record does not exist.
+var ErrNotFound = errors.New("not found")
 
 type DB struct {
 	conn *sql.DB
@@ -193,6 +197,9 @@ func (db *DB) GetConfig(key string) (string, error) {
 	row := db.conn.QueryRow(query, key)
 	var value string
 	err := row.Scan(&value)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
 	return value, err
 }
 
@@ -215,7 +222,7 @@ func (db *DB) DeleteConfig(key string) error {
 		return err
 	}
 	if rows == 0 {
-		return sql.ErrNoRows
+		return ErrNotFound
 	}
 	return nil
 }

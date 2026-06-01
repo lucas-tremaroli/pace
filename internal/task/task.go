@@ -349,19 +349,27 @@ const (
 	TypeDocs
 )
 
+// Label string constants for task labels.
+const (
+	LabelTask    = "task"
+	LabelBug     = "bug"
+	LabelFeature = "feature"
+	LabelDocs    = "docs"
+)
+
 // String returns the string representation of a task type
 func (t TaskType) String() string {
 	switch t {
 	case TypeTask:
-		return "task"
+		return LabelTask
 	case TypeBug:
-		return "bug"
+		return LabelBug
 	case TypeFeature:
-		return "feature"
+		return LabelFeature
 	case TypeDocs:
-		return "docs"
+		return LabelDocs
 	default:
-		return "task"
+		return LabelTask
 	}
 }
 
@@ -382,13 +390,13 @@ func (t TaskType) Symbol() string {
 // ParseTaskType parses a string into a task type value
 func ParseTaskType(s string) (TaskType, error) {
 	switch s {
-	case "task", "":
+	case LabelTask, "":
 		return TypeTask, nil
-	case "bug":
+	case LabelBug:
 		return TypeBug, nil
-	case "feature":
+	case LabelFeature:
 		return TypeFeature, nil
-	case "docs":
+	case LabelDocs:
 		return TypeDocs, nil
 	default:
 		return TypeTask, fmt.Errorf("invalid label: %s (valid: task, bug, feature, docs)", s)
@@ -396,7 +404,7 @@ func ParseTaskType(s string) (TaskType, error) {
 }
 
 // ValidLabels lists the label strings that are valid task labels
-var ValidLabels = []string{"task", "bug", "feature", "docs"}
+var ValidLabels = []string{LabelTask, LabelBug, LabelFeature, LabelDocs}
 
 // ValidateLabel checks if a label string is valid
 func ValidateLabel(s string) error {
@@ -404,16 +412,28 @@ func ValidateLabel(s string) error {
 	return err
 }
 
+// Priority level constants.
+const (
+	PriorityHigh   = 1
+	PriorityMedium = 2
+	PriorityLow    = 3
+)
+
+// IsValidPriority reports whether p is a recognized priority level.
+func IsValidPriority(p int) bool {
+	return p >= PriorityHigh && p <= PriorityLow
+}
+
 // ParsePriority parses a priority string (name or number) into an int.
 // Accepts "high"/"medium"/"low" or "1"/"2"/"3".
 func ParsePriority(s string) (int, error) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "high", "1":
-		return 1, nil
+		return PriorityHigh, nil
 	case "medium", "med", "2":
-		return 2, nil
+		return PriorityMedium, nil
 	case "low", "3":
-		return 3, nil
+		return PriorityLow, nil
 	default:
 		return 0, fmt.Errorf("invalid priority: %s (valid: high, medium, low or 1-3)", s)
 	}
@@ -422,11 +442,11 @@ func ParsePriority(s string) (int, error) {
 // PriorityName returns the display name for a priority level.
 func PriorityName(p int) string {
 	switch p {
-	case 1:
+	case PriorityHigh:
 		return "High"
-	case 2:
+	case PriorityMedium:
 		return "Medium"
-	case 3:
+	case PriorityLow:
 		return "Low"
 	default:
 		return fmt.Sprintf("P%d", p)

@@ -1,6 +1,8 @@
 package task
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,18 +11,17 @@ import (
 
 // Service handles task business logic and database operations
 type Service struct {
-	db     *storage.DB
+	db     TaskRepository
 	prefix string
 }
 
-// NewService creates a new task service
+// NewService creates a new task service backed by the default SQLite storage.
 func NewService() (*Service, error) {
 	db, err := storage.NewDB()
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize or get the ID prefix
 	prefix, err := GetOrInitPrefix(db)
 	if err != nil {
 		db.Close()
@@ -28,6 +29,12 @@ func NewService() (*Service, error) {
 	}
 
 	return &Service{db: db, prefix: prefix}, nil
+}
+
+// NewServiceWithRepo creates a service with a custom repository and prefix.
+// Intended for testing with in-memory implementations.
+func NewServiceWithRepo(repo TaskRepository, prefix string) *Service {
+	return &Service{db: repo, prefix: prefix}
 }
 
 // Prefix returns the current ID prefix
@@ -145,6 +152,9 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	record, err := s.db.GetTaskByID(taskID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
 		return nil, err
 	}
 

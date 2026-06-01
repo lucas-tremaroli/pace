@@ -14,7 +14,7 @@ var setCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		db, err := storage.NewDB()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		defer db.Close()
 
@@ -22,7 +22,7 @@ var setCmd = &cobra.Command{
 		value := args[1]
 
 		if err := db.SetConfig(key, value); err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		output.Success("config set", map[string]string{

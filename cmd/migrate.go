@@ -42,37 +42,37 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate flags
 		if migrateFrom == "" || migrateTo == "" {
-			output.ErrorMsg("both --from and --to flags are required")
+			return output.ErrorMsg("both --from and --to flags are required")
 		}
 		if migrateFrom != "global" && migrateFrom != "project" {
-			output.ErrorMsg("--from must be 'global' or 'project'")
+			return output.ErrorMsg("--from must be 'global' or 'project'")
 		}
 		if migrateTo != "global" && migrateTo != "project" {
-			output.ErrorMsg("--to must be 'global' or 'project'")
+			return output.ErrorMsg("--to must be 'global' or 'project'")
 		}
 		if migrateFrom == migrateTo {
-			output.ErrorMsg("--from and --to cannot be the same")
+			return output.ErrorMsg("--from and --to cannot be the same")
 		}
 		if migrateTasksOnly && migrateNotesOnly {
-			output.ErrorMsg("cannot use both --tasks-only and --notes-only")
+			return output.ErrorMsg("cannot use both --tasks-only and --notes-only")
 		}
 
 		// Get source and destination paths
 		globalDir, err := storage.GetGlobalPaceDir()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		projectDir, err := storage.GetProjectPaceDir()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		if migrateFrom == "project" && projectDir == "" {
-			output.ErrorMsg("no project storage found (run 'pace init' first)")
+			return output.ErrorMsg("no project storage found (run 'pace init' first)")
 		}
 		if migrateTo == "project" && projectDir == "" {
-			output.ErrorMsg("no project storage found (run 'pace init' first)")
+			return output.ErrorMsg("no project storage found (run 'pace init' first)")
 		}
 
 		var sourceDir, destDir string
@@ -86,12 +86,12 @@ Examples:
 
 		// Check if source exists
 		if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
-			output.ErrorMsg(fmt.Sprintf("source storage does not exist: %s", sourceDir))
+			return output.ErrorMsg(fmt.Sprintf("source storage does not exist: %s", sourceDir))
 		}
 
 		// Ensure destination exists
 		if err := os.MkdirAll(destDir, 0755); err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		result := map[string]any{
@@ -104,7 +104,7 @@ Examples:
 		if !migrateNotesOnly {
 			taskResult, err := migrateTasks(sourceDir, destDir, migrateDryRun)
 			if err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 			result["tasks"] = taskResult
 		}
@@ -113,7 +113,7 @@ Examples:
 		if !migrateTasksOnly {
 			noteResult, err := migrateNotes(sourceDir, destDir, migrateDryRun)
 			if err != nil {
-				output.Error(err)
+				return output.Error(err)
 			}
 			result["notes"] = noteResult
 		}

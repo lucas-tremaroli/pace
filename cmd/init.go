@@ -41,7 +41,7 @@ The command will:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		// Check if already initialized (search upward)
@@ -70,7 +70,7 @@ The command will:
 		// Initialize new project directory
 		paceDir, err := storage.InitProjectDir(cwd)
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 
 		// Handle .gitignore

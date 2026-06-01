@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -104,52 +103,6 @@ func (h *Handler) handleToolsCall(req JSONRPCRequest) *JSONRPCResponse {
 	return &resp
 }
 
-func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
-	switch name {
-	case "pace_context":
-		return h.toolContext()
-	case "pace_task_list":
-		return h.toolTaskList(args)
-	case "pace_task_get":
-		return h.toolTaskGet(args)
-	case "pace_task_create":
-		return h.toolTaskCreate(args)
-	case "pace_task_update":
-		return h.toolTaskUpdate(args)
-	case "pace_task_delete":
-		return h.toolTaskDelete(args)
-	case "pace_task_dep_add":
-		return h.toolTaskDepAdd(args)
-	case "pace_task_dep_remove":
-		return h.toolTaskDepRemove(args)
-	case "pace_task_note_link":
-		return h.toolTaskNoteLink(args)
-	case "pace_task_note_unlink":
-		return h.toolTaskNoteUnlink(args)
-	case "pace_note_list":
-		return h.toolNoteList(args)
-	case "pace_note_create":
-		return h.toolNoteCreate(args)
-	case "pace_note_read":
-		return h.toolNoteRead(args)
-	case "pace_note_delete":
-		return h.toolNoteDelete(args)
-	case "pace_task_log":
-		return h.toolTaskLog(args)
-	case "pace_task_close":
-		return h.toolTaskClose(args)
-	case "pace_task_logs":
-		return h.toolTaskLogs(args)
-	case "pace_task_bulk_delete":
-		return h.toolTaskBulkDelete(args)
-	default:
-		return ToolCallResult{
-			Content: []ContentBlock{NewTextContent(fmt.Sprintf("unknown tool: %s", name))},
-			IsError: true,
-		}
-	}
-}
-
 func (h *Handler) toolContext() ToolCallResult {
 	tasks, err := h.taskService.LoadAllTasks()
 	if err != nil {
@@ -242,7 +195,7 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 				}
 			case float64:
 				priority = int(v)
-				if float64(priority) != v || priority < 1 || priority > 3 {
+				if float64(priority) != v || !task.IsValidPriority(priority) {
 					return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
 				}
 			default:
@@ -279,7 +232,7 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 		return jsonResult(map[string]any{"tasks": filtered, "count": len(filtered)})
 	}
 
-	return jsonResult(map[string]any{"tasks": taskList, "count": len(taskList)})
+	return jsonResult(output.TaskListResponse{Tasks: taskList, Count: len(taskList)})
 }
 
 func (h *Handler) toolTaskGet(args map[string]any) ToolCallResult {
@@ -290,7 +243,7 @@ func (h *Handler) toolTaskGet(args map[string]any) ToolCallResult {
 
 	t, err := h.taskService.GetTaskByID(id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to get task: %v", err), "")
@@ -322,7 +275,7 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	}
 
 	// Parse label
-	label := "task"
+	label := task.LabelTask
 	if l, ok := args["label"].(string); ok && l != "" {
 		if err := task.ValidateLabel(l); err != nil {
 			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, docs")
@@ -342,7 +295,7 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 			}
 		case float64:
 			priority = int(v)
-			if float64(priority) != v || priority < 1 || priority > 3 {
+			if float64(priority) != v || !task.IsValidPriority(priority) {
 				return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
 			}
 		default:
@@ -385,7 +338,7 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 	// Load existing task
 	existingTask, err := h.taskService.GetTaskByID(id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to load task %s: %v", id, err), "")
@@ -426,7 +379,7 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 			}
 		case float64:
 			priority = int(v)
-			if float64(priority) != v || priority < 1 || priority > 3 {
+			if float64(priority) != v || !task.IsValidPriority(priority) {
 				return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
 			}
 		default:
@@ -469,7 +422,7 @@ func (h *Handler) toolTaskDelete(args map[string]any) ToolCallResult {
 	}
 
 	if err := h.taskService.DeleteTask(id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to delete task: %v", err), "")
@@ -540,7 +493,7 @@ func (h *Handler) toolTaskNoteLink(args map[string]any) ToolCallResult {
 	}
 
 	if err := h.taskService.LinkNote(taskID, noteFilename); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", taskID), "Use pace_task_list to see available task IDs")
 		}
 		return errorResult(fmt.Sprintf("failed to link note: %v", err))
@@ -589,23 +542,17 @@ func (h *Handler) toolNoteList(args map[string]any) ToolCallResult {
 		notes = notes[:head]
 	}
 
-	noteList := make([]map[string]any, 0, len(notes))
-	for _, n := range notes {
-		noteList = append(noteList, map[string]any{
-			"filename":    n.Filename,
-			"description": n.Description,
-			"labels":      n.Labels,
-			"modTime":    n.ModTime,
-		})
-	}
-
 	// Apply field filtering
 	if fields := parseFields(args); len(fields) > 0 {
-		filtered := output.FilterFields(noteList, fields)
+		maps, err := output.ToMapSlice(notes)
+		if err != nil {
+			return errorResult(fmt.Sprintf("failed to filter fields: %v", err))
+		}
+		filtered := output.FilterFields(maps, fields)
 		return jsonResult(map[string]any{"notes": filtered, "count": len(filtered)})
 	}
 
-	return jsonResult(map[string]any{"notes": noteList, "count": len(noteList)})
+	return jsonResult(output.NoteListResponse{Notes: notes, Count: len(notes)})
 }
 
 func (h *Handler) toolNoteCreate(args map[string]any) ToolCallResult {
@@ -721,7 +668,7 @@ func (h *Handler) toolTaskLog(args map[string]any) ToolCallResult {
 	}
 
 	if err := h.taskService.LogEntry(id, message); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return errorResult(fmt.Sprintf("failed to add log: %v", err))
@@ -742,7 +689,7 @@ func (h *Handler) toolTaskClose(args map[string]any) ToolCallResult {
 	outcome, _ := args["outcome"].(string)
 
 	if err := h.taskService.CloseTask(id, outcome); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return errorResult(fmt.Sprintf("failed to close task: %v", err))
@@ -762,7 +709,7 @@ func (h *Handler) toolTaskLogs(args map[string]any) ToolCallResult {
 
 	logs, err := h.taskService.GetTaskLogs(id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, task.ErrTaskNotFound) {
 			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", id), "Use pace_task_list to see available task IDs")
 		}
 		return errorResult(fmt.Sprintf("failed to get logs: %v", err))
@@ -823,7 +770,7 @@ func (h *Handler) toolTaskBulkDelete(args map[string]any) ToolCallResult {
 	var errs []string
 	for _, id := range unique {
 		if err := h.taskService.DeleteTask(id); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, task.ErrTaskNotFound) {
 				errs = append(errs, fmt.Sprintf("%s: not found", id))
 			} else {
 				errs = append(errs, fmt.Sprintf("%s: %v", id, err))

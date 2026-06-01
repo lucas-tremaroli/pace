@@ -15,7 +15,7 @@ import (
 
 type Service struct {
 	notesDir string
-	db       *storage.DB
+	db       NoteRepository
 }
 
 func NewService() (*Service, error) {
@@ -34,9 +34,15 @@ func NewService() (*Service, error) {
 	return &Service{notesDir: notesDir, db: db}, nil
 }
 
-// NewServiceWithDir creates a service with a custom notes directory (for testing)
+// NewServiceWithDir creates a service with a custom notes directory (for testing).
 func NewServiceWithDir(notesDir string) *Service {
 	return &Service{notesDir: notesDir}
+}
+
+// NewServiceWithRepo creates a service with a custom repository and notes directory.
+// Intended for testing with in-memory implementations.
+func NewServiceWithRepo(repo NoteRepository, notesDir string) *Service {
+	return &Service{notesDir: notesDir, db: repo}
 }
 
 // Close closes the database connection

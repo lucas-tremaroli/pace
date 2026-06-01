@@ -1,6 +1,7 @@
 package task
 
 import (
+	"github.com/lucas-tremaroli/pace/internal/cmdutil"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/task"
 	"github.com/spf13/cobra"
@@ -14,7 +15,7 @@ var (
 var deleteCmd = &cobra.Command{
 	Use:     "delete [id] [id2] [id3] ...",
 	GroupID: "manage",
-	Short: "Delete one or more tasks by ID or filter",
+	Short:   "Delete one or more tasks by ID or filter",
 	Long: `Deletes one or more tasks without confirmation and outputs the result in JSON format.
 
 Delete by ID:
@@ -27,90 +28,60 @@ Delete by filter:
   pace task delete --filter label=feature --dry-run`,
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check for conflicting options
 		if len(deleteFilters) > 0 && len(args) > 0 {
-			output.ErrorMsgWithCode("cannot use both task IDs and --filter (use one or the other)", output.ErrCodeInvalidParams, "")
+			return output.ErrorMsgWithCode("cannot use both task IDs and --filter (use one or the other)", output.ErrCodeInvalidParams, "")
+		}
+		if len(deleteFilters) == 0 && len(args) == 0 {
+			return output.ErrorMsgWithCode("task ID required (or use --filter for filter-based deletion)", output.ErrCodeMissingField, "")
 		}
 
-		// Check if filter-based deletion
-		if len(deleteFilters) > 0 {
-			return handleFilterDelete()
-		}
-
-		// ID-based deletion requires at least one ID
-		if len(args) == 0 {
-			output.ErrorMsgWithCode("task ID required (or use --filter for filter-based deletion)", output.ErrCodeMissingField, "")
-		}
-
-		svc, err := task.NewService()
-		if err != nil {
-			output.Error(err)
-		}
-		defer svc.Close()
-
-		// Single ID: backward compatible behavior
-		if len(args) == 1 {
-			taskID := args[0]
-			if err := svc.DeleteTask(taskID); err != nil {
-				output.Error(err)
+		return cmdutil.WithTaskService(func(svc *task.Service) error {
+			if len(deleteFilters) > 0 {
+				return handleFilterDelete(svc)
 			}
-			output.Success("task deleted", map[string]string{
-				"id": taskID,
-			})
+
+			if len(args) == 1 {
+				taskID := args[0]
+				if err := svc.DeleteTask(taskID); err != nil {
+					return output.Error(err)
+				}
+				output.Success("task deleted", map[string]string{"id": taskID})
+				return nil
+			}
+
+			result := output.BulkResult{Total: len(args)}
+			for _, taskID := range args {
+				if err := svc.DeleteTask(taskID); err != nil {
+					result.Failed = append(result.Failed, output.BulkItem{ID: taskID, Error: err.Error()})
+				} else {
+					result.Succeeded = append(result.Succeeded, output.BulkItem{ID: taskID})
+				}
+			}
+			output.BulkSuccess("tasks deleted", result)
 			return nil
-		}
-
-		// Multiple IDs: bulk delete
-		result := output.BulkResult{
-			Total: len(args),
-		}
-
-		for _, taskID := range args {
-			if err := svc.DeleteTask(taskID); err != nil {
-				result.Failed = append(result.Failed, output.BulkItem{
-					ID:    taskID,
-					Error: err.Error(),
-				})
-			} else {
-				result.Succeeded = append(result.Succeeded, output.BulkItem{
-					ID: taskID,
-				})
-			}
-		}
-
-		output.BulkSuccess("tasks deleted", result)
-		return nil
+		})
 	},
 }
 
-func handleFilterDelete() error {
-	// Parse filters
+func handleFilterDelete(svc *task.Service) error {
 	var filters []*task.TaskFilter
 	for _, f := range deleteFilters {
 		filter, err := task.ParseFilter(f)
 		if err != nil {
-			output.Error(err)
+			return output.Error(err)
 		}
 		filters = append(filters, filter)
 	}
 	mergedFilter, err := task.MergeFilters(filters)
 	if err != nil {
-		output.Error(err)
+		return output.Error(err)
 	}
 
-	svc, err := task.NewService()
-	if err != nil {
-		output.Error(err)
-	}
-	defer svc.Close()
-
-	// Load all tasks
 	tasks, err := svc.LoadAllTasks()
 	if err != nil {
-		output.Error(err)
+		return output.Error(err)
 	}
 
-	// Filter tasks
 	var matchingTasks []task.Task
 	for _, t := range tasks {
 		if mergedFilter.Matches(t) {
@@ -119,13 +90,10 @@ func handleFilterDelete() error {
 	}
 
 	if len(matchingTasks) == 0 {
-		output.Success("no tasks matched filter", map[string]any{
-			"matched": 0,
-		})
+		output.Success("no tasks matched filter", map[string]any{"matched": 0})
 		return nil
 	}
 
-	// Dry run mode
 	if deleteDryRun {
 		var preview []map[string]any
 		for _, t := range matchingTasks {
@@ -143,26 +111,14 @@ func handleFilterDelete() error {
 		return nil
 	}
 
-	// Delete matching tasks
-	result := output.BulkResult{
-		Total: len(matchingTasks),
-	}
-
+	result := output.BulkResult{Total: len(matchingTasks)}
 	for _, t := range matchingTasks {
 		if err := svc.DeleteTask(t.ID()); err != nil {
-			result.Failed = append(result.Failed, output.BulkItem{
-				ID:    t.ID(),
-				Title: t.Title(),
-				Error: err.Error(),
-			})
+			result.Failed = append(result.Failed, output.BulkItem{ID: t.ID(), Title: t.Title(), Error: err.Error()})
 		} else {
-			result.Succeeded = append(result.Succeeded, output.BulkItem{
-				ID:    t.ID(),
-				Title: t.Title(),
-			})
+			result.Succeeded = append(result.Succeeded, output.BulkItem{ID: t.ID(), Title: t.Title()})
 		}
 	}
-
 	output.BulkSuccess("tasks deleted", result)
 	return nil
 }

@@ -13,24 +13,6 @@ import (
 	"github.com/muesli/reflow/truncate"
 )
 
-var (
-	taskNormal         = lipgloss.NewStyle()
-	taskInProgressIcon = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
-	taskDoneIcon       = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	taskDoneText       = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Strikethrough(true)
-	taskBlockedIcon    = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	taskBlockedText    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	taskSelected       = lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true)
-	taskMeta           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	taskPriorityHigh   = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
-	taskPriorityMedium = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
-	taskPriorityLow    = lipgloss.NewStyle().Foreground(lipgloss.Color("146"))
-	labelTask          = lipgloss.NewStyle().Foreground(lipgloss.Color("75"))
-	labelBug           = lipgloss.NewStyle().Foreground(lipgloss.Color("167"))
-	labelFeature       = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
-	labelDocs          = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
-)
-
 // taskDelegate renders task items with status-based styling.
 type taskDelegate struct{}
 
@@ -59,32 +41,32 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	if selected {
 		switch {
 		case t.IsBlocked():
-			iconStyle = taskSelected.Foreground(lipgloss.Color("196"))
+			iconStyle = theme.TaskSelected.Foreground(lipgloss.Color("196"))
 			textStyle = iconStyle.Underline(hasLink)
 		case t.Status() == task.InProgress:
-			iconStyle = taskSelected.Foreground(lipgloss.Color("226"))
+			iconStyle = theme.TaskSelected.Foreground(lipgloss.Color("226"))
 			textStyle = iconStyle.Underline(hasLink)
 		case t.Status() == task.Done:
-			iconStyle = taskSelected.Foreground(lipgloss.Color("42"))
+			iconStyle = theme.TaskSelected.Foreground(lipgloss.Color("42"))
 			textStyle = iconStyle.Strikethrough(true).Underline(hasLink)
 		default:
-			iconStyle = taskSelected
-			textStyle = taskSelected.Underline(hasLink)
+			iconStyle = theme.TaskSelected
+			textStyle = theme.TaskSelected.Underline(hasLink)
 		}
 	} else {
 		switch {
 		case t.IsBlocked():
-			iconStyle = taskBlockedIcon
-			textStyle = taskBlockedText.Underline(hasLink)
+			iconStyle = theme.TaskBlockedIcon
+			textStyle = theme.TaskBlockedText.Underline(hasLink)
 		case t.Status() == task.InProgress:
-			iconStyle = taskInProgressIcon
-			textStyle = taskNormal.Underline(hasLink)
+			iconStyle = theme.TaskInProgressIcon
+			textStyle = theme.TaskNormal.Underline(hasLink)
 		case t.Status() == task.Done:
-			iconStyle = taskDoneIcon
-			textStyle = taskDoneText.Underline(hasLink)
+			iconStyle = theme.TaskDoneIcon
+			textStyle = theme.TaskDoneText.Underline(hasLink)
 		default:
-			iconStyle = taskNormal
-			textStyle = taskNormal.Underline(hasLink)
+			iconStyle = theme.TaskNormal
+			textStyle = theme.TaskNormal.Underline(hasLink)
 		}
 	}
 
@@ -96,13 +78,13 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	switch t.Priority() {
 	case 1:
 		suffix = " !"
-		priStyle = taskPriorityHigh
+		priStyle = theme.ItemPriorityHigh
 	case 2:
 		suffix = " ~"
-		priStyle = taskPriorityMedium
+		priStyle = theme.ItemPriorityMedium
 	case 3:
 		suffix = ""
-		priStyle = taskPriorityLow
+		priStyle = theme.ItemPriorityLow
 	}
 	lbl := t.Label()
 	if lbl == "" {
@@ -124,19 +106,19 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 
 	// Line 2: ID
 	meta := fmt.Sprintf("    %s", t.ID())
-	fmt.Fprint(w, "\n"+truncateText(taskMeta.Render(meta), m.Width()))
+	fmt.Fprint(w, "\n"+truncateText(theme.TaskMeta.Render(meta), m.Width()))
 }
 
 func labelStyle(lbl string) lipgloss.Style {
 	switch lbl {
 	case "bug":
-		return labelBug
+		return theme.LabelBug
 	case "feature":
-		return labelFeature
+		return theme.LabelFeature
 	case "docs":
-		return labelDocs
+		return theme.LabelDocs
 	default:
-		return labelTask
+		return theme.LabelTask
 	}
 }
 
@@ -188,10 +170,10 @@ func (d noteDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 
 	selected := index == m.Index()
 	prefix := "  "
-	style := taskNormal
+	style := theme.TaskNormal
 	if selected {
 		prefix = "> "
-		style = taskSelected
+		style = theme.TaskSelected
 	}
 
 	// Line 1: filename without .md
