@@ -113,7 +113,7 @@ func handleBulkCreate(svc *task.Service, bulkInput string) error {
 
 		label := input.Label
 		if label == "" {
-			label = "task"
+			label = task.LabelTask
 		}
 		if err := task.ValidateLabel(label); err != nil {
 			result.Failed = append(result.Failed, output.BulkItem{Title: input.Title, Error: err.Error()})
@@ -122,9 +122,9 @@ func handleBulkCreate(svc *task.Service, bulkInput string) error {
 
 		priority := input.Priority
 		if priority == 0 {
-			priority = 3
+			priority = task.PriorityLow
 		}
-		if priority < 1 || priority > 3 {
+		if !task.IsValidPriority(priority) {
 			result.Failed = append(result.Failed, output.BulkItem{
 				Title: input.Title,
 				Error: fmt.Sprintf("priority must be 1-3, got %d", priority),

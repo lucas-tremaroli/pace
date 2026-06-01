@@ -103,52 +103,6 @@ func (h *Handler) handleToolsCall(req JSONRPCRequest) *JSONRPCResponse {
 	return &resp
 }
 
-func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {
-	switch name {
-	case "pace_context":
-		return h.toolContext()
-	case "pace_task_list":
-		return h.toolTaskList(args)
-	case "pace_task_get":
-		return h.toolTaskGet(args)
-	case "pace_task_create":
-		return h.toolTaskCreate(args)
-	case "pace_task_update":
-		return h.toolTaskUpdate(args)
-	case "pace_task_delete":
-		return h.toolTaskDelete(args)
-	case "pace_task_dep_add":
-		return h.toolTaskDepAdd(args)
-	case "pace_task_dep_remove":
-		return h.toolTaskDepRemove(args)
-	case "pace_task_note_link":
-		return h.toolTaskNoteLink(args)
-	case "pace_task_note_unlink":
-		return h.toolTaskNoteUnlink(args)
-	case "pace_note_list":
-		return h.toolNoteList(args)
-	case "pace_note_create":
-		return h.toolNoteCreate(args)
-	case "pace_note_read":
-		return h.toolNoteRead(args)
-	case "pace_note_delete":
-		return h.toolNoteDelete(args)
-	case "pace_task_log":
-		return h.toolTaskLog(args)
-	case "pace_task_close":
-		return h.toolTaskClose(args)
-	case "pace_task_logs":
-		return h.toolTaskLogs(args)
-	case "pace_task_bulk_delete":
-		return h.toolTaskBulkDelete(args)
-	default:
-		return ToolCallResult{
-			Content: []ContentBlock{NewTextContent(fmt.Sprintf("unknown tool: %s", name))},
-			IsError: true,
-		}
-	}
-}
-
 func (h *Handler) toolContext() ToolCallResult {
 	tasks, err := h.taskService.LoadAllTasks()
 	if err != nil {
@@ -241,7 +195,7 @@ func (h *Handler) toolTaskList(args map[string]any) ToolCallResult {
 				}
 			case float64:
 				priority = int(v)
-				if float64(priority) != v || priority < 1 || priority > 3 {
+				if float64(priority) != v || !task.IsValidPriority(priority) {
 					return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
 				}
 			default:
@@ -321,7 +275,7 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	}
 
 	// Parse label
-	label := "task"
+	label := task.LabelTask
 	if l, ok := args["label"].(string); ok && l != "" {
 		if err := task.ValidateLabel(l); err != nil {
 			return codedError(output.ErrCodeInvalidType, err.Error(), "Valid values: task, bug, feature, docs")
@@ -341,7 +295,7 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 			}
 		case float64:
 			priority = int(v)
-			if float64(priority) != v || priority < 1 || priority > 3 {
+			if float64(priority) != v || !task.IsValidPriority(priority) {
 				return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
 			}
 		default:
@@ -425,7 +379,7 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 			}
 		case float64:
 			priority = int(v)
-			if float64(priority) != v || priority < 1 || priority > 3 {
+			if float64(priority) != v || !task.IsValidPriority(priority) {
 				return codedError(output.ErrCodeInvalidPriority, "priority must be 1-3", task.ValidPriorityHelp)
 			}
 		default:

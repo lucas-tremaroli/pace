@@ -33,6 +33,19 @@ var (
 	labelBugStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("167"))
 	labelFeatureStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	labelDocsStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
+
+	labelStyles = map[string]lipgloss.Style{
+		task.LabelTask:    labelTaskStyle,
+		task.LabelBug:     labelBugStyle,
+		task.LabelFeature: labelFeatureStyle,
+		task.LabelDocs:    labelDocsStyle,
+	}
+
+	priorityStyles = map[int]lipgloss.Style{
+		task.PriorityHigh:   p1Style,
+		task.PriorityMedium: p2Style,
+		task.PriorityLow:    p3Style,
+	}
 )
 
 var (
@@ -179,30 +192,16 @@ func formatTaskPretty(t task.Task) string {
 	parts = append(parts, titleStyle.Render(t.Title()))
 
 	if label := t.Label(); label != "" {
-		var lStyle lipgloss.Style
-		switch label {
-		case "bug":
-			lStyle = labelBugStyle
-		case "feature":
-			lStyle = labelFeatureStyle
-		case "docs":
-			lStyle = labelDocsStyle
-		default:
+		lStyle, ok := labelStyles[label]
+		if !ok {
 			lStyle = labelTaskStyle
 		}
 		parts = append(parts, lStyle.Render(fmt.Sprintf("[%s]", label)))
 	}
 
 	if p := t.Priority(); p > 0 {
-		var pStyle lipgloss.Style
-		switch p {
-		case 1:
-			pStyle = p1Style
-		case 2:
-			pStyle = p2Style
-		case 3:
-			pStyle = p3Style
-		default:
+		pStyle, ok := priorityStyles[p]
+		if !ok {
 			pStyle = priorityStyle
 		}
 		parts = append(parts, pStyle.Render(task.PriorityName(p)))
