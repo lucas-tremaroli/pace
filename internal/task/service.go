@@ -31,12 +31,6 @@ func NewService() (*Service, error) {
 	return &Service{db: db, prefix: prefix}, nil
 }
 
-// NewServiceWithRepo creates a service with a custom repository and prefix.
-// Intended for testing with in-memory implementations.
-func NewServiceWithRepo(repo TaskRepository, prefix string) *Service {
-	return &Service{db: repo, prefix: prefix}
-}
-
 // Prefix returns the current ID prefix
 func (s *Service) Prefix() string {
 	return s.prefix

@@ -71,8 +71,3 @@ func detectPrefix() string {
 
 	return dirName
 }
-
-// SetPrefix updates the configured prefix
-func SetPrefix(db *storage.DB, prefix string) error {
-	return db.SetConfig(ConfigKeyPrefix, prefix)
-}

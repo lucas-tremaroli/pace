@@ -30,10 +30,6 @@ func getRenderer(width int) *glamour.TermRenderer {
 	return r
 }
 
-func RenderMarkdown(content string) string {
-	return RenderMarkdownWithWidth(content, 100)
-}
-
 func RenderMarkdownWithWidth(content string, width int) string {
 	_, body, _ := ParseFrontmatter(content)
 
