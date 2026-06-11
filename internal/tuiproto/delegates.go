@@ -127,5 +127,5 @@ func (noteDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 	if desc == "" {
 		desc = "—"
 	}
-	fmt.Fprint(w, truncateText(theme.TaskMeta.Render("    "+desc), m.Width()))
+	fmt.Fprint(w, truncateText(theme.TaskMeta.Render("  "+desc), m.Width()))
 }

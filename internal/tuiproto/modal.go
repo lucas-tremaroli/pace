@@ -9,18 +9,17 @@ import (
 // modal is a centered overlay that wraps a viewport for scrollable
 // content. It owns input while open and exits on esc/q.
 type modal struct {
-	title   string
-	vp      viewport.Model
-	width   int // outer screen width
-	height  int // outer screen height
-	closed  bool
+	vp     viewport.Model
+	width  int // outer screen width
+	height int // outer screen height
+	closed bool
 }
 
-func newModal(title, content string, screenW, screenH int) *modal {
+func newModal(content string, screenW, screenH int) *modal {
 	mw, mh := modalSize(screenW, screenH)
 	vp := viewport.New(mw-4, mh-4)
 	vp.SetContent(content)
-	return &modal{title: title, vp: vp, width: screenW, height: screenH}
+	return &modal{vp: vp, width: screenW, height: screenH}
 }
 
 func modalSize(w, h int) (int, int) {
@@ -77,8 +76,6 @@ var modalBorder = lipgloss.NewStyle().
 
 func (m *modal) View(background string) string {
 	mw, mh := modalSize(m.width, m.height)
-	title := theme.DetailHeader.Render(m.title)
-	body := title + "\n" + m.vp.View()
-	box := modalBorder.Width(mw - 4).Height(mh - 2).Render(body)
+	box := modalBorder.Width(mw - 4).Height(mh - 2).Render(m.vp.View())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }

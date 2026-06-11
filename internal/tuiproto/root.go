@@ -113,9 +113,20 @@ func (r *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	var cmd tea.Cmd
-	r.tabs[r.active], cmd = r.tabs[r.active].Update(msg)
-	return r, cmd
+	// Key messages go to the active tab only (already handled above);
+	// every other message (Init results, ticks, filter matches) is
+	// broadcast so each tab can react to its own load/refresh cmds
+	// regardless of which tab is currently focused.
+	if _, isKey := msg.(tea.KeyMsg); isKey {
+		var cmd tea.Cmd
+		r.tabs[r.active], cmd = r.tabs[r.active].Update(msg)
+		return r, cmd
+	}
+	cmds := make([]tea.Cmd, len(r.tabs))
+	for i, t := range r.tabs {
+		r.tabs[i], cmds[i] = t.Update(msg)
+	}
+	return r, tea.Batch(cmds...)
 }
 
 // isCapturing returns true when the active tab is in an input-capturing

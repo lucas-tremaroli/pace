@@ -32,7 +32,6 @@ type kanbanLoadedMsg struct {
 type taskMutatedMsg struct{}
 
 type taskDetailLoadedMsg struct {
-	title   string
 	content string
 }
 
@@ -169,7 +168,7 @@ func (k *kanban) Update(msg tea.Msg) (tab, tea.Cmd) {
 		return k, k.load()
 
 	case taskDetailLoadedMsg:
-		k.modal = newModal(m.title, m.content, k.width, k.height)
+		k.modal = newModal(m.content, k.width, k.height)
 		return k, nil
 
 	case tea.KeyMsg:
@@ -288,7 +287,6 @@ func (k *kanban) openDetailCmd() tea.Cmd {
 			}
 		}
 		return taskDetailLoadedMsg{
-			title:   tk.ID() + " · " + tk.Title(),
 			content: renderTaskDetail(tk, w, logs),
 		}
 	}
