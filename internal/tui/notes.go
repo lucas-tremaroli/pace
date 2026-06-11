@@ -1,4 +1,4 @@
-package tuiproto
+package tui
 
 import (
 	"os"

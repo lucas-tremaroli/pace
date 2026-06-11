@@ -1,175 +1,149 @@
 package tui
 
 import (
+	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/lucas-tremaroli/pace/internal/note"
+	"github.com/charmbracelet/huh"
 	"github.com/lucas-tremaroli/pace/internal/task"
 )
 
-// editorFinishedMsg is sent when an external editor process exits.
-type editorFinishedMsg struct{ err error }
+const formWidth = 60
 
-// resolveEditor returns the first available editor, preferring nvim.
-func resolveEditor() string {
-	candidates := []string{"nvim"}
-	if e := os.Getenv("EDITOR"); e != "" {
-		candidates = append(candidates, e)
-	}
-	candidates = append(candidates, "vim", "vi", "nano")
-	for _, e := range candidates {
-		if _, err := exec.LookPath(e); err == nil {
-			return e
-		}
-	}
-	return "vi"
+// ConfirmFormState owns a yes/no confirmation dialog.
+type ConfirmFormState struct {
+	form   *huh.Form
+	result bool
 }
 
-func (t *Tui) startDelete() (tea.Model, tea.Cmd) {
-	var title, description, target string
-
-	switch t.focus {
-	case focusTasks:
-		item, ok := t.taskList.SelectedItem().(TaskItem)
-		if !ok {
-			return t, nil
-		}
-		title = item.Task.Title()
-		description = "This will also remove its dependencies, links, and logs."
-		target = "task"
-	case focusNotes:
-		item, ok := t.noteList.SelectedItem().(NoteItem)
-		if !ok {
-			return t, nil
-		}
-		title = item.Note.Filename
-		description = "This will permanently delete the note."
-		target = "note"
-	default:
-		return t, nil
-	}
-
-	t.confirm = newConfirmFormState("Delete \""+title+"\"?", description, target)
-	return t, t.confirm.form.Init()
+func newConfirmFormState(title, description string) *ConfirmFormState {
+	s := &ConfirmFormState{}
+	s.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(title).
+				Description(description).
+				Affirmative("Yes").
+				Negative("No").
+				Value(&s.result),
+		),
+	).WithWidth(formWidth)
+	return s
 }
 
-func (t *Tui) startCreate() (tea.Model, tea.Cmd) {
-	t.taskForm = newTaskFormState(nil)
-	return t, t.taskForm.form.Init()
+// TaskFormState owns the inputs and lifecycle for the task create form.
+// Edit support is a deliberate follow-up — only the create path is
+// populated for now, but the struct has the shape the edit form needs.
+type TaskFormState struct {
+	form     *huh.Form
+	id       string
+	title    string
+	desc     string
+	link     string
+	label    string
+	priority int
 }
 
-func (t *Tui) editTarget() int {
-	if t.focus == focusDetail {
-		return t.lastListFocus
+func newTaskFormState() *TaskFormState {
+	s := &TaskFormState{
+		label:    task.LabelTask,
+		priority: task.PriorityMedium,
 	}
-	return t.focus
+	s.form = s.build()
+	return s
 }
 
-func (t *Tui) startEdit() (tea.Model, tea.Cmd) {
-	target := t.editTarget()
-	if target == focusNotes {
-		return t.startNoteEdit()
+// newTaskEditFormState returns a form pre-populated from an existing task.
+// Submitting it updates rather than creates because s.id is non-empty.
+func newTaskEditFormState(existing task.Task) *TaskFormState {
+	s := &TaskFormState{
+		id:       existing.ID(),
+		title:    existing.Title(),
+		desc:     existing.Description(),
+		link:     existing.Link(),
+		label:    existing.Label(),
+		priority: existing.Priority(),
 	}
-	if target != focusTasks {
-		return t, nil
+	if s.label == "" {
+		s.label = task.LabelTask
 	}
-	item, ok := t.taskList.SelectedItem().(TaskItem)
-	if !ok {
-		return t, nil
+	if s.priority <= 0 {
+		s.priority = task.PriorityMedium
 	}
-
-	tk := item.Task
-	t.taskForm = newTaskFormState(&tk)
-	return t, t.taskForm.form.Init()
+	s.form = s.build()
+	return s
 }
 
-// taskFormSaveCmd persists the created or edited task and reloads data.
-func (t *Tui) taskFormSaveCmd() tea.Cmd {
-	s := t.taskForm
-	taskSvc := t.taskService
-	noteSvc := t.noteService
-
-	if s.id == "" {
-		return func() tea.Msg {
-			id := taskSvc.GenerateTaskID()
-			newTask := task.NewTaskComplete(id, task.Todo, s.title, s.desc, s.priority, s.link)
-			newTask.SetLabel(s.label)
-			taskSvc.CreateTask(newTask)
-			taskSvc.SetLabel(id, s.label)
-			return fetchData(taskSvc, noteSvc)
-		}
+func (s *TaskFormState) build() *huh.Form {
+	labelOpts := make([]huh.Option[string], len(task.ValidLabels))
+	for i, l := range task.ValidLabels {
+		labelOpts[i] = huh.NewOption(l, l)
 	}
-
-	return func() tea.Msg {
-		tk, err := taskSvc.GetTaskByID(s.id)
-		if err != nil {
-			return fetchData(taskSvc, noteSvc)
-		}
-		updated := task.NewTaskComplete(tk.ID(), tk.Status(), s.title, s.desc, s.priority, s.link)
-		updated.SetLabel(s.label)
-		updated.SetBlockedBy(tk.BlockedBy())
-		updated.SetBlocks(tk.Blocks())
-		updated.SetNotes(tk.Notes())
-		taskSvc.UpdateTask(updated)
-		taskSvc.SetLabel(s.id, s.label)
-		return fetchData(taskSvc, noteSvc)
-	}
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Title").
+				CharLimit(50).
+				Value(&s.title).
+				Validate(huh.ValidateNotEmpty()),
+			huh.NewText().
+				Title("Description").
+				Value(&s.desc).
+				Lines(4),
+			huh.NewInput().
+				Title("Link").
+				Value(&s.link).
+				Validate(func(v string) error {
+					return task.ValidateLink(task.NormalizeLink(v))
+				}),
+			huh.NewSelect[string]().
+				Title("Label").
+				Options(labelOpts...).
+				Value(&s.label),
+			huh.NewSelect[int]().
+				Title("Priority").
+				Options(
+					huh.NewOption("High (1)", task.PriorityHigh),
+					huh.NewOption("Medium (2)", task.PriorityMedium),
+					huh.NewOption("Low (3)", task.PriorityLow),
+				).
+				Value(&s.priority),
+		),
+	).WithWidth(formWidth).WithShowHelp(true)
 }
 
-func (t *Tui) startNoteCreate() (tea.Model, tea.Cmd) {
-	noteSvc := t.noteService
-	t.noteForm = newNoteFormState(func(name string) (bool, error) {
-		path := noteSvc.GetNotePath(name)
-		_, err := os.Stat(path)
-		if err == nil {
-			return true, nil
-		}
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	})
-	return t, t.noteForm.form.Init()
+// NoteFormState owns the input for the new-note dialog.
+type NoteFormState struct {
+	form     *huh.Form
+	filename string
 }
 
-// noteFormOpenEditorCmd writes a template note and opens it in an editor.
-func (t *Tui) noteFormOpenEditorCmd() tea.Cmd {
-	filename := t.noteForm.filename
-	noteSvc := t.noteService
-
-	editor := resolveEditor()
-	path := noteSvc.GetNotePath(filename)
-
-	if !strings.HasSuffix(filename, ".md") {
-		t.pendingNoteSelect = filename + ".md"
-	} else {
-		t.pendingNoteSelect = filename
-	}
-
-	return func() tea.Msg {
-		if err := noteSvc.WriteNote(filename, note.DefaultTemplate(filename)); err != nil {
-			return editorFinishedMsg{err}
-		}
-		c := exec.Command(editor, path)
-		return tea.ExecProcess(c, func(err error) tea.Msg {
-			return editorFinishedMsg{err}
-		})()
-	}
-}
-
-func (t *Tui) startNoteEdit() (tea.Model, tea.Cmd) {
-	item, ok := t.noteList.SelectedItem().(NoteItem)
-	if !ok {
-		return t, nil
-	}
-	editor := resolveEditor()
-	filename := strings.TrimSuffix(item.Note.Filename, ".md")
-	path := t.noteService.GetNotePath(filename)
-	c := exec.Command(editor, path)
-	return t, tea.ExecProcess(c, func(err error) tea.Msg {
-		return editorFinishedMsg{err}
-	})
+func newNoteFormState(noteExists func(string) (bool, error)) *NoteFormState {
+	s := &NoteFormState{}
+	s.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Filename").
+				Description("Without .md extension").
+				Value(&s.filename).
+				Validate(func(v string) error {
+					if v == "" {
+						return fmt.Errorf("filename is required")
+					}
+					if strings.Contains(v, "/") || strings.Contains(v, "\\") || strings.HasPrefix(v, ".") {
+						return fmt.Errorf("no path separators or leading dot")
+					}
+					exists, err := noteExists(v)
+					if err != nil && !os.IsNotExist(err) {
+						return fmt.Errorf("check %s: %v", v, err)
+					}
+					if exists {
+						return fmt.Errorf("note %s already exists", v)
+					}
+					return nil
+				}),
+		),
+	).WithWidth(formWidth).WithShowHelp(true)
+	return s
 }

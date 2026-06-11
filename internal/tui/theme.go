@@ -2,18 +2,8 @@ package tui
 
 import "github.com/charmbracelet/lipgloss"
 
-// Theme groups every Lipgloss style used by the TUI into a single value.
-// All render code reads from a Theme so the visual identity of the TUI can
-// be swapped at startup (or, in the future, at runtime) by substituting a
-// different Theme.
-//
-// Field groups:
-//   - Border / chrome      — list and dialog framing
-//   - Detail panel         — right-hand panel rendering
-//   - Status / priority    — semantic task-state colors used in detail + list
-//   - Overview             — left-side counts and progress bar
-//   - Task list item       — taskDelegate rendering
-//   - Label                — per-label color chips
+// Theme is a self-contained copy of the styles used by the prototype TUI.
+// Decoupled from internal/tui so the two TUIs can evolve independently.
 type Theme struct {
 	// Borders & chrome
 	BorderFocused lipgloss.Style
@@ -21,6 +11,10 @@ type Theme struct {
 	Help          lipgloss.Style
 	ListTitle     lipgloss.Style
 	ListTitleBar  lipgloss.Style
+
+	// Tab strip
+	TabActive   lipgloss.Style
+	TabInactive lipgloss.Style
 
 	// Detail panel
 	DetailHeader    lipgloss.Style
@@ -49,7 +43,7 @@ type Theme struct {
 	PriorityMedium   lipgloss.Style
 	PriorityLow      lipgloss.Style
 
-	// Overview
+	// Overview / header
 	OverviewLabel  lipgloss.Style
 	OverviewPct    lipgloss.Style
 	StorageTag     lipgloss.Style
@@ -57,7 +51,7 @@ type Theme struct {
 	ProgressEmpty  lipgloss.Style
 	NoTasks        lipgloss.Style
 
-	// Task list item (taskDelegate)
+	// Task list item
 	TaskNormal         lipgloss.Style
 	TaskInProgressIcon lipgloss.Style
 	TaskDoneIcon       lipgloss.Style
@@ -75,19 +69,19 @@ type Theme struct {
 	LabelBug     lipgloss.Style
 	LabelFeature lipgloss.Style
 	LabelDocs    lipgloss.Style
-
-	// Spinner foreground
-	Spinner lipgloss.Style
 }
 
-// DefaultTheme returns the built-in pace color scheme.
 func DefaultTheme() Theme {
 	return Theme{
-		BorderFocused:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("62")),
-		BorderBlurred:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("236")),
-		Help:             lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(0, 1),
-		ListTitle:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62")),
-		ListTitleBar:     lipgloss.NewStyle().MarginBottom(1),
+		BorderFocused: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("62")),
+		BorderBlurred: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("236")),
+		Help:          lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(0, 1),
+		ListTitle:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62")),
+		ListTitleBar:  lipgloss.NewStyle().MarginBottom(1),
+
+		TabActive:   lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212")),
+		TabInactive: lipgloss.NewStyle().Foreground(lipgloss.Color("241")),
+
 		DetailHeader:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).MarginBottom(1),
 		DetailTitle:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255")),
 		DetailID:         lipgloss.NewStyle().Foreground(lipgloss.Color("241")),
@@ -134,11 +128,7 @@ func DefaultTheme() Theme {
 		LabelBug:     lipgloss.NewStyle().Foreground(lipgloss.Color("167")),
 		LabelFeature: lipgloss.NewStyle().Foreground(lipgloss.Color("114")),
 		LabelDocs:    lipgloss.NewStyle().Foreground(lipgloss.Color("141")),
-
-		Spinner: lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
 	}
 }
 
-// theme is the package-level active theme. Render code reads styles from
-// here; runtime theme swapping is enabled by reassigning this value.
 var theme = DefaultTheme()

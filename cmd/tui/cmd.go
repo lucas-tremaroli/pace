@@ -12,9 +12,9 @@ var TuiCmd = &cobra.Command{
 	Use:     "tui",
 	GroupID: "core",
 	Short:   "Open the unified TUI dashboard",
-	Long:    `Launch an interactive TUI showing tasks and notes in a two-panel layout.`,
+	Long:    `Launch an interactive tabbed TUI with a kanban board for tasks and a list+viewer for notes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		t, err := tui.NewTui()
+		t, err := tui.New()
 		if err != nil {
 			return fmt.Errorf("failed to initialize TUI: %w", err)
 		}
