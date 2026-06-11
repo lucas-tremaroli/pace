@@ -17,7 +17,6 @@ type LogEntry struct {
 	Message   string
 }
 
-// renderFieldBox builds a bordered box for a single field.
 func renderFieldBox(label, value string, valueStyle lipgloss.Style, boxWidth int) string {
 	innerW := boxWidth - 2
 
@@ -35,13 +34,10 @@ func renderFieldBox(label, value string, valueStyle lipgloss.Style, boxWidth int
 		padLen = 0
 	}
 	mid := theme.FieldBoxBorder.Render("│") + " " + styledVal + strings.Repeat(" ", padLen) + theme.FieldBoxBorder.Render("│")
-
 	bot := theme.FieldBoxBorder.Render("└" + strings.Repeat("─", innerW) + "┘")
-
 	return top + "\n" + mid + "\n" + bot
 }
 
-// renderFieldBoxes renders Status, Priority, and Label boxes side-by-side.
 func renderFieldBoxes(tk task.Task, w int) string {
 	const boxW = 14
 	const gap = 2
@@ -97,12 +93,10 @@ func renderFieldBoxes(tk task.Task, w int) string {
 	if w < 46 {
 		return box1 + "\n" + box2 + "\n" + box3
 	}
-
 	spacer := strings.Repeat(" ", gap)
 	return lipgloss.JoinHorizontal(lipgloss.Top, box1, spacer, box2, spacer, box3)
 }
 
-// renderChips renders items as [item1] [item2] with styled brackets.
 func renderChips(items []string) string {
 	parts := make([]string, len(items))
 	for i, item := range items {
@@ -119,7 +113,6 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 		}
 		return strings.Join(lines, "\n")
 	}
-
 	wrapIndent := func(s string, indent int, style lipgloss.Style) string {
 		iw := w - indent
 		if iw < 10 {
@@ -138,15 +131,12 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 	}
 
 	var b strings.Builder
-
 	b.WriteString(wrapStyled(tk.Title(), theme.DetailTitle))
 	b.WriteString("\n")
 	b.WriteString(theme.DetailID.Render(tk.ID()))
 	b.WriteString("\n\n")
 	b.WriteString(renderFieldBoxes(tk, w))
-	b.WriteString("\n")
-
-	b.WriteString("\n")
+	b.WriteString("\n\n")
 	b.WriteString(theme.DetailSection.Render("Description"))
 	b.WriteString("\n\n")
 	if desc := tk.Description(); desc != "" {
@@ -154,9 +144,7 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 	} else {
 		b.WriteString(theme.DetailDim.Render("No description"))
 	}
-	b.WriteString("\n")
-
-	b.WriteString("\n")
+	b.WriteString("\n\n")
 	b.WriteString(theme.DetailSection.Render("Metadata"))
 	b.WriteString("\n\n")
 
@@ -172,7 +160,6 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 			b.WriteString(value)
 			b.WriteString("\n")
 		}
-
 		if hasLink {
 			metaRow("Link", wrapIndent(tk.Link(), metaLabelW, theme.DetailLinkURL))
 		}
@@ -211,7 +198,6 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 			b.WriteString("\n")
 		}
 	}
-
 	return b.String()
 }
 
@@ -224,16 +210,13 @@ func renderNoteDetail(n note.Note, w int) string {
 		b.WriteString(theme.DetailLabel.Render(wrap.String(n.Description, w)))
 		b.WriteString("\n\n")
 	}
-
 	if len(n.Tasks) > 0 {
 		b.WriteString(theme.DetailLabel.Render("Linked tasks: "))
 		b.WriteString(theme.DetailValue.Render(wrap.String(strings.Join(n.Tasks, ", "), w)))
 		b.WriteString("\n\n")
 	}
-
 	if n.Content != "" {
 		b.WriteString(note.RenderMarkdownWithWidth(n.Content, w))
 	}
-
 	return b.String()
 }
