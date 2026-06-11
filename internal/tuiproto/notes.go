@@ -1,10 +1,15 @@
 package tuiproto
 
 import (
+	"os"
+	"os/exec"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/internal/note"
 )
@@ -12,6 +17,8 @@ import (
 type notesService interface {
 	ListNotesWithMeta(includeContent bool) ([]note.Note, error)
 	ReadNoteWithMeta(filename string) (*note.Note, error)
+	WriteNote(filename, content string) error
+	GetNotePath(filename string) string
 }
 
 // --- messages ----------------------------------------------------------
@@ -29,20 +36,21 @@ type noteLoadedMsg struct {
 // --- model -------------------------------------------------------------
 
 type notesKeys struct {
-	Focus, Open, Filter, Reload key.Binding
+	Focus, Open, Filter, Reload, New key.Binding
 }
 
 func newNotesKeys() notesKeys {
 	return notesKeys{
 		Focus:  key.NewBinding(key.WithKeys("h", "left", "l", "right"), key.WithHelp("h/l", "focus")),
-		Open:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "open"),),
+		Open:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "open")),
 		Filter: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		Reload: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
+		New:    key.NewBinding(key.WithKeys("+"), key.WithHelp("+", "new note")),
 	}
 }
 
 func (k notesKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.Focus, k.Open, k.Filter, k.Reload}
+	return []key.Binding{k.New, k.Focus, k.Open, k.Filter, k.Reload}
 }
 func (k notesKeys) FullHelp() [][]key.Binding { return [][]key.Binding{k.ShortHelp()} }
 
@@ -52,15 +60,17 @@ const (
 )
 
 type notes struct {
-	svc     notesService
-	list    list.Model
-	vp      viewport.Model
-	focus   int
-	width   int
-	height  int
-	loadErr error
-	lastKey string
-	keys    notesKeys
+	svc       notesService
+	list      list.Model
+	vp        viewport.Model
+	focus     int
+	width     int
+	height    int
+	loadErr   error
+	lastKey   string
+	keys      notesKeys
+	form      *NoteFormState
+	pendingSel string
 }
 
 func newNotes(svc notesService) *notes {
@@ -100,6 +110,24 @@ func (n *notes) Init() tea.Cmd {
 }
 
 func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
+	// Form owns input while open.
+	if n.form != nil {
+		form, cmd := n.form.form.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			n.form.form = f
+			switch n.form.form.State {
+			case huh.StateCompleted:
+				openCmd := n.openEditorCmd()
+				n.form = nil
+				return n, openCmd
+			case huh.StateAborted:
+				n.form = nil
+				return n, nil
+			}
+		}
+		return n, cmd
+	}
+
 	switch m := msg.(type) {
 	case tea.WindowSizeMsg:
 		n.width, n.height = m.Width, m.Height
@@ -113,7 +141,19 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 	case notesListedMsg:
 		n.loadErr = m.err
 		n.list.SetItems(m.items)
+		if n.pendingSel != "" {
+			for i, it := range m.items {
+				if ni, ok := it.(noteItem); ok && ni.Note.Filename == n.pendingSel {
+					n.list.Select(i)
+					break
+				}
+			}
+			n.pendingSel = ""
+		}
 		return n, nil
+
+	case editorFinishedMsg:
+		return n, tea.Batch(tea.ClearScreen, n.Init())
 
 	case noteLoadedMsg:
 		n.lastKey = m.key
@@ -138,6 +178,20 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 			return n, n.loadCmd()
 		case "r":
 			return n, n.Init()
+		case "+":
+			svc := n.svc
+			n.form = newNoteFormState(func(name string) (bool, error) {
+				path := svc.GetNotePath(name)
+				_, err := os.Stat(path)
+				if err == nil {
+					return true, nil
+				}
+				if os.IsNotExist(err) {
+					return false, nil
+				}
+				return false, err
+			})
+			return n, n.form.form.Init()
 		}
 		var cmd tea.Cmd
 		if n.focus == notesFocusList {
@@ -232,4 +286,33 @@ func (n *notes) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
 }
 
-func (n *notes) ModalOverlay() string { return "" }
+func (n *notes) ModalOverlay() string {
+	if n.form == nil {
+		return ""
+	}
+	return centerOverlay(n.form.form.View(), n.width, n.height)
+}
+
+// openEditorCmd writes a template for the new note and opens it in $EDITOR.
+func (n *notes) openEditorCmd() tea.Cmd {
+	filename := n.form.filename
+	svc := n.svc
+	editor := resolveEditor()
+	path := svc.GetNotePath(filename)
+
+	if strings.HasSuffix(filename, ".md") {
+		n.pendingSel = filename
+	} else {
+		n.pendingSel = filename + ".md"
+	}
+
+	return func() tea.Msg {
+		if err := svc.WriteNote(filename, note.DefaultTemplate(filename)); err != nil {
+			return editorFinishedMsg{err}
+		}
+		c := exec.Command(editor, path)
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			return editorFinishedMsg{err}
+		})()
+	}
+}

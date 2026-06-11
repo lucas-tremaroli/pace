@@ -79,3 +79,10 @@ func (m *modal) View(background string) string {
 	box := modalBorder.Width(mw - 4).Height(mh - 2).Render(m.vp.View())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
+
+// centerOverlay centers any pre-rendered content (e.g. a huh form) on
+// the full screen with a subtle border.
+func centerOverlay(content string, screenW, screenH int) string {
+	return lipgloss.Place(screenW, screenH, lipgloss.Center, lipgloss.Center,
+		modalBorder.Render(content))
+}

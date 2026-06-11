@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/lucas-tremaroli/pace/internal/task"
@@ -20,6 +21,9 @@ type kanbanService interface {
 	UpdateTask(t task.Task) error
 	CloseTask(id, outcome string) error
 	GetTaskLogs(id string) ([]storage.LogRecord, error)
+	GenerateTaskID() string
+	CreateTask(t task.Task) error
+	SetLabel(id, label string) error
 }
 
 // --- messages ----------------------------------------------------------
@@ -38,7 +42,7 @@ type taskDetailLoadedMsg struct {
 // --- model -------------------------------------------------------------
 
 type kanbanKeys struct {
-	Left, Right, Open, Cycle, OpenLink, Filter, Reload, Quit key.Binding
+	Left, Right, Open, Cycle, OpenLink, Filter, Reload, New, Quit key.Binding
 }
 
 func newKanbanKeys() kanbanKeys {
@@ -50,12 +54,13 @@ func newKanbanKeys() kanbanKeys {
 		OpenLink: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open link")),
 		Filter:   key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		Reload:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
+		New:      key.NewBinding(key.WithKeys("+"), key.WithHelp("+", "new task")),
 		Quit:     key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	}
 }
 
 func (k kanbanKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.Left, k.Right, k.Open, k.Cycle, k.OpenLink, k.Filter, k.Reload}
+	return []key.Binding{k.New, k.Left, k.Right, k.Open, k.Cycle, k.OpenLink, k.Filter, k.Reload}
 }
 func (k kanbanKeys) FullHelp() [][]key.Binding { return [][]key.Binding{k.ShortHelp()} }
 
@@ -68,6 +73,7 @@ type kanban struct {
 	loadErr error
 	keys    kanbanKeys
 	modal   *modal
+	form    *TaskFormState
 }
 
 var columnTitles = [3]string{
@@ -141,6 +147,24 @@ func (k *kanban) selected() (task.Task, bool) {
 }
 
 func (k *kanban) Update(msg tea.Msg) (tab, tea.Cmd) {
+	// Form owns input while open.
+	if k.form != nil {
+		form, cmd := k.form.form.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			k.form.form = f
+			switch k.form.form.State {
+			case huh.StateCompleted:
+				save := k.saveTaskCmd()
+				k.form = nil
+				return k, save
+			case huh.StateAborted:
+				k.form = nil
+				return k, nil
+			}
+		}
+		return k, cmd
+	}
+
 	// Modal owns input while open.
 	if k.modal != nil {
 		cmd := k.modal.Update(msg)
@@ -192,6 +216,9 @@ func (k *kanban) Update(msg tea.Msg) (tab, tea.Cmd) {
 				return k, k.cycleCmd()
 			case key.Matches(m, k.keys.OpenLink):
 				return k, k.openLinkCmd()
+			case key.Matches(m, k.keys.New):
+				k.form = newTaskFormState()
+				return k, k.form.form.Init()
 			}
 		}
 		var cmd tea.Cmd
@@ -343,11 +370,30 @@ func (k *kanban) openLinkCmd() tea.Cmd {
 	}
 }
 
-// ModalOverlay returns the modal view if open, "" otherwise. Root uses
-// this to render on top of the rest of the UI.
+// ModalOverlay returns the centered overlay (form or detail modal) if
+// open, "" otherwise. Root uses this to render on top of the rest of
+// the UI and to route input.
 func (k *kanban) ModalOverlay() string {
+	if k.form != nil {
+		return centerOverlay(k.form.form.View(), k.width, k.height)
+	}
 	if k.modal == nil {
 		return ""
 	}
 	return k.modal.View("")
+}
+
+func (k *kanban) saveTaskCmd() tea.Cmd {
+	s := k.form
+	svc := k.svc
+	return func() tea.Msg {
+		id := svc.GenerateTaskID()
+		newTask := task.NewTaskComplete(id, task.Todo, s.title, s.desc, s.priority, s.link)
+		newTask.SetLabel(s.label)
+		if err := svc.CreateTask(newTask); err != nil {
+			return taskMutatedMsg{}
+		}
+		svc.SetLabel(id, s.label)
+		return taskMutatedMsg{}
+	}
 }
