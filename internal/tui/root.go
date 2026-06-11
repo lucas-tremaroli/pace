@@ -31,6 +31,11 @@ type Root struct {
 	help        help.Model
 	rootKeys    rootKeys
 	tooSmall    bool
+
+	// Retained so Close() can shut the underlying DB connections
+	// down deterministically — both services wrap a SQLite handle.
+	taskSvc *task.Service
+	noteSvc *note.Service
 }
 
 type rootKeys struct {
@@ -69,7 +74,30 @@ func New() (*Root, error) {
 		rootKeys:    newRootKeys(),
 		storagePath: storePath,
 		storageType: storeType,
+		taskSvc:     ts,
+		noteSvc:     ns,
 	}, nil
+}
+
+// Close releases the underlying DB connections. Safe to call multiple
+// times: the services' Close is idempotent for nil receivers and a
+// reused Root will hand back stale-but-closed handles instead of
+// crashing. Always defer this from the CLI entrypoint.
+func (r *Root) Close() error {
+	var firstErr error
+	if r.taskSvc != nil {
+		if err := r.taskSvc.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		r.taskSvc = nil
+	}
+	if r.noteSvc != nil {
+		if err := r.noteSvc.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		r.noteSvc = nil
+	}
+	return firstErr
 }
 
 func (r *Root) Init() tea.Cmd {
@@ -103,6 +131,7 @@ func (r *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch {
 		case key.Matches(m, r.rootKeys.Quit):
+			r.Close()
 			return r, tea.Quit
 		case key.Matches(m, r.rootKeys.Tab):
 			r.active = (r.active + 1) % len(r.tabs)

@@ -445,10 +445,14 @@ func (k *kanban) deleteCmd(id string) tea.Cmd {
 func (k *kanban) saveTaskCmd() tea.Cmd {
 	s := k.form
 	svc := k.svc
+	// Normalize the link the same way the form validator did, then
+	// persist that normalized value. Otherwise "github.com" passes
+	// validation but the stored value fails task.ValidateLink later.
+	link := task.NormalizeLink(s.link)
 	if s.id == "" {
 		return func() tea.Msg {
 			id := svc.GenerateTaskID()
-			newTask := task.NewTaskComplete(id, task.Todo, s.title, s.desc, s.priority, s.link)
+			newTask := task.NewTaskComplete(id, task.Todo, s.title, s.desc, s.priority, link)
 			newTask.SetLabel(s.label)
 			if err := svc.CreateTask(newTask); err != nil {
 				return taskMutatedMsg{}
@@ -462,7 +466,7 @@ func (k *kanban) saveTaskCmd() tea.Cmd {
 		if err != nil {
 			return taskMutatedMsg{}
 		}
-		updated := task.NewTaskComplete(existing.ID(), existing.Status(), s.title, s.desc, s.priority, s.link)
+		updated := task.NewTaskComplete(existing.ID(), existing.Status(), s.title, s.desc, s.priority, link)
 		updated.SetLabel(s.label)
 		updated.SetBlockedBy(existing.BlockedBy())
 		updated.SetBlocks(existing.Blocks())

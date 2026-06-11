@@ -184,6 +184,9 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 		return n, nil
 
 	case editorFinishedMsg:
+		// Force the next Enter on the same note to reload from disk;
+		// otherwise loadCmd no-ops because filename == n.lastKey.
+		n.lastKey = ""
 		return n, tea.Batch(tea.ClearScreen, n.Init())
 
 	case notesMutatedMsg:

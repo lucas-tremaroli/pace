@@ -18,6 +18,7 @@ var TuiCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to initialize TUI: %w", err)
 		}
+		defer t.Close()
 		p := tea.NewProgram(t, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("error running TUI: %w", err)
