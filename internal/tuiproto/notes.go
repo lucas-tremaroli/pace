@@ -104,7 +104,7 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		n.width, n.height = m.Width, m.Height
 		lw, dw, h := n.paneSizes()
-		// inner = visual - border(2) - padding(2)
+		// inner = visual - border(2). Padding(0,1) is horizontal only.
 		n.list.SetSize(lw-4, h-2)
 		n.vp.Width = dw - 4
 		n.vp.Height = h - 2
@@ -176,9 +176,9 @@ func (n *notes) loadCmd() tea.Cmd {
 	}
 }
 
-// paneSizes returns the desired visual widths of the list and detail
-// panes (border-inclusive) and the box height. The two widths sum to
-// n.width so the panes span the full body row.
+// paneSizes returns the visual widths and height of the list and
+// detail panes (border-inclusive). Widths sum to n.width and the
+// height fills n.height so notes match the kanban box dimensions.
 func (n *notes) paneSizes() (listW, detailW, h int) {
 	listW = n.width / 3
 	if listW < 22 {
@@ -188,9 +188,9 @@ func (n *notes) paneSizes() (listW, detailW, h int) {
 	if detailW < 20 {
 		detailW = 20
 	}
-	h = n.height - 4
-	if h < 4 {
-		h = 4
+	h = n.height
+	if h < 6 {
+		h = 6
 	}
 	return
 }
@@ -227,8 +227,8 @@ func (n *notes) View() string {
 	} else {
 		listBody = n.list.View()
 	}
-	leftBox := listStyle.Width(lw - 2).Height(h).Padding(0, 1).Render(listBody)
-	rightBox := detailStyle.Width(dw - 2).Height(h).Padding(0, 1).Render(n.vp.View())
+	leftBox := listStyle.Width(lw - 2).Height(h - 2).Padding(0, 1).Render(listBody)
+	rightBox := detailStyle.Width(dw - 2).Height(h - 2).Padding(0, 1).Render(n.vp.View())
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
 }
 
