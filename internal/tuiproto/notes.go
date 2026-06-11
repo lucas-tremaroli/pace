@@ -1,0 +1,231 @@
+package tuiproto
+
+import (
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/lucas-tremaroli/pace/internal/note"
+)
+
+type notesService interface {
+	ListNotesWithMeta(includeContent bool) ([]note.Note, error)
+	ReadNoteWithMeta(filename string) (*note.Note, error)
+}
+
+// --- messages ----------------------------------------------------------
+
+type notesListedMsg struct {
+	items []list.Item
+	err   error
+}
+
+type noteLoadedMsg struct {
+	key     string
+	content string
+}
+
+// --- model -------------------------------------------------------------
+
+type notesKeys struct {
+	Focus, Open, Filter, Reload key.Binding
+}
+
+func newNotesKeys() notesKeys {
+	return notesKeys{
+		Focus:  key.NewBinding(key.WithKeys("h", "left", "l", "right"), key.WithHelp("h/l", "focus")),
+		Open:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "open"),),
+		Filter: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
+		Reload: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
+	}
+}
+
+func (k notesKeys) ShortHelp() []key.Binding {
+	return []key.Binding{k.Focus, k.Open, k.Filter, k.Reload}
+}
+func (k notesKeys) FullHelp() [][]key.Binding { return [][]key.Binding{k.ShortHelp()} }
+
+const (
+	notesFocusList   = 0
+	notesFocusDetail = 1
+)
+
+type notes struct {
+	svc     notesService
+	list    list.Model
+	vp      viewport.Model
+	focus   int
+	width   int
+	height  int
+	loadErr error
+	lastKey string
+	keys    notesKeys
+}
+
+func newNotes(svc notesService) *notes {
+	l := list.New(nil, noteDelegate{}, 0, 0)
+	l.Title = "Notes"
+	l.Styles.Title = theme.ListTitle
+	l.Styles.TitleBar = theme.ListTitleBar
+	l.SetShowStatusBar(false)
+	l.SetShowHelp(false)
+	l.SetFilteringEnabled(true)
+	l.DisableQuitKeybindings()
+
+	vp := viewport.New(0, 0)
+	vp.SetContent(theme.DetailDim.Render("Press ⏎ to load a note"))
+	return &notes{svc: svc, list: l, vp: vp, keys: newNotesKeys()}
+}
+
+func (n *notes) Title() string         { return "Notes" }
+func (n *notes) HelpBindings() []key.Binding { return n.keys.ShortHelp() }
+func (n *notes) HelpHint() string {
+	return "h/l focus • ⏎ open • / filter • j/k scroll"
+}
+func (n *notes) Count() int { return len(n.list.Items()) }
+
+func (n *notes) Init() tea.Cmd {
+	return func() tea.Msg {
+		items, err := n.svc.ListNotesWithMeta(false)
+		if err != nil {
+			return notesListedMsg{err: err}
+		}
+		converted := make([]list.Item, len(items))
+		for i, x := range items {
+			converted[i] = noteItem{Note: x}
+		}
+		return notesListedMsg{items: converted}
+	}
+}
+
+func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
+	switch m := msg.(type) {
+	case tea.WindowSizeMsg:
+		n.width, n.height = m.Width, m.Height
+		lw, dw, h := n.paneSizes()
+		n.list.SetSize(lw, h)
+		n.vp.Width = dw
+		n.vp.Height = h
+		return n, nil
+
+	case notesListedMsg:
+		n.loadErr = m.err
+		n.list.SetItems(m.items)
+		return n, nil
+
+	case noteLoadedMsg:
+		n.lastKey = m.key
+		n.vp.SetContent(m.content)
+		n.vp.GotoTop()
+		return n, nil
+
+	case tea.KeyMsg:
+		if n.list.FilterState() == list.Filtering {
+			var cmd tea.Cmd
+			n.list, cmd = n.list.Update(msg)
+			return n, cmd
+		}
+		switch m.String() {
+		case "h", "left":
+			n.focus = notesFocusList
+			return n, nil
+		case "l", "right":
+			n.focus = notesFocusDetail
+			return n, nil
+		case "enter":
+			return n, n.loadCmd()
+		case "r":
+			return n, n.Init()
+		}
+		var cmd tea.Cmd
+		if n.focus == notesFocusList {
+			n.list, cmd = n.list.Update(msg)
+		} else {
+			n.vp, cmd = n.vp.Update(msg)
+		}
+		return n, cmd
+	}
+
+	// Forward unhandled messages to the list so filter matches,
+	// blink, and pagination updates flow through.
+	var lcmd, vcmd tea.Cmd
+	n.list, lcmd = n.list.Update(msg)
+	n.vp, vcmd = n.vp.Update(msg)
+	return n, tea.Batch(lcmd, vcmd)
+}
+
+func (n *notes) loadCmd() tea.Cmd {
+	it, ok := n.list.SelectedItem().(noteItem)
+	if !ok {
+		return nil
+	}
+	filename := it.Note.Filename
+	if filename == n.lastKey {
+		return nil
+	}
+	svc := n.svc
+	w := n.detailContentWidth()
+	return func() tea.Msg {
+		full, err := svc.ReadNoteWithMeta(filename)
+		if err != nil {
+			return noteLoadedMsg{key: filename, content: theme.StatusBlocked.Render(err.Error())}
+		}
+		return noteLoadedMsg{key: filename, content: renderNoteDetail(*full, w)}
+	}
+}
+
+func (n *notes) paneSizes() (listW, detailW, h int) {
+	listW = n.width / 3
+	if listW < 22 {
+		listW = 22
+	}
+	detailW = n.width - listW - 6
+	if detailW < 20 {
+		detailW = 20
+	}
+	h = n.height - 4
+	if h < 4 {
+		h = 4
+	}
+	return
+}
+
+func (n *notes) detailContentWidth() int {
+	_, dw, _ := n.paneSizes()
+	w := dw - 2
+	if w < 20 {
+		w = 20
+	}
+	return w
+}
+
+func (n *notes) View() string {
+	if n.loadErr != nil {
+		return theme.StatusBlocked.Render("error: " + n.loadErr.Error())
+	}
+	if n.width == 0 {
+		return ""
+	}
+	lw, dw, h := n.paneSizes()
+
+	listStyle := theme.BorderBlurred
+	detailStyle := theme.BorderBlurred
+	if n.focus == notesFocusList {
+		listStyle = theme.BorderFocused
+	} else {
+		detailStyle = theme.BorderFocused
+	}
+
+	var listBody string
+	if len(n.list.Items()) == 0 {
+		listBody = theme.NoTasks.Render("  no notes")
+	} else {
+		listBody = n.list.View()
+	}
+	leftBox := listStyle.Width(lw).Height(h).Padding(0, 1).Render(listBody)
+	rightBox := detailStyle.Width(dw).Height(h).Padding(0, 1).Render(n.vp.View())
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+}
+
+func (n *notes) ModalOverlay() string { return "" }
