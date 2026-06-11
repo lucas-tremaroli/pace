@@ -166,30 +166,66 @@ func (r *Root) bodyHeight() int {
 	return h
 }
 
-func (r *Root) headerHeight() int { return 2 } // tab strip + spacer
+// headerHeight: title row + horizontal rule.
+func (r *Root) headerHeight() int { return 2 }
+
+const (
+	tabSeparatorGlyph = " · "
+	minStoreGap       = 2
+)
 
 func (r *Root) renderHeader() string {
-	tabs := make([]string, len(r.tabs))
+	titleRow := r.renderTitleRow()
+	rule := theme.OverviewLabel.Render(strings.Repeat("─", r.width))
+	return lipgloss.JoinVertical(lipgloss.Left, titleRow, rule)
+}
+
+func (r *Root) renderTitleRow() string {
+	tabStrip := r.renderTabStrip()
+	store := r.renderStorageInfo(r.width - lipgloss.Width(tabStrip) - minStoreGap)
+
+	used := lipgloss.Width(tabStrip) + lipgloss.Width(store)
+	gap := r.width - used
+	if gap < minStoreGap {
+		gap = minStoreGap
+	}
+	return tabStrip + strings.Repeat(" ", gap) + store
+}
+
+func (r *Root) renderTabStrip() string {
+	parts := make([]string, 0, len(r.tabs)*2)
 	for i, t := range r.tabs {
+		if i > 0 {
+			parts = append(parts, theme.OverviewLabel.Render(tabSeparatorGlyph))
+		}
 		if i == r.active {
-			tabs[i] = theme.TabActive.Render(t.Title())
+			parts = append(parts, theme.TabActive.Render(t.Title()))
 		} else {
-			tabs[i] = theme.TabInactive.Render(t.Title())
+			parts = append(parts, theme.TabInactive.Render(t.Title()))
 		}
 	}
-	tabStrip := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
+	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+}
 
-	storeTag := theme.StorageTag.Render(strings.ToUpper(string(r.storageType)))
-	storeLine := theme.OverviewLabel.Render(shortenPath(r.storagePath)) + "  " + storeTag
-
-	// Right-align storage tag on the same row as the tab strip when there's room.
-	gap := r.width - lipgloss.Width(tabStrip) - lipgloss.Width(storeLine)
-	if gap < 1 {
-		gap = 1
+// renderStorageInfo returns the storage info string sized to fit within
+// budget. Falls back gracefully: full path + tag → tag only → empty.
+func (r *Root) renderStorageInfo(budget int) string {
+	if budget <= 0 || r.storagePath == "" {
+		return ""
 	}
-	topRow := tabStrip + strings.Repeat(" ", gap) + storeLine
+	tag := theme.StorageTag.Render("[" + strings.ToUpper(string(r.storageType)) + "]")
+	tagW := lipgloss.Width(tag)
 
-	return lipgloss.JoinVertical(lipgloss.Left, topRow, "")
+	path := shortenPath(r.storagePath)
+	pathRendered := theme.OverviewLabel.Render(path)
+	full := pathRendered + " " + tag
+	if lipgloss.Width(full) <= budget {
+		return full
+	}
+	if tagW <= budget {
+		return tag
+	}
+	return ""
 }
 
 func (r *Root) renderFooter() string {

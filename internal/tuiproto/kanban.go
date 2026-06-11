@@ -215,24 +215,31 @@ func (k *kanban) Update(msg tea.Msg) (tab, tea.Cmd) {
 }
 
 func (k *kanban) resizeColumns() {
-	colW, colH := k.colInner()
+	widths := k.colWidths()
+	innerH := k.colInnerH()
 	for i := range k.cols {
-		k.cols[i].SetSize(colW, colH)
+		inner := widths[i] - 4 // border (2) + padding (2)
+		if inner < 8 {
+			inner = 8
+		}
+		k.cols[i].SetSize(inner, innerH)
 	}
 }
 
-func (k *kanban) colInner() (int, int) {
-	colOuterW := k.width / 3
-	// Account for rounded border (2) + padding (2).
-	innerW := colOuterW - 4
-	if innerW < 12 {
-		innerW = 12
+// colWidths returns three outer widths that sum to k.width. Remainder
+// goes to the last column so totals are exact.
+func (k *kanban) colWidths() [3]int {
+	base := k.width / 3
+	rem := k.width - base*3
+	return [3]int{base, base, base + rem}
+}
+
+func (k *kanban) colInnerH() int {
+	h := k.height - 4
+	if h < 4 {
+		return 4
 	}
-	innerH := k.height - 4
-	if innerH < 4 {
-		innerH = 4
-	}
-	return innerW, innerH
+	return h
 }
 
 func (k *kanban) View() string {
@@ -242,8 +249,8 @@ func (k *kanban) View() string {
 	if k.width == 0 {
 		return ""
 	}
+	widths := k.colWidths()
 	var rendered [3]string
-	colOuterW := k.width / 3
 	for i := range k.cols {
 		style := theme.BorderBlurred
 		if i == k.col {
@@ -253,8 +260,9 @@ func (k *kanban) View() string {
 		if len(k.cols[i].Items()) == 0 {
 			body = theme.NoTasks.Render("  empty")
 		}
+		// Width(N) on a bordered style produces a box of total width N.
 		rendered[i] = style.
-			Width(colOuterW - 2).
+			Width(widths[i] - 2).
 			Height(k.height - 2).
 			Padding(0, 1).
 			Render(body)

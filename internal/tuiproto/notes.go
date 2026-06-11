@@ -104,9 +104,10 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		n.width, n.height = m.Width, m.Height
 		lw, dw, h := n.paneSizes()
-		n.list.SetSize(lw, h)
-		n.vp.Width = dw
-		n.vp.Height = h
+		// inner = visual - border(2) - padding(2)
+		n.list.SetSize(lw-4, h-2)
+		n.vp.Width = dw - 4
+		n.vp.Height = h - 2
 		return n, nil
 
 	case notesListedMsg:
@@ -175,12 +176,15 @@ func (n *notes) loadCmd() tea.Cmd {
 	}
 }
 
+// paneSizes returns the desired visual widths of the list and detail
+// panes (border-inclusive) and the box height. The two widths sum to
+// n.width so the panes span the full body row.
 func (n *notes) paneSizes() (listW, detailW, h int) {
 	listW = n.width / 3
 	if listW < 22 {
 		listW = 22
 	}
-	detailW = n.width - listW - 6
+	detailW = n.width - listW
 	if detailW < 20 {
 		detailW = 20
 	}
@@ -193,7 +197,7 @@ func (n *notes) paneSizes() (listW, detailW, h int) {
 
 func (n *notes) detailContentWidth() int {
 	_, dw, _ := n.paneSizes()
-	w := dw - 2
+	w := dw - 4 // border + padding
 	if w < 20 {
 		w = 20
 	}
@@ -223,8 +227,8 @@ func (n *notes) View() string {
 	} else {
 		listBody = n.list.View()
 	}
-	leftBox := listStyle.Width(lw).Height(h).Padding(0, 1).Render(listBody)
-	rightBox := detailStyle.Width(dw).Height(h).Padding(0, 1).Render(n.vp.View())
+	leftBox := listStyle.Width(lw - 2).Height(h).Padding(0, 1).Render(listBody)
+	rightBox := detailStyle.Width(dw - 2).Height(h).Padding(0, 1).Render(n.vp.View())
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
 }
 
