@@ -55,11 +55,6 @@ func NewTask(id string, status Status, title, description string) Task {
 	}
 }
 
-// NewTaskWithID is an alias for NewTask for compatibility
-func NewTaskWithID(id string, status Status, title, description string) Task {
-	return NewTask(id, status, title, description)
-}
-
 // NewTaskComplete creates a new task with all fields
 func NewTaskComplete(id string, status Status, title, description string, priority int, link string) Task {
 	link = NormalizeLink(link)
@@ -356,22 +351,6 @@ const (
 	LabelFeature = "feature"
 	LabelDocs    = "docs"
 )
-
-// String returns the string representation of a task type
-func (t TaskType) String() string {
-	switch t {
-	case TypeTask:
-		return LabelTask
-	case TypeBug:
-		return LabelBug
-	case TypeFeature:
-		return LabelFeature
-	case TypeDocs:
-		return LabelDocs
-	default:
-		return LabelTask
-	}
-}
 
 // Symbol returns a short symbol for the task type (for TUI display)
 func (t TaskType) Symbol() string {

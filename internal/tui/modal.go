@@ -55,9 +55,9 @@ func (m *modal) Update(msg tea.Msg) tea.Cmd {
 			m.closed = true
 			return nil
 		case "j", "down":
-			m.vp.LineDown(1)
+			m.vp.ScrollDown(1)
 		case "k", "up":
-			m.vp.LineUp(1)
+			m.vp.ScrollUp(1)
 		case "g", "home":
 			m.vp.GotoTop()
 		case "G", "end":

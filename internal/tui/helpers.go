@@ -17,21 +17,6 @@ func truncateText(s string, maxW int) string {
 	return truncate.StringWithTail(s, uint(maxW), "…")
 }
 
-// fitHeight ensures s is exactly h lines tall.
-func fitHeight(s string, h int) string {
-	if h <= 0 {
-		return ""
-	}
-	lines := strings.Split(s, "\n")
-	if len(lines) > h {
-		lines = lines[:h]
-	}
-	for len(lines) < h {
-		lines = append(lines, "")
-	}
-	return strings.Join(lines, "\n")
-}
-
 func shortenPath(p string) string {
 	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(p, home) {
 		return "~" + p[len(home):]
