@@ -39,7 +39,7 @@ type noteLoadedMsg struct {
 // --- model -------------------------------------------------------------
 
 type notesKeys struct {
-	Focus, Open, Filter, Reload, New, Delete key.Binding
+	Focus, Open, Filter, Reload, New, Edit, Delete key.Binding
 }
 
 func newNotesKeys() notesKeys {
@@ -49,12 +49,13 @@ func newNotesKeys() notesKeys {
 		Filter: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		Reload: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
 		New:    key.NewBinding(key.WithKeys("+"), key.WithHelp("+", "new note")),
+		Edit:   key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit")),
 		Delete: key.NewBinding(key.WithKeys("backspace"), key.WithHelp("⌫", "delete")),
 	}
 }
 
 func (k notesKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.New, k.Delete, k.Focus, k.Open, k.Filter, k.Reload}
+	return []key.Binding{k.New, k.Edit, k.Delete, k.Focus, k.Open, k.Filter, k.Reload}
 }
 func (k notesKeys) FullHelp() [][]key.Binding { return [][]key.Binding{k.ShortHelp()} }
 
@@ -211,6 +212,8 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 			return n, n.loadCmd()
 		case "r":
 			return n, n.Init()
+		case "e":
+			return n, n.editCmd()
 		case "backspace":
 			it, ok := n.list.SelectedItem().(noteItem)
 			if !ok {
@@ -346,6 +349,22 @@ func (n *notes) deleteCmd(filename string) tea.Cmd {
 		svc.DeleteNote(filename)
 		return notesMutatedMsg{}
 	}
+}
+
+// editCmd opens the selected note in $EDITOR without writing a template.
+func (n *notes) editCmd() tea.Cmd {
+	it, ok := n.list.SelectedItem().(noteItem)
+	if !ok {
+		return nil
+	}
+	filename := strings.TrimSuffix(it.Note.Filename, ".md")
+	n.pendingSel = it.Note.Filename
+	path := n.svc.GetNotePath(filename)
+	editor := resolveEditor()
+	c := exec.Command(editor, path)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return editorFinishedMsg{err}
+	})
 }
 
 // openEditorCmd writes a template for the new note and opens it in $EDITOR.
