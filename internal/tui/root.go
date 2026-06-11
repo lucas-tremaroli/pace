@@ -131,7 +131,6 @@ func (r *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch {
 		case key.Matches(m, r.rootKeys.Quit):
-			r.Close()
 			return r, tea.Quit
 		case key.Matches(m, r.rootKeys.Tab):
 			r.active = (r.active + 1) % len(r.tabs)
