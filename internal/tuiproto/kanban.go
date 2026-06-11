@@ -257,7 +257,8 @@ func (k *kanban) View() string {
 		}
 		body := k.cols[i].View()
 		if len(k.cols[i].Items()) == 0 {
-			body = theme.NoTasks.Render("  empty")
+			title := theme.ListTitle.Render(k.cols[i].Title)
+			body = title + "\n\n" + theme.NoTasks.Render("  empty")
 		}
 		// Width(N) on a bordered style produces a box of total width N.
 		rendered[i] = style.
