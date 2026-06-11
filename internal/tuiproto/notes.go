@@ -19,6 +19,7 @@ type notesService interface {
 	ReadNoteWithMeta(filename string) (*note.Note, error)
 	WriteNote(filename, content string) error
 	GetNotePath(filename string) string
+	DeleteNote(filename string) error
 }
 
 // --- messages ----------------------------------------------------------
@@ -28,6 +29,8 @@ type notesListedMsg struct {
 	err   error
 }
 
+type notesMutatedMsg struct{}
+
 type noteLoadedMsg struct {
 	key     string
 	content string
@@ -36,7 +39,7 @@ type noteLoadedMsg struct {
 // --- model -------------------------------------------------------------
 
 type notesKeys struct {
-	Focus, Open, Filter, Reload, New key.Binding
+	Focus, Open, Filter, Reload, New, Delete key.Binding
 }
 
 func newNotesKeys() notesKeys {
@@ -46,11 +49,12 @@ func newNotesKeys() notesKeys {
 		Filter: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		Reload: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
 		New:    key.NewBinding(key.WithKeys("+"), key.WithHelp("+", "new note")),
+		Delete: key.NewBinding(key.WithKeys("backspace"), key.WithHelp("⌫", "delete")),
 	}
 }
 
 func (k notesKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.New, k.Focus, k.Open, k.Filter, k.Reload}
+	return []key.Binding{k.New, k.Delete, k.Focus, k.Open, k.Filter, k.Reload}
 }
 func (k notesKeys) FullHelp() [][]key.Binding { return [][]key.Binding{k.ShortHelp()} }
 
@@ -60,17 +64,19 @@ const (
 )
 
 type notes struct {
-	svc       notesService
-	list      list.Model
-	vp        viewport.Model
-	focus     int
-	width     int
-	height    int
-	loadErr   error
-	lastKey   string
-	keys      notesKeys
-	form      *NoteFormState
-	pendingSel string
+	svc           notesService
+	list          list.Model
+	vp            viewport.Model
+	focus         int
+	width         int
+	height        int
+	loadErr       error
+	lastKey       string
+	keys          notesKeys
+	form          *NoteFormState
+	confirm       *ConfirmFormState
+	pendingSel    string
+	pendingDelete string
 }
 
 func newNotes(svc notesService) *notes {
@@ -110,6 +116,30 @@ func (n *notes) Init() tea.Cmd {
 }
 
 func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
+	// Confirm dialog owns input while open.
+	if n.confirm != nil {
+		form, cmd := n.confirm.form.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			n.confirm.form = f
+			switch n.confirm.form.State {
+			case huh.StateCompleted:
+				yes := n.confirm.result
+				name := n.pendingDelete
+				n.confirm = nil
+				n.pendingDelete = ""
+				if yes {
+					return n, n.deleteCmd(name)
+				}
+				return n, nil
+			case huh.StateAborted:
+				n.confirm = nil
+				n.pendingDelete = ""
+				return n, nil
+			}
+		}
+		return n, cmd
+	}
+
 	// Form owns input while open.
 	if n.form != nil {
 		form, cmd := n.form.form.Update(msg)
@@ -155,6 +185,9 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 	case editorFinishedMsg:
 		return n, tea.Batch(tea.ClearScreen, n.Init())
 
+	case notesMutatedMsg:
+		return n, n.Init()
+
 	case noteLoadedMsg:
 		n.lastKey = m.key
 		n.vp.SetContent(m.content)
@@ -178,6 +211,17 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 			return n, n.loadCmd()
 		case "r":
 			return n, n.Init()
+		case "backspace":
+			it, ok := n.list.SelectedItem().(noteItem)
+			if !ok {
+				return n, nil
+			}
+			n.pendingDelete = it.Note.Filename
+			n.confirm = newConfirmFormState(
+				"Delete \""+it.Note.Filename+"\"?",
+				"This will permanently delete the note.",
+			)
+			return n, n.confirm.form.Init()
 		case "+":
 			svc := n.svc
 			n.form = newNoteFormState(func(name string) (bool, error) {
@@ -287,10 +331,21 @@ func (n *notes) View() string {
 }
 
 func (n *notes) ModalOverlay() string {
-	if n.form == nil {
-		return ""
+	if n.confirm != nil {
+		return boxedOverlay(n.confirm.form.View())
 	}
-	return centerOverlay(n.form.form.View(), n.width, n.height)
+	if n.form != nil {
+		return boxedOverlay(n.form.form.View())
+	}
+	return ""
+}
+
+func (n *notes) deleteCmd(filename string) tea.Cmd {
+	svc := n.svc
+	return func() tea.Msg {
+		svc.DeleteNote(filename)
+		return notesMutatedMsg{}
+	}
 }
 
 // openEditorCmd writes a template for the new note and opens it in $EDITOR.

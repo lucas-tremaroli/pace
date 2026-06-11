@@ -24,6 +24,8 @@ type kanbanService interface {
 	GenerateTaskID() string
 	CreateTask(t task.Task) error
 	SetLabel(id, label string) error
+	DeleteTask(id string) error
+	GetTaskByID(id string) (*task.Task, error)
 }
 
 // --- messages ----------------------------------------------------------
@@ -42,7 +44,7 @@ type taskDetailLoadedMsg struct {
 // --- model -------------------------------------------------------------
 
 type kanbanKeys struct {
-	Left, Right, Open, Cycle, OpenLink, Filter, Reload, New, Quit key.Binding
+	Left, Right, Open, Cycle, OpenLink, Filter, Reload, New, Edit, Delete, Quit key.Binding
 }
 
 func newKanbanKeys() kanbanKeys {
@@ -55,25 +57,29 @@ func newKanbanKeys() kanbanKeys {
 		Filter:   key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		Reload:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
 		New:      key.NewBinding(key.WithKeys("+"), key.WithHelp("+", "new task")),
+		Edit:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit")),
+		Delete:   key.NewBinding(key.WithKeys("backspace"), key.WithHelp("⌫", "delete")),
 		Quit:     key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	}
 }
 
 func (k kanbanKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.New, k.Left, k.Right, k.Open, k.Cycle, k.OpenLink, k.Filter, k.Reload}
+	return []key.Binding{k.New, k.Edit, k.Delete, k.Left, k.Right, k.Open, k.Cycle, k.OpenLink, k.Filter, k.Reload}
 }
 func (k kanbanKeys) FullHelp() [][]key.Binding { return [][]key.Binding{k.ShortHelp()} }
 
 type kanban struct {
-	svc     kanbanService
-	cols    [3]list.Model
-	col     int
-	width   int
-	height  int
-	loadErr error
-	keys    kanbanKeys
-	modal   *modal
-	form    *TaskFormState
+	svc           kanbanService
+	cols          [3]list.Model
+	col           int
+	width         int
+	height        int
+	loadErr       error
+	keys          kanbanKeys
+	modal         *modal
+	form          *TaskFormState
+	confirm       *ConfirmFormState
+	pendingDelete string
 }
 
 var columnTitles = [3]string{
@@ -147,6 +153,30 @@ func (k *kanban) selected() (task.Task, bool) {
 }
 
 func (k *kanban) Update(msg tea.Msg) (tab, tea.Cmd) {
+	// Confirm dialog owns input while open.
+	if k.confirm != nil {
+		form, cmd := k.confirm.form.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			k.confirm.form = f
+			switch k.confirm.form.State {
+			case huh.StateCompleted:
+				yes := k.confirm.result
+				id := k.pendingDelete
+				k.confirm = nil
+				k.pendingDelete = ""
+				if yes {
+					return k, k.deleteCmd(id)
+				}
+				return k, nil
+			case huh.StateAborted:
+				k.confirm = nil
+				k.pendingDelete = ""
+				return k, nil
+			}
+		}
+		return k, cmd
+	}
+
 	// Form owns input while open.
 	if k.form != nil {
 		form, cmd := k.form.form.Update(msg)
@@ -219,6 +249,24 @@ func (k *kanban) Update(msg tea.Msg) (tab, tea.Cmd) {
 			case key.Matches(m, k.keys.New):
 				k.form = newTaskFormState()
 				return k, k.form.form.Init()
+			case key.Matches(m, k.keys.Edit):
+				tk, ok := k.selected()
+				if !ok {
+					return k, nil
+				}
+				k.form = newTaskEditFormState(tk)
+				return k, k.form.form.Init()
+			case key.Matches(m, k.keys.Delete):
+				tk, ok := k.selected()
+				if !ok {
+					return k, nil
+				}
+				k.pendingDelete = tk.ID()
+				k.confirm = newConfirmFormState(
+					"Delete \""+tk.Title()+"\"?",
+					"This will also remove its dependencies, links, and logs.",
+				)
+				return k, k.confirm.form.Init()
 			}
 		}
 		var cmd tea.Cmd
@@ -374,26 +422,53 @@ func (k *kanban) openLinkCmd() tea.Cmd {
 // open, "" otherwise. Root uses this to render on top of the rest of
 // the UI and to route input.
 func (k *kanban) ModalOverlay() string {
+	if k.confirm != nil {
+		return boxedOverlay(k.confirm.form.View())
+	}
 	if k.form != nil {
-		return centerOverlay(k.form.form.View(), k.width, k.height)
+		return boxedOverlay(k.form.form.View())
 	}
 	if k.modal == nil {
 		return ""
 	}
-	return k.modal.View("")
+	return k.modal.View()
+}
+
+func (k *kanban) deleteCmd(id string) tea.Cmd {
+	svc := k.svc
+	return func() tea.Msg {
+		svc.DeleteTask(id)
+		return taskMutatedMsg{}
+	}
 }
 
 func (k *kanban) saveTaskCmd() tea.Cmd {
 	s := k.form
 	svc := k.svc
-	return func() tea.Msg {
-		id := svc.GenerateTaskID()
-		newTask := task.NewTaskComplete(id, task.Todo, s.title, s.desc, s.priority, s.link)
-		newTask.SetLabel(s.label)
-		if err := svc.CreateTask(newTask); err != nil {
+	if s.id == "" {
+		return func() tea.Msg {
+			id := svc.GenerateTaskID()
+			newTask := task.NewTaskComplete(id, task.Todo, s.title, s.desc, s.priority, s.link)
+			newTask.SetLabel(s.label)
+			if err := svc.CreateTask(newTask); err != nil {
+				return taskMutatedMsg{}
+			}
+			svc.SetLabel(id, s.label)
 			return taskMutatedMsg{}
 		}
-		svc.SetLabel(id, s.label)
+	}
+	return func() tea.Msg {
+		existing, err := svc.GetTaskByID(s.id)
+		if err != nil {
+			return taskMutatedMsg{}
+		}
+		updated := task.NewTaskComplete(existing.ID(), existing.Status(), s.title, s.desc, s.priority, s.link)
+		updated.SetLabel(s.label)
+		updated.SetBlockedBy(existing.BlockedBy())
+		updated.SetBlocks(existing.Blocks())
+		updated.SetNotes(existing.Notes())
+		svc.UpdateTask(updated)
+		svc.SetLabel(s.id, s.label)
 		return taskMutatedMsg{}
 	}
 }

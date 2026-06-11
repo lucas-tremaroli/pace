@@ -11,6 +11,27 @@ import (
 
 const formWidth = 60
 
+// ConfirmFormState owns a yes/no confirmation dialog.
+type ConfirmFormState struct {
+	form   *huh.Form
+	result bool
+}
+
+func newConfirmFormState(title, description string) *ConfirmFormState {
+	s := &ConfirmFormState{}
+	s.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(title).
+				Description(description).
+				Affirmative("Yes").
+				Negative("No").
+				Value(&s.result),
+		),
+	).WithWidth(formWidth)
+	return s
+}
+
 // TaskFormState owns the inputs and lifecycle for the task create form.
 // Edit support is a deliberate follow-up — only the create path is
 // populated for now, but the struct has the shape the edit form needs.
@@ -28,6 +49,27 @@ func newTaskFormState() *TaskFormState {
 	s := &TaskFormState{
 		label:    task.LabelTask,
 		priority: task.PriorityMedium,
+	}
+	s.form = s.build()
+	return s
+}
+
+// newTaskEditFormState returns a form pre-populated from an existing task.
+// Submitting it updates rather than creates because s.id is non-empty.
+func newTaskEditFormState(existing task.Task) *TaskFormState {
+	s := &TaskFormState{
+		id:       existing.ID(),
+		title:    existing.Title(),
+		desc:     existing.Description(),
+		link:     existing.Link(),
+		label:    existing.Label(),
+		priority: existing.Priority(),
+	}
+	if s.label == "" {
+		s.label = task.LabelTask
+	}
+	if s.priority <= 0 {
+		s.priority = task.PriorityMedium
 	}
 	s.form = s.build()
 	return s

@@ -17,8 +17,8 @@ type tab interface {
 	Title() string
 	HelpBindings() []key.Binding
 
-	// ModalOverlay returns a full-screen string to layer on top of the
-	// composed root view, or "" if nothing is open. Used for task
-	// detail dialogs etc.
+	// ModalOverlay returns the raw modal box (un-placed) when the tab
+	// has a dialog/form open, or "" otherwise. Root is responsible
+	// for centering it on the full screen.
 	ModalOverlay() string
 }

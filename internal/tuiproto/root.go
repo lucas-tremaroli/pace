@@ -164,7 +164,7 @@ func (r *Root) View() string {
 	base := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
 
 	if overlay := r.tabs[r.active].ModalOverlay(); overlay != "" {
-		return overlay
+		return lipgloss.Place(r.width, r.height, lipgloss.Center, lipgloss.Center, overlay)
 	}
 	return base
 }

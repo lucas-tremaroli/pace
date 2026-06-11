@@ -1,6 +1,8 @@
 package tuiproto
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -74,15 +76,18 @@ var modalBorder = lipgloss.NewStyle().
 	BorderForeground(lipgloss.Color("62")).
 	Padding(1, 2)
 
-func (m *modal) View(background string) string {
+// View returns the raw modal box; root.View does the screen placement.
+func (m *modal) View() string {
 	mw, mh := modalSize(m.width, m.height)
-	box := modalBorder.Width(mw - 4).Height(mh - 2).Render(m.vp.View())
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	return modalBorder.Width(mw - 4).Height(mh - 2).Render(m.vp.View())
 }
 
-// centerOverlay centers any pre-rendered content (e.g. a huh form) on
-// the full screen with a subtle border.
-func centerOverlay(content string, screenW, screenH int) string {
-	return lipgloss.Place(screenW, screenH, lipgloss.Center, lipgloss.Center,
-		modalBorder.Render(content))
+// boxedOverlay wraps a huh form view in the same rounded border used
+// by the task detail modal. Trailing whitespace from the form is
+// trimmed so lipgloss can compute the box height (and root can center
+// it) accurately. Visual size stays consistent regardless of the
+// message length because the form drives its own width via WithWidth.
+func boxedOverlay(content string) string {
+	trimmed := strings.TrimRight(content, "\n ")
+	return modalBorder.Render(trimmed)
 }
