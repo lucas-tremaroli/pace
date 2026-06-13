@@ -129,18 +129,45 @@ func (s *Service) ListNotes() ([]NoteInfo, error) {
 	return notes, nil
 }
 
-// getDescriptionFromPath returns the description from frontmatter, or falls back to first content line
-func getDescriptionFromPath(path string) string {
-	contentBytes, err := os.ReadFile(path)
+// metaReadLimit bounds how many bytes we read when we only need the
+// frontmatter and the first body line. Larger than any plausible
+// frontmatter block plus a leading paragraph.
+const metaReadLimit = 4096
+
+// readPrefix reads up to limit bytes from path. Short reads on small
+// files are fine — we only need enough to cover frontmatter + first
+// non-empty line.
+func readPrefix(path string, limit int) ([]byte, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		return ""
+		return nil, err
 	}
-	content := string(contentBytes)
-	fm, _, _ := ParseFrontmatter(content)
+	defer f.Close()
+	buf := make([]byte, limit)
+	n, err := f.Read(buf)
+	if err != nil && n == 0 {
+		return nil, err
+	}
+	return buf[:n], nil
+}
+
+// descriptionFrom returns frontmatter description if present, otherwise
+// the first non-empty body line. Single parse — caller passes raw content.
+func descriptionFrom(content string) string {
+	fm, body, _ := ParseFrontmatter(content)
 	if fm != nil && fm.Description != "" {
 		return fm.Description
 	}
-	return extractFirstLine(content)
+	return firstNonEmptyLine(body)
+}
+
+// getDescriptionFromPath returns the description from frontmatter, or falls back to first content line
+func getDescriptionFromPath(path string) string {
+	contentBytes, err := readPrefix(path, metaReadLimit)
+	if err != nil {
+		return ""
+	}
+	return descriptionFrom(string(contentBytes))
 }
 
 // ParseFrontmatter extracts YAML frontmatter from content.
@@ -189,7 +216,7 @@ func (s *Service) ReadNoteWithMeta(filename string) (*Note, error) {
 	}
 
 	content := string(contentBytes)
-	fm, _, err := ParseFrontmatter(content)
+	fm, body, err := ParseFrontmatter(content)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +234,7 @@ func (s *Service) ReadNoteWithMeta(filename string) (*Note, error) {
 		description = fm.Description
 	}
 	if description == "" {
-		description = extractFirstLine(content)
+		description = firstNonEmptyLine(body)
 	}
 
 	n := &Note{
@@ -282,20 +309,27 @@ func (s *Service) ListNotesWithMeta(includeContent bool) ([]Note, error) {
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
 			path := filepath.Join(s.notesDir, e.Name())
-			contentBytes, err := os.ReadFile(path)
-			if err != nil {
+			var contentBytes []byte
+			var rerr error
+			if includeContent {
+				contentBytes, rerr = os.ReadFile(path)
+			} else {
+				contentBytes, rerr = readPrefix(path, metaReadLimit)
+			}
+			if rerr != nil {
 				continue
 			}
 
 			content := string(contentBytes)
-			fm, _, err := ParseFrontmatter(content)
-			if err != nil {
+			fm, body, perr := ParseFrontmatter(content)
+			if perr != nil {
 				fm = nil
+				body = content
 			}
 
-			info, err := e.Info()
+			info, ierr := e.Info()
 			var modTime time.Time
-			if err == nil {
+			if ierr == nil {
 				modTime = info.ModTime()
 			}
 
@@ -306,7 +340,7 @@ func (s *Service) ListNotesWithMeta(includeContent bool) ([]Note, error) {
 				description = fm.Description
 			}
 			if description == "" {
-				description = extractFirstLine(content)
+				description = firstNonEmptyLine(body)
 			}
 
 			note := Note{
@@ -386,6 +420,12 @@ func (s *Service) MergeNotes(filenames []string, outputFilename string) (*Note, 
 // extractFirstLine extracts the first meaningful line from content, skipping frontmatter
 func extractFirstLine(content string) string {
 	_, body, _ := ParseFrontmatter(content)
+	return firstNonEmptyLine(body)
+}
+
+// firstNonEmptyLine returns the first non-empty line of body with any
+// leading markdown heading marks stripped.
+func firstNonEmptyLine(body string) string {
 	scanner := bufio.NewScanner(strings.NewReader(body))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())

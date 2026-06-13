@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -68,6 +69,9 @@ type notes struct {
 	svc           notesService
 	list          list.Model
 	vp            viewport.Model
+	spinner       spinner.Model
+	loading       bool
+	loadingKey    string
 	focus         int
 	width         int
 	height        int
@@ -92,7 +96,10 @@ func newNotes(svc notesService) *notes {
 
 	vp := viewport.New(0, 0)
 	vp.SetContent(theme.DetailDim.Render("Press ⏎ to load a note"))
-	return &notes{svc: svc, list: l, vp: vp, keys: newNotesKeys()}
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+	sp.Style = theme.DetailDim
+	return &notes{svc: svc, list: l, vp: vp, spinner: sp, keys: newNotesKeys()}
 }
 
 func (n *notes) Title() string         { return "Notes" }
@@ -193,10 +200,20 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 		return n, n.Init()
 
 	case noteLoadedMsg:
+		n.loading = false
+		n.loadingKey = ""
 		n.lastKey = m.key
 		n.vp.SetContent(m.content)
 		n.vp.GotoTop()
 		return n, nil
+
+	case spinner.TickMsg:
+		if !n.loading {
+			return n, nil
+		}
+		var cmd tea.Cmd
+		n.spinner, cmd = n.spinner.Update(msg)
+		return n, cmd
 
 	case tea.KeyMsg:
 		if n.list.FilterState() == list.Filtering {
@@ -266,18 +283,21 @@ func (n *notes) loadCmd() tea.Cmd {
 		return nil
 	}
 	filename := it.Note.Filename
-	if filename == n.lastKey {
+	if filename == n.lastKey || (n.loading && filename == n.loadingKey) {
 		return nil
 	}
 	svc := n.svc
 	w := n.detailContentWidth()
-	return func() tea.Msg {
+	n.loading = true
+	n.loadingKey = filename
+	read := func() tea.Msg {
 		full, err := svc.ReadNoteWithMeta(filename)
 		if err != nil {
 			return noteLoadedMsg{key: filename, content: theme.StatusBlocked.Render(err.Error())}
 		}
 		return noteLoadedMsg{key: filename, content: renderNoteDetail(*full, w)}
 	}
+	return tea.Batch(n.spinner.Tick, read)
 }
 
 // paneSizes returns the visual widths and height of the list and
@@ -332,7 +352,13 @@ func (n *notes) View() string {
 		listBody = n.list.View()
 	}
 	leftBox := listStyle.Width(lw - 2).Height(h - 2).Padding(0, 1).Render(listBody)
-	rightBox := detailStyle.Width(dw - 2).Height(h - 2).Padding(0, 1).Render(n.vp.View())
+	var detailBody string
+	if n.loading {
+		detailBody = n.spinner.View() + theme.DetailDim.Render(" Loading "+n.loadingKey+"…")
+	} else {
+		detailBody = n.vp.View()
+	}
+	rightBox := detailStyle.Width(dw - 2).Height(h - 2).Padding(0, 1).Render(detailBody)
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
 }
 
@@ -365,9 +391,9 @@ func (n *notes) editCmd() tea.Cmd {
 	path := n.svc.GetNotePath(filename)
 	editor := resolveEditor()
 	c := exec.Command(editor, path)
-	return tea.ExecProcess(c, func(err error) tea.Msg {
+	return tea.Sequence(tea.ClearScreen, tea.ExecProcess(c, func(err error) tea.Msg {
 		return editorFinishedMsg{err}
-	})
+	}))
 }
 
 // openEditorCmd writes a template for the new note and opens it in $EDITOR.
@@ -383,7 +409,7 @@ func (n *notes) openEditorCmd() tea.Cmd {
 		n.pendingSel = filename + ".md"
 	}
 
-	return func() tea.Msg {
+	write := func() tea.Msg {
 		if err := svc.WriteNote(filename, note.DefaultTemplate(filename)); err != nil {
 			return editorFinishedMsg{err}
 		}
@@ -392,4 +418,5 @@ func (n *notes) openEditorCmd() tea.Cmd {
 			return editorFinishedMsg{err}
 		})()
 	}
+	return tea.Sequence(tea.ClearScreen, write)
 }
