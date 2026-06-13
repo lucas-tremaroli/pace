@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -21,6 +22,7 @@ type notesService interface {
 	WriteNote(filename, content string) error
 	GetNotePath(filename string) string
 	DeleteNote(filename string) error
+	GetLinkedTaskIDs(filename string) ([]string, error)
 }
 
 // --- messages ----------------------------------------------------------
@@ -240,9 +242,17 @@ func (n *notes) Update(msg tea.Msg) (tab, tea.Cmd) {
 				return n, nil
 			}
 			n.pendingDelete = it.Note.Filename
+			desc := "This will permanently delete the note."
+			if links, err := n.svc.GetLinkedTaskIDs(it.Note.Filename); err == nil && len(links) > 0 {
+				noun := "link"
+				if len(links) > 1 {
+					noun = "links"
+				}
+				desc = fmt.Sprintf("This will delete the note and remove %d task %s.", len(links), noun)
+			}
 			n.confirm = newConfirmFormState(
 				"Delete \""+it.Note.Filename+"\"?",
-				"This will permanently delete the note.",
+				desc,
 			)
 			return n, n.confirm.form.Init()
 		case "+":

@@ -75,6 +75,15 @@ func (s *Service) GetNotesDir() string {
 	return s.notesDir
 }
 
+// GetLinkedTaskIDs returns task IDs linked to the note, or nil when no
+// DB is wired. Cheap query — no file IO.
+func (s *Service) GetLinkedTaskIDs(filename string) ([]string, error) {
+	if s.db == nil {
+		return nil, nil
+	}
+	return s.db.GetTasksForNote(filename)
+}
+
 func (s *Service) DeleteNote(filename string) error {
 	// Clean up task links before deleting
 	if s.db != nil {
@@ -317,6 +326,11 @@ func (s *Service) ListNotesWithMeta(includeContent bool) ([]Note, error) {
 				contentBytes, rerr = readPrefix(path, metaReadLimit)
 			}
 			if rerr != nil {
+				notes = append(notes, Note{
+					Filename:    e.Name(),
+					Path:        path,
+					Description: "(read error: " + rerr.Error() + ")",
+				})
 				continue
 			}
 

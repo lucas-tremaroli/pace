@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/huh"
+	"github.com/lucas-tremaroli/pace/internal/task"
 	"github.com/lucas-tremaroli/pace/internal/tick"
 	"github.com/spf13/cobra"
 )
@@ -27,18 +27,22 @@ var TickCmd = &cobra.Command{
 			return fmt.Errorf("minutes must be between 1 and 60")
 		}
 
-		var goal string
-		err = huh.NewInput().
-			Title("What's your goal for this session?").
-			Placeholder("optional").
-			CharLimit(50).
-			Value(&goal).
-			Run()
-		if err != nil {
-			return err
+		var opts []tick.TaskOption
+		var closeTask tick.CloseTaskFunc
+		var logTask tick.LogTaskFunc
+		if ts, err := task.NewService(); err == nil {
+			defer ts.Close()
+			if ready, err := ts.GetReadyTasks(); err == nil {
+				opts = make([]tick.TaskOption, 0, len(ready))
+				for _, t := range ready {
+					opts = append(opts, tick.TaskOption{ID: t.ID(), Title: t.Title()})
+				}
+			}
+			closeTask = ts.CloseTask
+			logTask = ts.LogEntry
 		}
 
-		svc := tick.NewService(minutes, goal)
+		svc := tick.NewService(minutes, opts, closeTask, logTask)
 		svc.Start()
 		return nil
 	},

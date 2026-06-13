@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/stopwatch"
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -21,13 +22,24 @@ var (
 	resetColor    = lipgloss.Color("#FFEAA7")
 	overtimeColor = lipgloss.Color("#FFEAA7")
 
-	progressFilled = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	progressFilled = lipgloss.NewStyle().Foreground(doneColor)
 	progressEmpty  = lipgloss.NewStyle().Foreground(lipgloss.Color("236"))
 
 	timerBase = lipgloss.NewStyle().Bold(true)
-	helpStyle = lipgloss.NewStyle().Foreground(dimColor)
+	dimStyle  = lipgloss.NewStyle().Foreground(dimColor)
+	helpStyle = dimStyle
 	goalStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Italic(true)
+	taskStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+
+	setupBorder = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("62")).
+			Padding(1, 2)
+	setupTitle = lipgloss.NewStyle().Bold(true).Foreground(doneColor)
+	setupMeta  = lipgloss.NewStyle().Foreground(dimColor)
 )
+
+const setupFormWidth = 56
 
 type model struct {
 	timer          timer.Model
@@ -41,6 +53,7 @@ type model struct {
 	width          int
 	height         int
 	goal           string
+	task           string
 	flashing       bool
 	showElapsed    bool
 	pausedTotal    time.Duration
@@ -57,20 +70,21 @@ type keymap struct {
 type flashDoneMsg struct{}
 type bellMsg struct{}
 
-func bellCmd() tea.Msg {
-	return bellMsg{}
-}
+// timerExitMsg is dispatched by the timer in place of tea.Quit so the
+// rootModel can decide whether to show the post-session review prompt.
+type timerExitMsg struct{}
 
 func (m model) Init() tea.Cmd {
 	return m.timer.Init()
 }
 
-func NewModel(timeout time.Duration, goal string) model {
+func newTimerModel(timeout time.Duration, goal, task string) model {
 	return model{
 		timer:          timer.NewWithInterval(timeout, time.Millisecond),
 		overtime:       stopwatch.NewWithInterval(time.Millisecond),
 		initialTimeout: timeout,
 		running:        true,
+		task:           task,
 		keymap: keymap{
 			startStop: key.NewBinding(
 				key.WithKeys("s"),
@@ -133,7 +147,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keymap.quit):
 			m.quitting = true
-			return m, tea.Quit
+			return m, func() tea.Msg { return timerExitMsg{} }
 		}
 	case timer.TickMsg:
 		var cmd tea.Cmd
@@ -142,7 +156,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case timer.TimeoutMsg:
 		m.done = true
 		m.running = true
-		return m, tea.Batch(m.overtime.Init(), bellCmd)
+		return m, tea.Batch(m.overtime.Init(), func() tea.Msg { return bellMsg{} })
 	case bellMsg:
 		fmt.Print("\a")
 		return m, nil
@@ -213,6 +227,16 @@ func (m model) timerColor() lipgloss.Color {
 	return runningColor
 }
 
+// focused returns the total time spent in the session: timer progress
+// (full duration when done) plus any overtime.
+func (m model) focused() time.Duration {
+	d := m.initialTimeout - m.timer.Timeout
+	if m.done {
+		d = m.initialTimeout
+	}
+	return d + m.overtime.Elapsed()
+}
+
 func (m model) View() string {
 	color := m.timerColor()
 
@@ -231,7 +255,6 @@ func (m model) View() string {
 	}
 
 	barW := 30
-	dimStyle := lipgloss.NewStyle().Foreground(dimColor)
 	durationLabel := dimStyle.Render(fmt.Sprintf("%dm", int(m.initialTimeout.Minutes())))
 	timeDisplay := timerBase.Foreground(color).Render(timeStr)
 
@@ -258,6 +281,9 @@ func (m model) View() string {
 	if m.goal != "" {
 		parts = append(parts, "", goalStyle.Render(m.goal))
 	}
+	if m.task != "" {
+		parts = append(parts, "", taskStyle.Render("→ "+m.task))
+	}
 	parts = append(parts, "", helpText)
 
 	content := lipgloss.JoinVertical(lipgloss.Center, parts...)
@@ -266,13 +292,8 @@ func (m model) View() string {
 }
 
 func (m model) Summary() string {
-	// Focused = how far the timer progressed + overtime
-	focused := m.initialTimeout - m.timer.Timeout
-	if m.done {
-		focused = m.initialTimeout
-	}
+	focused := m.focused()
 	overtime := m.overtime.Elapsed()
-	focused += overtime
 
 	// Paused = accumulated pause time (include current pause if still paused)
 	paused := m.pausedTotal
@@ -281,8 +302,6 @@ func (m model) Summary() string {
 	}
 
 	summaryStyle := lipgloss.NewStyle().Foreground(doneColor)
-	dimStyle := lipgloss.NewStyle().Foreground(dimColor)
-
 	summary := summaryStyle.Render(fmt.Sprintf("Focused for %s", formatDuration(focused)))
 
 	if overtime >= time.Second {
@@ -297,26 +316,263 @@ func (m model) Summary() string {
 		summary += dimStyle.Render(fmt.Sprintf(" — %s", m.goal))
 	}
 
+	if m.task != "" {
+		summary += dimStyle.Render(fmt.Sprintf(" · on %s", m.task))
+	}
+
 	return summary
 }
 
-func NewService(minutes int, goal string) *Service {
-	return &Service{
-		minutes: minutes,
-		goal:    goal,
-	}
+// TaskOption is a minimal task descriptor the setup form can render
+// without dragging the full task domain into this package.
+type TaskOption struct {
+	ID    string
+	Title string
+}
+
+func (t TaskOption) Label() string {
+	return fmt.Sprintf("[%s] %s", t.ID, t.Title)
+}
+
+// CloseTaskFunc closes a task with an optional outcome message. The
+// tick service uses it for the post-session "mark as done?" prompt
+// without depending on the task package directly.
+type CloseTaskFunc func(id, outcome string) error
+
+// LogTaskFunc appends a progress entry to a task. Called after a focus
+// session targeted at a specific task ends, so the time spent is
+// captured in the task's history regardless of the close choice.
+type LogTaskFunc func(id, message string) error
+
+func NewService(minutes int, tasks []TaskOption, closeTask CloseTaskFunc, logTask LogTaskFunc) *Service {
+	return &Service{minutes: minutes, tasks: tasks, closeTask: closeTask, logTask: logTask}
 }
 
 type Service struct {
-	minutes int
-	goal    string
+	minutes   int
+	tasks     []TaskOption
+	closeTask CloseTaskFunc
+	logTask   LogTaskFunc
 }
 
 func (s *Service) Start() {
-	m := NewModel(time.Duration(s.minutes)*time.Minute, s.goal)
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	finalModel, _ := p.Run()
-	if fm, ok := finalModel.(model); ok {
-		fmt.Println(fm.Summary())
+	r := newRootModel(s.minutes, s.tasks, s.closeTask, s.logTask)
+	p := tea.NewProgram(r, tea.WithAltScreen())
+	final, _ := p.Run()
+	if fr, ok := final.(*rootModel); ok && fr.phase != phaseSetup {
+		fmt.Println(fr.timer.Summary())
 	}
+}
+
+const (
+	phaseSetup = iota
+	phaseTimer
+	phaseReview
+)
+
+// rootModel hosts the setup form, timer, and post-session review prompt
+// in a single Bubbletea program so the alt-screen is active from the
+// very first frame.
+type rootModel struct {
+	minutes       int
+	tasks         []TaskOption
+	closeTask     CloseTaskFunc
+	logTask       LogTaskFunc
+	form          *huh.Form
+	review        *huh.Form
+	markDone      bool
+	goal          string
+	taskID        string
+	taskLabel     string
+	width, height int
+	phase         int
+	timer         model
+}
+
+func newRootModel(minutes int, tasks []TaskOption, closeTask CloseTaskFunc, logTask LogTaskFunc) *rootModel {
+	r := &rootModel{minutes: minutes, tasks: tasks, closeTask: closeTask, logTask: logTask}
+	fields := []huh.Field{
+		huh.NewInput().
+			Title("What's your goal for this session?").
+			Placeholder("optional").
+			CharLimit(50).
+			Value(&r.goal),
+	}
+	if len(tasks) > 0 {
+		opts := make([]huh.Option[string], 0, len(tasks)+1)
+		opts = append(opts, huh.NewOption("(none)", ""))
+		for _, t := range tasks {
+			opts = append(opts, huh.NewOption(t.Label(), t.ID))
+		}
+		fields = append(fields, huh.NewSelect[string]().
+			Title("Focus on a task").
+			Options(opts...).
+			Height(8).
+			Value(&r.taskID))
+	}
+	r.form = huh.NewForm(huh.NewGroup(fields...)).
+		WithShowHelp(true).
+		WithWidth(setupFormWidth)
+	return r
+}
+
+func (r *rootModel) Init() tea.Cmd { return r.form.Init() }
+
+func (r *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if sz, ok := msg.(tea.WindowSizeMsg); ok {
+		r.width, r.height = sz.Width, sz.Height
+	}
+	switch r.phase {
+	case phaseSetup:
+		return r.updateSetup(msg)
+	case phaseTimer:
+		if _, ok := msg.(timerExitMsg); ok {
+			return r.finishTimer()
+		}
+		m2, cmd := r.timer.Update(msg)
+		if mm, ok := m2.(model); ok {
+			r.timer = mm
+		}
+		return r, cmd
+	case phaseReview:
+		return r.updateReview(msg)
+	}
+	return r, nil
+}
+
+func (r *rootModel) updateSetup(msg tea.Msg) (tea.Model, tea.Cmd) {
+	form, cmd := r.form.Update(msg)
+	if f, ok := form.(*huh.Form); ok {
+		r.form = f
+	}
+	switch r.form.State {
+	case huh.StateCompleted:
+		return r, r.startTimer()
+	case huh.StateAborted:
+		return r, tea.Quit
+	}
+	return r, cmd
+}
+
+func (r *rootModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
+	form, cmd := r.review.Update(msg)
+	if f, ok := form.(*huh.Form); ok {
+		r.review = f
+	}
+	switch r.review.State {
+	case huh.StateCompleted:
+		if r.markDone && r.closeTask != nil {
+			outcome := r.sessionLog()
+			if outcome == "" {
+				outcome = "Closed via tick focus session"
+			} else {
+				outcome = "Closed via tick — " + outcome
+			}
+			r.closeTask(r.taskID, outcome)
+		} else {
+			// kept open — record the session as a log entry instead
+			r.logSession()
+		}
+		return r, tea.Quit
+	case huh.StateAborted:
+		r.logSession()
+		return r, tea.Quit
+	}
+	return r, cmd
+}
+
+func (r *rootModel) startTimer() tea.Cmd {
+	if r.taskID != "" {
+		for _, t := range r.tasks {
+			if t.ID == r.taskID {
+				r.taskLabel = t.Label()
+				break
+			}
+		}
+	}
+	m := newTimerModel(time.Duration(r.minutes)*time.Minute, r.goal, r.taskLabel)
+	m.width, m.height = r.width, r.height
+	r.timer = m
+	r.phase = phaseTimer
+	return r.timer.Init()
+}
+
+func (r *rootModel) finishTimer() (tea.Model, tea.Cmd) {
+	if r.taskID == "" {
+		return r, tea.Quit
+	}
+	if r.closeTask == nil {
+		// no review possible — still capture the session as a log
+		r.logSession()
+		return r, tea.Quit
+	}
+	r.review = huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(fmt.Sprintf("Mark %s as done?", r.taskLabel)).
+				Description("Goal: " + r.reviewGoal()).
+				Affirmative("Yes, close it").
+				Negative("No, keep open").
+				Value(&r.markDone),
+		),
+	).WithShowHelp(true).WithWidth(setupFormWidth)
+	r.phase = phaseReview
+	return r, r.review.Init()
+}
+
+// logSession writes the session summary to the linked task, if any
+// content and a logger are available. Called on review paths that do
+// NOT close the task — closing already captures the same info via the
+// outcome message.
+func (r *rootModel) logSession() {
+	if r.logTask == nil {
+		return
+	}
+	if msg := r.sessionLog(); msg != "" {
+		r.logTask(r.taskID, msg)
+	}
+}
+
+// sessionLog returns a plain-text summary of the just-finished session
+// suitable for storing in a task's log. Returns "" when no measurable
+// time elapsed (user quit immediately) so we don't pollute the log.
+func (r *rootModel) sessionLog() string {
+	focused := r.timer.focused()
+	if focused < time.Second {
+		return ""
+	}
+	msg := fmt.Sprintf("Focus session: %s", formatDuration(focused))
+	if r.goal != "" {
+		msg += " · goal: " + r.goal
+	}
+	return msg
+}
+
+func (r *rootModel) reviewGoal() string {
+	if r.goal == "" {
+		return "(no goal set)"
+	}
+	return r.goal
+}
+
+func (r *rootModel) View() string {
+	switch r.phase {
+	case phaseTimer:
+		return r.timer.View()
+	case phaseReview:
+		return r.centered(boxedForm("Session review", r.taskLabel, r.review.View()))
+	}
+	return r.centered(boxedForm("Focus session", fmt.Sprintf("%dm", r.minutes), r.form.View()))
+}
+
+func (r *rootModel) centered(s string) string {
+	return lipgloss.Place(r.width, r.height, lipgloss.Center, lipgloss.Center, s)
+}
+
+// boxedForm renders a huh form view inside the rounded setup box with a
+// "title · meta" header above it.
+func boxedForm(title, meta, formView string) string {
+	header := setupTitle.Render(title) + " " + setupMeta.Render("· "+meta)
+	body := lipgloss.JoinVertical(lipgloss.Left, header, "", strings.TrimRight(formView, "\n "))
+	return setupBorder.Render(body)
 }
