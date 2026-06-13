@@ -118,7 +118,7 @@ func DefaultTheme() Theme {
 		TaskDoneText:       lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Strikethrough(true),
 		TaskBlockedIcon:    lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
 		TaskBlockedText:    lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		TaskSelected:       lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
+		TaskSelected:       lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230")).Bold(true),
 		TaskMeta:           lipgloss.NewStyle().Foreground(lipgloss.Color("241")),
 		ItemPriorityHigh:   lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true),
 		ItemPriorityMedium: lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true),

@@ -88,8 +88,12 @@ func (taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 	if lbl != "task" {
 		lblTag = " " + lblStyle.Render("["+lbl+"]")
 	}
-	line1 := truncateText(iconStyle.Render(prefix)+textStyle.Render(text), maxW)
-	line1 += lblTag + priStyle.Render(suffix)
+	right := lblTag + priStyle.Render(suffix)
+	titleMax := maxW - lipgloss.Width(right)
+	if titleMax < 0 {
+		titleMax = 0
+	}
+	line1 := truncateText(iconStyle.Render(prefix)+textStyle.Render(text), titleMax) + right
 	fmt.Fprint(w, line1)
 
 	meta := fmt.Sprintf("  %s", t.ID())

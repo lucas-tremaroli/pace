@@ -19,6 +19,17 @@ type ConfirmFormState struct {
 
 func newConfirmFormState(title, description string) *ConfirmFormState {
 	s := &ConfirmFormState{}
+	w := len(title)
+	if len(description) > w {
+		w = len(description)
+	}
+	w += 4
+	if w < 30 {
+		w = 30
+	}
+	if w > formWidth {
+		w = formWidth
+	}
 	s.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -28,7 +39,7 @@ func newConfirmFormState(title, description string) *ConfirmFormState {
 				Negative("No").
 				Value(&s.result),
 		),
-	).WithWidth(formWidth)
+	).WithWidth(w)
 	return s
 }
 
