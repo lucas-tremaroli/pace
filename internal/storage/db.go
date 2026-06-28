@@ -34,6 +34,14 @@ type LogRecord struct {
 	CreatedAt string `json:"created_at"`
 }
 
+type EpicRecord struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Summary   string `json:"summary"`
+	Status    int    `json:"status"`
+	CreatedAt string `json:"created_at"`
+}
+
 func NewDB() (*DB, error) {
 	dbPath, err := getDBPath()
 	if err != nil {
@@ -185,6 +193,20 @@ func (db *DB) createTables() error {
 		);
 	`
 	if _, err := db.conn.Exec(taskNotesQuery); err != nil {
+		return err
+	}
+
+	// Create epics table for grouping tasks under a spec-first container
+	epicsQuery := `
+		CREATE TABLE IF NOT EXISTS epics (
+			id VARCHAR PRIMARY KEY,
+			title VARCHAR NOT NULL,
+			summary VARCHAR NOT NULL DEFAULT '',
+			status INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+		);
+	`
+	if _, err := db.conn.Exec(epicsQuery); err != nil {
 		return err
 	}
 
@@ -668,4 +690,72 @@ func (db *DB) DeleteLogsByTaskID(taskID string) error {
 	// Delete from main table
 	_, err = db.conn.Exec(`DELETE FROM task_logs WHERE task_id = ?`, taskID)
 	return err
+}
+
+func (db *DB) CreateEpic(id, title, summary string, status int) error {
+	query := `INSERT INTO epics (id, title, summary, status) VALUES (?, ?, ?, ?)`
+	_, err := db.conn.Exec(query, id, title, summary, status)
+	return err
+}
+
+func (db *DB) GetAllEpics() ([]EpicRecord, error) {
+	query := `SELECT id, title, summary, status, created_at FROM epics ORDER BY created_at DESC`
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var epics []EpicRecord
+	for rows.Next() {
+		var e EpicRecord
+		if err := rows.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		epics = append(epics, e)
+	}
+	return epics, rows.Err()
+}
+
+func (db *DB) GetEpicByID(id string) (*EpicRecord, error) {
+	query := `SELECT id, title, summary, status, created_at FROM epics WHERE id = ?`
+	row := db.conn.QueryRow(query, id)
+
+	var e EpicRecord
+	if err := row.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CreatedAt); err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+func (db *DB) UpdateEpic(id, title, summary string, status int) error {
+	query := `UPDATE epics SET title = ?, summary = ?, status = ? WHERE id = ?`
+	result, err := db.conn.Exec(query, title, summary, status, id)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (db *DB) DeleteEpic(id string) error {
+	query := `DELETE FROM epics WHERE id = ?`
+	result, err := db.conn.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
