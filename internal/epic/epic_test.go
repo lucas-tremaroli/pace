@@ -80,9 +80,32 @@ func TestParseStatus(t *testing.T) {
 
 func TestToJSON(t *testing.T) {
 	e := NewEpic("epic-1", Active, "title", "summary")
+	e.SetSpec(Spec{CurrentState: "now", TargetState: "next"})
 	j := e.ToJSON()
 	if j.ID != "epic-1" || j.Title != "title" || j.Summary != "summary" || j.Status != "active" {
 		t.Errorf("unexpected JSON form: %+v", j)
+	}
+	if j.Spec.CurrentState != "now" || j.Spec.TargetState != "next" {
+		t.Errorf("spec missing in JSON form: %+v", j.Spec)
+	}
+}
+
+func TestSpecSetters(t *testing.T) {
+	e := NewEpic("epic-1", Planning, "title", "")
+	e.SetCurrentState("now")
+	e.SetTargetState("next")
+	e.SetConstraints("no net")
+	e.SetExclusions("no sessions")
+	e.SetFreeform("raw")
+	s := e.Spec()
+	if s.CurrentState != "now" || s.TargetState != "next" || s.Constraints != "no net" || s.Exclusions != "no sessions" || s.Freeform != "raw" {
+		t.Errorf("sectionwise setters did not apply: %+v", s)
+	}
+
+	e.SetSpec(Spec{CurrentState: "reset"})
+	s = e.Spec()
+	if s.CurrentState != "reset" || s.TargetState != "" || s.Freeform != "" {
+		t.Errorf("SetSpec did not replace whole spec: %+v", s)
 	}
 }
 

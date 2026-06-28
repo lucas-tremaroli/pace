@@ -19,17 +19,12 @@ func newMemRepo() *memRepo {
 
 func (m *memRepo) Close() error { return nil }
 
-func (m *memRepo) CreateEpic(id, title, summary string, status int) error {
-	if _, exists := m.records[id]; exists {
+func (m *memRepo) CreateEpic(rec storage.EpicRecord) error {
+	if _, exists := m.records[rec.ID]; exists {
 		return errors.New("duplicate id")
 	}
-	m.records[id] = storage.EpicRecord{
-		ID:        id,
-		Title:     title,
-		Summary:   summary,
-		Status:    status,
-		CreatedAt: "2026-06-28T00:00:00Z",
-	}
+	rec.CreatedAt = "2026-06-28T00:00:00Z"
+	m.records[rec.ID] = rec
 	return nil
 }
 
@@ -49,15 +44,13 @@ func (m *memRepo) GetEpicByID(id string) (*storage.EpicRecord, error) {
 	return &r, nil
 }
 
-func (m *memRepo) UpdateEpic(id, title, summary string, status int) error {
-	r, ok := m.records[id]
+func (m *memRepo) UpdateEpic(rec storage.EpicRecord) error {
+	existing, ok := m.records[rec.ID]
 	if !ok {
 		return storage.ErrNotFound
 	}
-	r.Title = title
-	r.Summary = summary
-	r.Status = status
-	m.records[id] = r
+	rec.CreatedAt = existing.CreatedAt
+	m.records[rec.ID] = rec
 	return nil
 }
 
@@ -142,6 +135,69 @@ func TestService_DeleteAndMissing(t *testing.T) {
 	}
 	if err := svc.DeleteEpic("epic-ccc"); err != ErrEpicNotFound {
 		t.Errorf("expected ErrEpicNotFound on second delete, got %v", err)
+	}
+}
+
+func TestService_SpecRoundTrip(t *testing.T) {
+	svc := NewServiceWithRepository(newMemRepo())
+	e := NewEpic("epic-spec", Planning, "spec round trip", "")
+	e.SetSpec(Spec{
+		CurrentState: "flat tasks, no grouping",
+		TargetState:  "epics group tasks behind a spec",
+		Constraints:  "no network",
+		Exclusions:   "no session entity",
+		Freeform:     "raw thoughts here",
+	})
+	if err := svc.CreateEpic(e); err != nil {
+		t.Fatalf("CreateEpic: %v", err)
+	}
+
+	got, err := svc.GetEpicByID("epic-spec")
+	if err != nil {
+		t.Fatalf("GetEpicByID: %v", err)
+	}
+	spec := got.Spec()
+	if spec.CurrentState != "flat tasks, no grouping" ||
+		spec.TargetState != "epics group tasks behind a spec" ||
+		spec.Constraints != "no network" ||
+		spec.Exclusions != "no session entity" ||
+		spec.Freeform != "raw thoughts here" {
+		t.Errorf("spec did not round-trip: %+v", spec)
+	}
+}
+
+func TestService_SpecSectionwiseUpdate(t *testing.T) {
+	svc := NewServiceWithRepository(newMemRepo())
+	e := NewEpic("epic-section", Planning, "sectionwise", "")
+	if err := svc.CreateEpic(e); err != nil {
+		t.Fatalf("CreateEpic: %v", err)
+	}
+
+	// fetch → mutate one section → update; repeat for another section.
+	loaded, err := svc.GetEpicByID("epic-section")
+	if err != nil {
+		t.Fatalf("GetEpicByID: %v", err)
+	}
+	loaded.SetCurrentState("first")
+	if err := svc.UpdateEpic(*loaded); err != nil {
+		t.Fatalf("UpdateEpic current: %v", err)
+	}
+
+	loaded, err = svc.GetEpicByID("epic-section")
+	if err != nil {
+		t.Fatalf("GetEpicByID: %v", err)
+	}
+	loaded.SetTargetState("second")
+	if err := svc.UpdateEpic(*loaded); err != nil {
+		t.Fatalf("UpdateEpic target: %v", err)
+	}
+
+	got, err := svc.GetEpicByID("epic-section")
+	if err != nil {
+		t.Fatalf("GetEpicByID: %v", err)
+	}
+	if got.Spec().CurrentState != "first" || got.Spec().TargetState != "second" {
+		t.Errorf("sectionwise updates did not stack: %+v", got.Spec())
 	}
 }
 

@@ -35,11 +35,16 @@ type LogRecord struct {
 }
 
 type EpicRecord struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Summary   string `json:"summary"`
-	Status    int    `json:"status"`
-	CreatedAt string `json:"created_at"`
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Summary      string `json:"summary"`
+	Status       int    `json:"status"`
+	CurrentState string `json:"current_state"`
+	TargetState  string `json:"target_state"`
+	Constraints  string `json:"constraints"`
+	Exclusions   string `json:"exclusions"`
+	Freeform     string `json:"freeform"`
+	CreatedAt    string `json:"created_at"`
 }
 
 func NewDB() (*DB, error) {
@@ -210,7 +215,51 @@ func (db *DB) createTables() error {
 		return err
 	}
 
+	// Migrations: spec sections on epics. Check the existing schema first
+	// rather than relying on ALTER-and-swallow, so real errors (locked db,
+	// corrupt schema) surface here instead of as confusing "no such
+	// column" failures later.
+	for _, col := range []string{"current_state", "target_state", "constraints", "exclusions", "freeform"} {
+		has, err := db.hasColumn("epics", col)
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := db.conn.Exec(`ALTER TABLE epics ADD COLUMN ` + col + ` TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+// hasColumn reports whether `table` already has a column named `col`. Used
+// by migrations that need to be idempotent without swallowing real errors.
+func (db *DB) hasColumn(table, col string) (bool, error) {
+	rows, err := db.conn.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			cid       int
+			name      string
+			ctype     string
+			notnull   int
+			dfltValue sql.NullString
+			pk        int
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return false, err
+		}
+		if name == col {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // GetConfig retrieves a config value by key
@@ -692,14 +741,14 @@ func (db *DB) DeleteLogsByTaskID(taskID string) error {
 	return err
 }
 
-func (db *DB) CreateEpic(id, title, summary string, status int) error {
-	query := `INSERT INTO epics (id, title, summary, status) VALUES (?, ?, ?, ?)`
-	_, err := db.conn.Exec(query, id, title, summary, status)
+func (db *DB) CreateEpic(rec EpicRecord) error {
+	query := `INSERT INTO epics (id, title, summary, status, current_state, target_state, constraints, exclusions, freeform) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(query, rec.ID, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform)
 	return err
 }
 
 func (db *DB) GetAllEpics() ([]EpicRecord, error) {
-	query := `SELECT id, title, summary, status, created_at FROM epics ORDER BY created_at DESC`
+	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, created_at FROM epics ORDER BY created_at DESC`
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
@@ -709,7 +758,7 @@ func (db *DB) GetAllEpics() ([]EpicRecord, error) {
 	var epics []EpicRecord
 	for rows.Next() {
 		var e EpicRecord
-		if err := rows.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		epics = append(epics, e)
@@ -718,19 +767,19 @@ func (db *DB) GetAllEpics() ([]EpicRecord, error) {
 }
 
 func (db *DB) GetEpicByID(id string) (*EpicRecord, error) {
-	query := `SELECT id, title, summary, status, created_at FROM epics WHERE id = ?`
+	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, created_at FROM epics WHERE id = ?`
 	row := db.conn.QueryRow(query, id)
 
 	var e EpicRecord
-	if err := row.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CreatedAt); err != nil {
+	if err := row.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.CreatedAt); err != nil {
 		return nil, err
 	}
 	return &e, nil
 }
 
-func (db *DB) UpdateEpic(id, title, summary string, status int) error {
-	query := `UPDATE epics SET title = ?, summary = ?, status = ? WHERE id = ?`
-	result, err := db.conn.Exec(query, title, summary, status, id)
+func (db *DB) UpdateEpic(rec EpicRecord) error {
+	query := `UPDATE epics SET title = ?, summary = ?, status = ?, current_state = ?, target_state = ?, constraints = ?, exclusions = ?, freeform = ? WHERE id = ?`
+	result, err := db.conn.Exec(query, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, rec.ID)
 	if err != nil {
 		return err
 	}
