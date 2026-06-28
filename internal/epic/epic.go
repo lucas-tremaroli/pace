@@ -39,12 +39,24 @@ func ParseStatus(s string) (Status, error) {
 	}
 }
 
+// Spec captures the design statement for an epic. Each section is markdown.
+// Freeform is a fallback for users/agents that don't want the structured form;
+// it is used alongside, not instead of, the structured sections.
+type Spec struct {
+	CurrentState string `json:"current_state,omitempty"`
+	TargetState  string `json:"target_state,omitempty"`
+	Constraints  string `json:"constraints,omitempty"`
+	Exclusions   string `json:"exclusions,omitempty"`
+	Freeform     string `json:"freeform,omitempty"`
+}
+
 // Epic is the in-memory representation of an epic record.
 type Epic struct {
 	id        string
 	status    Status
 	title     string
 	summary   string
+	spec      Spec
 	createdAt string
 }
 
@@ -54,6 +66,7 @@ type EpicJSON struct {
 	Title     string `json:"title"`
 	Summary   string `json:"summary,omitempty"`
 	Status    string `json:"status"`
+	Spec      Spec   `json:"spec"`
 	CreatedAt string `json:"created_at,omitempty"`
 }
 
@@ -71,6 +84,7 @@ func (e Epic) ID() string        { return e.id }
 func (e Epic) Title() string     { return e.title }
 func (e Epic) Summary() string   { return e.summary }
 func (e Epic) Status() Status    { return e.status }
+func (e Epic) Spec() Spec        { return e.spec }
 func (e Epic) CreatedAt() string { return e.createdAt }
 
 // SetTitle updates the title.
@@ -78,6 +92,24 @@ func (e *Epic) SetTitle(title string) { e.title = title }
 
 // SetSummary updates the summary.
 func (e *Epic) SetSummary(summary string) { e.summary = summary }
+
+// SetSpec replaces the entire spec.
+func (e *Epic) SetSpec(spec Spec) { e.spec = spec }
+
+// SetCurrentState updates only the current-state section.
+func (e *Epic) SetCurrentState(s string) { e.spec.CurrentState = s }
+
+// SetTargetState updates only the target-state section.
+func (e *Epic) SetTargetState(s string) { e.spec.TargetState = s }
+
+// SetConstraints updates only the constraints section.
+func (e *Epic) SetConstraints(s string) { e.spec.Constraints = s }
+
+// SetExclusions updates only the exclusions section.
+func (e *Epic) SetExclusions(s string) { e.spec.Exclusions = s }
+
+// SetFreeform updates only the freeform fallback section.
+func (e *Epic) SetFreeform(s string) { e.spec.Freeform = s }
 
 // SetStatus updates the status with validation.
 func (e *Epic) SetStatus(s Status) error {
@@ -112,6 +144,7 @@ func (e Epic) ToJSON() EpicJSON {
 		Title:     e.title,
 		Summary:   e.summary,
 		Status:    e.status.String(),
+		Spec:      e.spec,
 		CreatedAt: e.createdAt,
 	}
 }

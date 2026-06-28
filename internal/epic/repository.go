@@ -7,9 +7,9 @@ import "github.com/lucas-tremaroli/pace/internal/storage"
 // in-memory) can be used in tests.
 type EpicRepository interface {
 	Close() error
-	CreateEpic(id, title, summary string, status int) error
+	CreateEpic(rec storage.EpicRecord) error
 	GetAllEpics() ([]storage.EpicRecord, error)
 	GetEpicByID(id string) (*storage.EpicRecord, error)
-	UpdateEpic(id, title, summary string, status int) error
+	UpdateEpic(rec storage.EpicRecord) error
 	DeleteEpic(id string) error
 }
