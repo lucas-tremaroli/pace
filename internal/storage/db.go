@@ -215,13 +215,51 @@ func (db *DB) createTables() error {
 		return err
 	}
 
-	// Migrations: spec sections on epics. Errors are ignored when the
-	// column already exists, matching the pattern used for tasks above.
+	// Migrations: spec sections on epics. Check the existing schema first
+	// rather than relying on ALTER-and-swallow, so real errors (locked db,
+	// corrupt schema) surface here instead of as confusing "no such
+	// column" failures later.
 	for _, col := range []string{"current_state", "target_state", "constraints", "exclusions", "freeform"} {
-		_, _ = db.conn.Exec(`ALTER TABLE epics ADD COLUMN ` + col + ` TEXT NOT NULL DEFAULT ''`)
+		has, err := db.hasColumn("epics", col)
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := db.conn.Exec(`ALTER TABLE epics ADD COLUMN ` + col + ` TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+// hasColumn reports whether `table` already has a column named `col`. Used
+// by migrations that need to be idempotent without swallowing real errors.
+func (db *DB) hasColumn(table, col string) (bool, error) {
+	rows, err := db.conn.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			cid       int
+			name      string
+			ctype     string
+			notnull   int
+			dfltValue sql.NullString
+			pk        int
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return false, err
+		}
+		if name == col {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // GetConfig retrieves a config value by key
