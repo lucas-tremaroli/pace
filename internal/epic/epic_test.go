@@ -2,6 +2,13 @@ package epic
 
 import "testing"
 
+func TestValidate_EmptyID(t *testing.T) {
+	e := NewEpic("", Planning, "title", "")
+	if err := e.Validate(); err != ErrEmptyID {
+		t.Errorf("expected ErrEmptyID, got %v", err)
+	}
+}
+
 func TestValidate_EmptyTitle(t *testing.T) {
 	e := NewEpic("epic-1", Planning, "", "summary")
 	if err := e.Validate(); err != ErrEmptyTitle {

@@ -93,6 +93,9 @@ func (e *Epic) setCreatedAt(t string) { e.createdAt = t }
 
 // Validate checks that the epic has valid field values.
 func (e Epic) Validate() error {
+	if e.id == "" {
+		return ErrEmptyID
+	}
 	if e.title == "" {
 		return ErrEmptyTitle
 	}
