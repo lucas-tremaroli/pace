@@ -8,4 +8,6 @@ var (
 	ErrInvalidStatus = errors.New("invalid task status")
 	ErrInvalidLink   = errors.New("invalid link: must be a valid URL (e.g. https://example.com)")
 	ErrTaskNotFound  = errors.New("task not found")
+	ErrEpicNotFound  = errors.New("epic not found")
+	ErrCrossEpicDep  = errors.New("cannot add a dependency across different epics")
 )

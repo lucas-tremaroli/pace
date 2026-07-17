@@ -181,7 +181,7 @@ func migrateTasks(sourceDir, destDir string, dryRun bool) (map[string]any, error
 
 		if !dryRun {
 			// Create task in destination
-			if err := destDB.CreateTask(task.ID, task.Title, task.Description, task.Status, task.Priority, task.Link); err != nil {
+			if err := destDB.CreateTask(task.ID, task.Title, task.Description, task.Status, task.Priority, task.Link, task.EpicID); err != nil {
 				return nil, fmt.Errorf("failed to migrate task %s: %w", task.ID, err)
 			}
 
