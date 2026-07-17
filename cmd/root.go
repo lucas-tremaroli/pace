@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/cmd/config"
+	"github.com/lucas-tremaroli/pace/cmd/epic"
 	"github.com/lucas-tremaroli/pace/cmd/joke"
 	"github.com/lucas-tremaroli/pace/cmd/mcp"
 	"github.com/lucas-tremaroli/pace/cmd/note"
@@ -111,6 +112,7 @@ func init() {
 	rootCmd.AddCommand(tui.TuiCmd)
 	rootCmd.AddCommand(task.TaskCmd)
 	rootCmd.AddCommand(note.NoteCmd)
+	rootCmd.AddCommand(epic.EpicCmd)
 	rootCmd.AddCommand(tick.TickCmd)
 	rootCmd.AddCommand(joke.JokeCmd)
 	rootCmd.AddCommand(config.ConfigCmd)

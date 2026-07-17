@@ -136,6 +136,12 @@ func runInstall() error {
 		"pace_task_close",
 		"pace_task_logs",
 		"pace_task_bulk_delete",
+		"pace_epic_create",
+		"pace_epic_list",
+		"pace_epic_get",
+		"pace_epic_update",
+		"pace_epic_delete",
+		"pace_epic_spec_set",
 	}
 
 	output.Success("Pace MCP server installed", map[string]any{

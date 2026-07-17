@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/lucas-tremaroli/pace/internal/cmdutil"
+	"github.com/lucas-tremaroli/pace/internal/epic"
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/storage"
@@ -57,13 +59,24 @@ var contextCmd = &cobra.Command{
 			return output.Error(err)
 		}
 
+		var activeEpics []epic.Epic
+		if err := cmdutil.WithEpicService(func(epicSvc *epic.Service) error {
+			activeEpics, err = epicSvc.LoadEpicsByStatus(epic.Active)
+			if err != nil {
+				return output.Error(err)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+
 		resolved, err := storage.ResolvePaceDir()
 		if err != nil {
 			return output.Error(err)
 		}
 
 		if contextPretty {
-			printContextPretty(resolved, tasks, todoTasks, inProgressTasks, notes)
+			printContextPretty(resolved, tasks, todoTasks, inProgressTasks, notes, activeEpics)
 			return nil
 		}
 
@@ -84,11 +97,17 @@ var contextCmd = &cobra.Command{
 			})
 		}
 
+		epicList := make([]map[string]any, 0, len(activeEpics))
+		for _, e := range activeEpics {
+			epicList = append(epicList, epicSummary(e))
+		}
+
 		output.Success("context loaded", map[string]any{
 			"storage": map[string]any{
 				"path": resolved.Path,
 				"type": resolved.Type,
 			},
+			"active_epics": epicList,
 			"tasks": map[string]any{
 				"in_progress": inProgressList,
 				"todo":        todoList,
@@ -102,18 +121,52 @@ var contextCmd = &cobra.Command{
 					"done":        len(tasks) - len(todoList) - len(inProgressList),
 				},
 				"notes": len(noteList),
+				"epics": len(epicList),
 			},
 		})
 		return nil
 	},
 }
 
-func printContextPretty(resolved storage.ResolvedPath, all, todo, inProgress []task.Task, notes []note.Note) {
+// epicSummary returns id/title/status plus first-line spec headlines.
+func epicSummary(e epic.Epic) map[string]any {
+	spec := e.Spec()
+	return map[string]any{
+		"id":            e.ID(),
+		"title":         e.Title(),
+		"status":        e.Status().String(),
+		"current_state": firstLine(spec.CurrentState),
+		"target_state":  firstLine(spec.TargetState),
+	}
+}
+
+// firstLine returns the first non-empty line of s, trimmed.
+func firstLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) != "" {
+			return strings.TrimSpace(line)
+		}
+	}
+	return ""
+}
+
+func printContextPretty(resolved storage.ResolvedPath, all, todo, inProgress []task.Task, notes []note.Note, activeEpics []epic.Epic) {
 	done := len(all) - len(todo) - len(inProgress)
 	fmt.Println()
 	fmt.Println(ctxHeading.Render("Storage"))
 	fmt.Printf("  %s %s %s\n", ctxLabel.Render("path:"), ctxTitle.Render(resolved.Path), ctxDim.Render("("+string(resolved.Type)+")"))
 	fmt.Println()
+
+	if len(activeEpics) > 0 {
+		fmt.Println(ctxHeading.Render("Active epics"))
+		for _, e := range activeEpics {
+			fmt.Println("  " + ctxID.Render(e.ID()) + " " + ctxTitle.Render(e.Title()))
+			if h := firstLine(e.Spec().TargetState); h != "" {
+				fmt.Println("    " + ctxDim.Render("→ "+h))
+			}
+		}
+		fmt.Println()
+	}
 
 	fmt.Println(ctxHeading.Render("Tasks"))
 	fmt.Printf("  %s %d total, %d in-progress, %d todo, %d done\n", ctxDim.Render("›"), len(all), len(inProgress), len(todo), done)

@@ -106,6 +106,38 @@ func TestIntegration_FullRoundTrip(t *testing.T) {
 	}
 }
 
+// TestIntegration_DeleteUnlinksTasks verifies FORK-8's cleanup: deleting an
+// epic clears epic_id on any task that pointed at it, without deleting the task.
+func TestIntegration_DeleteUnlinksTasks(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "epics.db")
+	db, err := storage.NewDBWithPath(dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewServiceWithRepository(db)
+
+	e := NewEpic(svc.GenerateEpicID(), Active, "container", "")
+	if err := svc.CreateEpic(e); err != nil {
+		t.Fatalf("CreateEpic: %v", err)
+	}
+	if err := db.CreateTask("t1", "linked", "", 0, 3, "", e.ID()); err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	if err := svc.DeleteEpic(e.ID()); err != nil {
+		t.Fatalf("DeleteEpic: %v", err)
+	}
+
+	rec, err := db.GetTaskByID("t1")
+	if err != nil {
+		t.Fatalf("task should still exist after epic delete: %v", err)
+	}
+	if rec.EpicID != "" {
+		t.Errorf("expected epic_id cleared, got %q", rec.EpicID)
+	}
+}
+
 // TestIntegration_PreFORK6Migration simulates an existing tasks.db that
 // already has the FORK-5 epics table but not the FORK-6 spec columns,
 // then runs the migration via NewDBWithPath and verifies the spec columns

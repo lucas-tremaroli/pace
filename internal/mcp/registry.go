@@ -26,6 +26,12 @@ var toolRegistry = map[string]toolHandler{
 	"pace_task_close":       (*Handler).toolTaskClose,
 	"pace_task_logs":        (*Handler).toolTaskLogs,
 	"pace_task_bulk_delete": (*Handler).toolTaskBulkDelete,
+	"pace_epic_create":      (*Handler).toolEpicCreate,
+	"pace_epic_list":        (*Handler).toolEpicList,
+	"pace_epic_get":         (*Handler).toolEpicGet,
+	"pace_epic_update":      (*Handler).toolEpicUpdate,
+	"pace_epic_delete":      (*Handler).toolEpicDelete,
+	"pace_epic_spec_set":    (*Handler).toolEpicSpecSet,
 }
 
 func (h *Handler) executeTool(name string, args map[string]any) ToolCallResult {

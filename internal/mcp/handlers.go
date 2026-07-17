@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/lucas-tremaroli/pace/internal/epic"
 	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/storage"
@@ -21,6 +22,7 @@ var Version = "dev"
 type Handler struct {
 	taskService *task.Service
 	noteService *note.Service
+	epicService *epic.Service
 }
 
 // NewHandler creates a new MCP handler with initialized services
@@ -36,18 +38,34 @@ func NewHandler() (*Handler, error) {
 		return nil, fmt.Errorf("failed to initialize note service: %w", err)
 	}
 
+	epicService, err := epic.NewService()
+	if err != nil {
+		taskService.Close()
+		noteService.Close()
+		return nil, fmt.Errorf("failed to initialize epic service: %w", err)
+	}
+
 	return &Handler{
 		taskService: taskService,
 		noteService: noteService,
+		epicService: epicService,
 	}, nil
 }
 
-// Close cleans up handler resources
+// Close cleans up handler resources, closing every service and returning a
+// combined error so no close failure is silently dropped.
 func (h *Handler) Close() error {
-	if h.taskService != nil {
-		return h.taskService.Close()
+	var errs []error
+	if h.epicService != nil {
+		errs = append(errs, h.epicService.Close())
 	}
-	return nil
+	if h.noteService != nil {
+		errs = append(errs, h.noteService.Close())
+	}
+	if h.taskService != nil {
+		errs = append(errs, h.taskService.Close())
+	}
+	return errors.Join(errs...)
 }
 
 // HandleRequest processes a JSON-RPC request and returns a response
@@ -141,6 +159,15 @@ func (h *Handler) toolContext() ToolCallResult {
 		})
 	}
 
+	activeEpics, err := h.epicService.LoadEpicsByStatus(epic.Active)
+	if err != nil {
+		return errorResult(fmt.Sprintf("failed to load epics: %v", err))
+	}
+	epicList := make([]map[string]any, 0, len(activeEpics))
+	for _, e := range activeEpics {
+		epicList = append(epicList, activeEpicSummary(e))
+	}
+
 	resolved, err := storage.ResolvePaceDir()
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to resolve storage: %v", err))
@@ -151,6 +178,7 @@ func (h *Handler) toolContext() ToolCallResult {
 			"path": resolved.Path,
 			"type": string(resolved.Type),
 		},
+		"active_epics": epicList,
 		"tasks": map[string]any{
 			"in_progress": inProgressList,
 			"todo":        todoList,
@@ -164,6 +192,7 @@ func (h *Handler) toolContext() ToolCallResult {
 				"done":        len(tasks) - len(todoList) - len(inProgressList),
 			},
 			"notes": len(noteList),
+			"epics": len(epicList),
 		},
 	})
 }
@@ -789,6 +818,172 @@ func (h *Handler) toolTaskBulkDelete(args map[string]any) ToolCallResult {
 		result["errors"] = errs
 	}
 	return jsonResult(result)
+}
+
+// --- Epic tools ---
+
+func (h *Handler) toolEpicCreate(args map[string]any) ToolCallResult {
+	title, ok := args["title"].(string)
+	if !ok || title == "" {
+		return codedError(output.ErrCodeMissingField, "title is required", "Provide a title string when creating an epic")
+	}
+	summary, _ := args["summary"].(string)
+
+	status := epic.Planning
+	if s, ok := args["status"].(string); ok && s != "" {
+		parsed, err := epic.ParseStatus(s)
+		if err != nil {
+			return codedError(output.ErrCodeInvalidStatus, err.Error(), "Valid values: planning, active, done")
+		}
+		status = parsed
+	}
+
+	e := epic.NewEpic(h.epicService.GenerateEpicID(), status, title, summary)
+	if err := h.epicService.CreateEpic(e); err != nil {
+		return errorResult(fmt.Sprintf("failed to create epic: %v", err))
+	}
+	return jsonResult(map[string]any{
+		"success": true,
+		"message": fmt.Sprintf("created epic %s", e.ID()),
+		"epic":    e.ToJSON(),
+	})
+}
+
+func (h *Handler) toolEpicList(_ map[string]any) ToolCallResult {
+	epics, err := h.epicService.LoadAllEpics()
+	if err != nil {
+		return errorResult(fmt.Sprintf("failed to list epics: %v", err))
+	}
+	jsons := make([]epic.EpicJSON, 0, len(epics))
+	for _, e := range epics {
+		jsons = append(jsons, e.ToJSON())
+	}
+	return jsonResult(map[string]any{"success": true, "epics": jsons, "count": len(jsons)})
+}
+
+func (h *Handler) toolEpicGet(args map[string]any) ToolCallResult {
+	id, ok := args["id"].(string)
+	if !ok || id == "" {
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the epic ID to retrieve")
+	}
+	e, err := h.epicService.GetEpicByID(id)
+	if err != nil {
+		return epicMCPLookupError(err, id)
+	}
+	return jsonResult(map[string]any{"success": true, "epic": e.ToJSON()})
+}
+
+func (h *Handler) toolEpicUpdate(args map[string]any) ToolCallResult {
+	id, ok := args["id"].(string)
+	if !ok || id == "" {
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the epic ID to update")
+	}
+	e, err := h.epicService.GetEpicByID(id)
+	if err != nil {
+		return epicMCPLookupError(err, id)
+	}
+
+	if title, ok := args["title"].(string); ok && title != "" {
+		e.SetTitle(title)
+	}
+	if summary, ok := args["summary"].(string); ok {
+		e.SetSummary(summary)
+	}
+	if s, ok := args["status"].(string); ok && s != "" {
+		parsed, err := epic.ParseStatus(s)
+		if err != nil {
+			return codedError(output.ErrCodeInvalidStatus, err.Error(), "Valid values: planning, active, done")
+		}
+		if err := e.SetStatus(parsed); err != nil {
+			return errorResult(err.Error())
+		}
+	}
+
+	if err := h.epicService.UpdateEpic(*e); err != nil {
+		return errorResult(fmt.Sprintf("failed to update epic: %v", err))
+	}
+	return jsonResult(map[string]any{"success": true, "message": fmt.Sprintf("updated epic %s", id), "epic": e.ToJSON()})
+}
+
+func (h *Handler) toolEpicDelete(args map[string]any) ToolCallResult {
+	id, ok := args["id"].(string)
+	if !ok || id == "" {
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the epic ID to delete")
+	}
+	if err := h.epicService.DeleteEpic(id); err != nil {
+		return epicMCPLookupError(err, id)
+	}
+	return jsonResult(map[string]any{"success": true, "message": fmt.Sprintf("deleted epic %s", id)})
+}
+
+func (h *Handler) toolEpicSpecSet(args map[string]any) ToolCallResult {
+	id, ok := args["id"].(string)
+	if !ok || id == "" {
+		return codedError(output.ErrCodeMissingField, "id is required", "Provide the epic ID whose spec to set")
+	}
+	e, err := h.epicService.GetEpicByID(id)
+	if err != nil {
+		return epicMCPLookupError(err, id)
+	}
+
+	changed := false
+	if v, ok := args["current_state"].(string); ok {
+		e.SetCurrentState(v)
+		changed = true
+	}
+	if v, ok := args["target_state"].(string); ok {
+		e.SetTargetState(v)
+		changed = true
+	}
+	if v, ok := args["constraints"].(string); ok {
+		e.SetConstraints(v)
+		changed = true
+	}
+	if v, ok := args["exclusions"].(string); ok {
+		e.SetExclusions(v)
+		changed = true
+	}
+	if v, ok := args["freeform"].(string); ok {
+		e.SetFreeform(v)
+		changed = true
+	}
+	if !changed {
+		return codedError(output.ErrCodeInvalidParams, "no spec sections provided", "Pass at least one of current_state, target_state, constraints, exclusions, freeform")
+	}
+
+	if err := h.epicService.UpdateEpic(*e); err != nil {
+		return errorResult(fmt.Sprintf("failed to update epic spec: %v", err))
+	}
+	return jsonResult(map[string]any{"success": true, "message": fmt.Sprintf("updated spec for epic %s", id), "epic": e.ToJSON()})
+}
+
+func epicMCPLookupError(err error, id string) ToolCallResult {
+	if errors.Is(err, epic.ErrEpicNotFound) {
+		return codedError(output.ErrCodeEpicNotFound, fmt.Sprintf("epic not found: %s", id), "Use pace_epic_list to see available epic IDs")
+	}
+	return codedError(output.ErrCodeStorageError, fmt.Sprintf("epic operation failed: %v", err), "")
+}
+
+// activeEpicSummary returns an id/title/status plus spec headlines for context.
+func activeEpicSummary(e epic.Epic) map[string]any {
+	spec := e.Spec()
+	return map[string]any{
+		"id":            e.ID(),
+		"title":         e.Title(),
+		"status":        e.Status().String(),
+		"current_state": headline(spec.CurrentState),
+		"target_state":  headline(spec.TargetState),
+	}
+}
+
+// headline trims a spec section to its first non-empty line for compact display.
+func headline(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) != "" {
+			return strings.TrimSpace(line)
+		}
+	}
+	return ""
 }
 
 // Helper functions

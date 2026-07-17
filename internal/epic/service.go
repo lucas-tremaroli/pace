@@ -114,11 +114,27 @@ func fromRecord(r storage.EpicRecord) Epic {
 	return epic
 }
 
-// DeleteEpic removes an epic by ID.
+// DeleteEpic removes an epic by ID. Storage atomically unlinks any tasks that
+// pointed at it in the same transaction.
 func (s *Service) DeleteEpic(id string) error {
 	err := s.db.DeleteEpic(id)
 	if errors.Is(err, storage.ErrNotFound) {
 		return ErrEpicNotFound
 	}
 	return err
+}
+
+// LoadEpicsByStatus returns every epic in the given lifecycle state.
+func (s *Service) LoadEpicsByStatus(status Status) ([]Epic, error) {
+	epics, err := s.LoadAllEpics()
+	if err != nil {
+		return nil, err
+	}
+	var out []Epic
+	for _, e := range epics {
+		if e.Status() == status {
+			out = append(out, e)
+		}
+	}
+	return out, nil
 }
