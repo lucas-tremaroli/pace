@@ -1,0 +1,14 @@
+[tools]
+go = "1.25.1"
+
+[tasks.build]
+run = "go build -ldflags='-s -w' -o bin/pace ."
+
+[tasks.test]
+run = "go test -v ./..."
+
+[tasks.install]
+run = "go install -ldflags='-s -w' ."
+
+[tasks.clean]
+run = "rm -rf bin/"
