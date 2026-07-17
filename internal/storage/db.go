@@ -127,7 +127,9 @@ func (db *DB) createTables() error {
 	// Migration: consolidate P4 into P3 (4-level → 3-level priority)
 	_, _ = db.conn.Exec(`UPDATE tasks SET priority = 3 WHERE priority = 4`)
 
-	// Migration: add epic_id column linking a task to an epic (nullable)
+	// Migration: add epic_id column linking a task to an epic. Empty string
+	// ('') means "no epic" — the whole codebase treats "" as unset, so we use
+	// an empty-string sentinel rather than NULL to keep reads/filters simple.
 	if has, err := db.hasColumn("tasks", "epic_id"); err != nil {
 		return err
 	} else if !has {

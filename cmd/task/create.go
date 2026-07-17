@@ -135,6 +135,7 @@ func handleBulkCreate(svc *task.Service, bulkInput string) error {
 		}
 
 		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, input.Title, input.Description, priority, input.Link)
+		newTask.SetEpicID(createEpic)
 
 		if err := svc.CreateTask(newTask); err != nil {
 			result.Failed = append(result.Failed, output.BulkItem{Title: input.Title, Error: err.Error()})

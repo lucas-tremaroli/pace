@@ -147,7 +147,7 @@ func init() {
 	listCmd.Flags().StringArrayVar(&listFilterPriority, "priority", nil, "Filter by priority (high, medium, low or 1-3, repeatable)")
 	listCmd.Flags().StringVar(&listFilterLabel, "label", "", "Filter by label")
 	listCmd.Flags().StringVar(&listFilterEpic, "epic", "", "Filter by epic ID (empty string matches tasks with no epic)")
-	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link")
+	listCmd.Flags().StringVar(&listFields, "fields", "", "Comma-separated fields to include. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link, epic_id")
 	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to first N tasks")
 	listCmd.Flags().BoolVar(&listReady, "ready", false, "Only show tasks ready to work on (not blocked, not done)")
 }
