@@ -8,7 +8,7 @@
 
 ```bash
 mise run build    # Build the binary to bin/pace
-mise run install  # Build and install to $HOME/go/bin
+mise run install  # Install to your Go bin dir ($GOBIN, else $GOPATH/bin)
 mise run clean    # Remove build artifacts
 ```
 
