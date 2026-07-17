@@ -376,5 +376,125 @@ func GetToolDefinitions() []Tool {
 				},
 			},
 		},
+		{
+			Name:        "pace_epic_create",
+			Description: "Create a new epic — a spec-first container that groups tasks",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"title": {
+						Type:        "string",
+						Description: "Epic title (required)",
+					},
+					"summary": {
+						Type:        "string",
+						Description: "Short summary of the epic",
+					},
+					"status": {
+						Type:        "string",
+						Description: "Epic status (default: planning)",
+						Enum:        []string{"planning", "active", "done"},
+					},
+				},
+				Required: []string{"title"},
+			},
+		},
+		{
+			Name:        "pace_epic_list",
+			Description: "List all epics with their status and spec",
+			InputSchema: ToolInputSchema{
+				Type:       "object",
+				Properties: map[string]Property{},
+			},
+		},
+		{
+			Name:        "pace_epic_get",
+			Description: "Get a single epic by ID, including its full spec",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Epic ID (required)",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
+			Name:        "pace_epic_update",
+			Description: "Update an epic's title, summary, or status. Only provided fields change.",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Epic ID (required)",
+					},
+					"title": {
+						Type:        "string",
+						Description: "New title",
+					},
+					"summary": {
+						Type:        "string",
+						Description: "New summary",
+					},
+					"status": {
+						Type:        "string",
+						Description: "New status",
+						Enum:        []string{"planning", "active", "done"},
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
+			Name:        "pace_epic_delete",
+			Description: "Delete an epic. Tasks that belonged to it are kept but unlinked.",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Epic ID (required)",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
+			Name:        "pace_epic_spec_set",
+			Description: "Set one or more spec sections on an epic (current/target/constraints/exclusions plus a freeform fallback). Only provided sections change.",
+			InputSchema: ToolInputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"id": {
+						Type:        "string",
+						Description: "Epic ID (required)",
+					},
+					"current_state": {
+						Type:        "string",
+						Description: "Current state section (markdown)",
+					},
+					"target_state": {
+						Type:        "string",
+						Description: "Target state section (markdown)",
+					},
+					"constraints": {
+						Type:        "string",
+						Description: "Constraints section (markdown)",
+					},
+					"exclusions": {
+						Type:        "string",
+						Description: "Exclusions section (markdown)",
+					},
+					"freeform": {
+						Type:        "string",
+						Description: "Freeform fallback section (markdown)",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
 	}
 }
