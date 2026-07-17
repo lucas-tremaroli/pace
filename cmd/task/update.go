@@ -17,6 +17,7 @@ var (
 	updatePriority    string
 	updateLabel       string
 	updateLink        string
+	updateEpic        string
 	updateFilters     []string
 	updateDryRun      bool
 )
@@ -99,6 +100,12 @@ For batch updates, use --filter with update flags:
 				}
 			}
 
+			if cmd.Flags().Changed("epic") {
+				if err := svc.SetEpic(taskID, updateEpic); err != nil {
+					return output.Error(err)
+				}
+			}
+
 			finalTask, err := svc.GetTaskByID(taskID)
 			if err != nil {
 				return output.Error(err)
@@ -150,8 +157,8 @@ func handleBatchUpdate(svc *task.Service, cmd *cobra.Command) error {
 		}
 	}
 
-	if batchStatus == nil && batchPriority == nil && !cmd.Flags().Changed("label") {
-		return output.ErrorMsgWithCode("no updates specified (use --status, --priority, or --label)", output.ErrCodeInvalidParams, "")
+	if batchStatus == nil && batchPriority == nil && !cmd.Flags().Changed("label") && !cmd.Flags().Changed("epic") {
+		return output.ErrorMsgWithCode("no updates specified (use --status, --priority, --label, or --epic)", output.ErrCodeInvalidParams, "")
 	}
 
 	tasks, err := svc.LoadAllTasks()
@@ -183,6 +190,9 @@ func handleBatchUpdate(svc *task.Service, cmd *cobra.Command) error {
 			}
 			if cmd.Flags().Changed("label") {
 				changes["label"] = fmt.Sprintf("%s -> %s", t.Label(), updateLabel)
+			}
+			if cmd.Flags().Changed("epic") {
+				changes["epic"] = fmt.Sprintf("%s -> %s", t.EpicID(), updateEpic)
 			}
 			preview = append(preview, changes)
 		}
@@ -216,6 +226,11 @@ func handleBatchUpdate(svc *task.Service, cmd *cobra.Command) error {
 				warnings = append(warnings, "set label '"+updateLabel+"': "+err.Error())
 			}
 		}
+		if cmd.Flags().Changed("epic") {
+			if err := svc.SetEpic(t.ID(), updateEpic); err != nil {
+				warnings = append(warnings, "set epic '"+updateEpic+"': "+err.Error())
+			}
+		}
 		result.Succeeded = append(result.Succeeded, output.BulkItem{ID: t.ID(), Title: t.Title(), Warnings: warnings})
 	}
 	output.BulkSuccess("tasks updated", result)
@@ -229,6 +244,7 @@ func init() {
 	updateCmd.Flags().StringVar(&updatePriority, "priority", "", "Task priority (high, medium, low or 1-3)")
 	updateCmd.Flags().StringVar(&updateLabel, "label", "", "Set task label (task, bug, feature, docs)")
 	updateCmd.Flags().StringVar(&updateLink, "url", "", "URL associated with the task (e.g., google.com)")
-	updateCmd.Flags().StringArrayVar(&updateFilters, "filter", nil, "Filter tasks to update (status=X, priority=X, label=X)")
+	updateCmd.Flags().StringVar(&updateEpic, "epic", "", "Assign the task to an epic (empty string clears it)")
+	updateCmd.Flags().StringArrayVar(&updateFilters, "filter", nil, "Filter tasks to update (status=X, priority=X, label=X, epic=X)")
 	updateCmd.Flags().BoolVar(&updateDryRun, "dry-run", false, "Preview changes without applying them")
 }

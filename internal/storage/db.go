@@ -24,6 +24,7 @@ type TaskRecord struct {
 	Status   int    `json:"status"`
 	Priority int    `json:"priority"`
 	Link     string `json:"link"`
+	EpicID   string `json:"epic_id"`
 }
 
 type LogRecord struct {
@@ -125,6 +126,17 @@ func (db *DB) createTables() error {
 
 	// Migration: consolidate P4 into P3 (4-level → 3-level priority)
 	_, _ = db.conn.Exec(`UPDATE tasks SET priority = 3 WHERE priority = 4`)
+
+	// Migration: add epic_id column linking a task to an epic. Empty string
+	// ('') means "no epic" — the whole codebase treats "" as unset, so we use
+	// an empty-string sentinel rather than NULL to keep reads/filters simple.
+	if has, err := db.hasColumn("tasks", "epic_id"); err != nil {
+		return err
+	} else if !has {
+		if _, err := db.conn.Exec(`ALTER TABLE tasks ADD COLUMN epic_id VARCHAR NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
 
 	// Create task_dependencies table for blocking relationships
 	depQuery := `
@@ -318,14 +330,14 @@ func (db *DB) GetAllConfig() (map[string]string, error) {
 	return config, rows.Err()
 }
 
-func (db *DB) CreateTask(id, title, description string, status, priority int, link string) error {
-	query := `INSERT INTO tasks (id, title, description, status, priority, link) VALUES (?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(query, id, title, description, status, priority, link)
+func (db *DB) CreateTask(id, title, description string, status, priority int, link, epicID string) error {
+	query := `INSERT INTO tasks (id, title, description, status, priority, link, epic_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(query, id, title, description, status, priority, link, epicID)
 	return err
 }
 
 func (db *DB) GetAllTasks() ([]TaskRecord, error) {
-	query := `SELECT id, title, description, status, priority, COALESCE(link, '') FROM tasks ORDER BY priority DESC, title`
+	query := `SELECT id, title, description, status, priority, COALESCE(link, ''), COALESCE(epic_id, '') FROM tasks ORDER BY priority DESC, title`
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
@@ -335,7 +347,7 @@ func (db *DB) GetAllTasks() ([]TaskRecord, error) {
 	var tasks []TaskRecord
 	for rows.Next() {
 		var task TaskRecord
-		err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.Priority, &task.Link)
+		err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.Priority, &task.Link, &task.EpicID)
 		if err != nil {
 			return nil, err
 		}
@@ -343,6 +355,14 @@ func (db *DB) GetAllTasks() ([]TaskRecord, error) {
 	}
 
 	return tasks, rows.Err()
+}
+
+// SetTaskEpic assigns a task to an epic. Pass an empty string to clear it.
+// Kept separate from UpdateTask so generic edits never clobber the epic link.
+func (db *DB) SetTaskEpic(taskID, epicID string) error {
+	query := `UPDATE tasks SET epic_id = ? WHERE id = ?`
+	_, err := db.conn.Exec(query, epicID, taskID)
+	return err
 }
 
 func (db *DB) UpdateTask(id, title, description string, status, priority int, link string) error {
@@ -358,11 +378,11 @@ func (db *DB) DeleteTask(id string) error {
 }
 
 func (db *DB) GetTaskByID(id string) (*TaskRecord, error) {
-	query := `SELECT id, title, description, status, priority, COALESCE(link, '') FROM tasks WHERE id = ?`
+	query := `SELECT id, title, description, status, priority, COALESCE(link, ''), COALESCE(epic_id, '') FROM tasks WHERE id = ?`
 	row := db.conn.QueryRow(query, id)
 
 	var task TaskRecord
-	err := row.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.Priority, &task.Link)
+	err := row.Scan(&task.ID, &task.Title, &task.Description, &task.Status, &task.Priority, &task.Link, &task.EpicID)
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,7 @@ var (
 	createPriority    string
 	createLabel       string
 	createLink        string
+	createEpic        string
 	createBulk        string
 )
 
@@ -56,6 +57,7 @@ For bulk creation, use --bulk with a JSON array or '-' for stdin:
 			}
 
 			newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, createTitle, createDescription, priority, createLink)
+			newTask.SetEpicID(createEpic)
 
 			if err := svc.CreateTask(newTask); err != nil {
 				return output.Error(err)
@@ -133,6 +135,7 @@ func handleBulkCreate(svc *task.Service, bulkInput string) error {
 		}
 
 		newTask := task.NewTaskComplete(svc.GenerateTaskID(), status, input.Title, input.Description, priority, input.Link)
+		newTask.SetEpicID(createEpic)
 
 		if err := svc.CreateTask(newTask); err != nil {
 			result.Failed = append(result.Failed, output.BulkItem{Title: input.Title, Error: err.Error()})
@@ -162,5 +165,6 @@ func init() {
 	createCmd.Flags().StringVar(&createPriority, "priority", "low", "Task priority (high, medium, low or 1-3)")
 	createCmd.Flags().StringVar(&createLabel, "label", "task", "Task label (task, bug, feature, docs)")
 	createCmd.Flags().StringVar(&createLink, "url", "", "URL associated with the task (e.g., google.com)")
+	createCmd.Flags().StringVar(&createEpic, "epic", "", "ID of the epic this task belongs to")
 	createCmd.Flags().StringVar(&createBulk, "bulk", "", "JSON array of tasks to create, or '-' for stdin")
 }

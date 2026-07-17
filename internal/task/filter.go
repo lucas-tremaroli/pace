@@ -11,6 +11,7 @@ type TaskFilter struct {
 	Priority   *int    // Single priority, AND semantics (used by bulk ops)
 	Priorities []int   // Multiple priorities, OR semantics (used by list)
 	Label      *string // Filter by label
+	EpicID     *string // Filter by epic (empty string matches epic-less tasks)
 	Ready      bool    // Only show tasks ready to work on (not done, all blockers done)
 }
 
@@ -41,8 +42,10 @@ func ParseFilter(s string) (*TaskFilter, error) {
 		filter.Priority = &priority
 	case "label":
 		filter.Label = &value
+	case "epic":
+		filter.EpicID = &value
 	default:
-		return nil, fmt.Errorf("unknown filter key: %s (valid: status, priority, label)", key)
+		return nil, fmt.Errorf("unknown filter key: %s (valid: status, priority, label, epic)", key)
 	}
 
 	return filter, nil
@@ -69,6 +72,9 @@ func (f *TaskFilter) Matches(t Task) bool {
 		}
 	}
 	if f.Label != nil && t.Label() != *f.Label {
+		return false
+	}
+	if f.EpicID != nil && t.EpicID() != *f.EpicID {
 		return false
 	}
 	return true
@@ -137,6 +143,12 @@ func MergeFilters(filters []*TaskFilter) (*TaskFilter, error) {
 				return nil, fmt.Errorf("duplicate filter: label specified multiple times")
 			}
 			merged.Label = f.Label
+		}
+		if f.EpicID != nil {
+			if merged.EpicID != nil {
+				return nil, fmt.Errorf("duplicate filter: epic specified multiple times")
+			}
+			merged.EpicID = f.EpicID
 		}
 	}
 	return merged, nil

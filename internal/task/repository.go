@@ -8,11 +8,14 @@ import "github.com/lucas-tremaroli/pace/internal/storage"
 type TaskRepository interface {
 	Close() error
 	// Tasks
-	CreateTask(id, title, description string, status, priority int, link string) error
+	CreateTask(id, title, description string, status, priority int, link, epicID string) error
 	GetAllTasks() ([]storage.TaskRecord, error)
 	GetTaskByID(id string) (*storage.TaskRecord, error)
 	UpdateTask(id, title, description string, status, priority int, link string) error
 	DeleteTask(id string) error
+	SetTaskEpic(taskID, epicID string) error
+	// Epics (used to validate epic links and scope dependencies)
+	GetEpicByID(id string) (*storage.EpicRecord, error)
 	// Dependencies
 	AddDependency(blockerID, blockedID string) error
 	RemoveDependency(blockerID, blockedID string) error

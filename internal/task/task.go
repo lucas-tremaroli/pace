@@ -18,6 +18,7 @@ type Task struct {
 	labels      []string
 	notes       []string
 	link        string
+	epicID      string
 }
 
 // TaskJSON is the JSON-serializable representation of a Task
@@ -32,6 +33,7 @@ type TaskJSON struct {
 	Label       string   `json:"label,omitempty"`
 	Notes       []string `json:"notes,omitempty"`
 	Link        string   `json:"link,omitempty"`
+	EpicID      string   `json:"epic_id,omitempty"`
 }
 
 // TaskInput is used for parsing bulk task creation input
@@ -94,6 +96,16 @@ func (t Task) Priority() int {
 
 func (t Task) Link() string {
 	return t.link
+}
+
+// EpicID returns the ID of the epic this task belongs to (empty if none)
+func (t Task) EpicID() string {
+	return t.epicID
+}
+
+// SetEpicID assigns the task to an epic (empty string clears it)
+func (t *Task) SetEpicID(id string) {
+	t.epicID = id
 }
 
 // BlockedBy returns the IDs of tasks that block this task
@@ -226,6 +238,7 @@ func (t Task) ToJSON() TaskJSON {
 		Label:       t.Label(),
 		Notes:       t.notes,
 		Link:        t.link,
+		EpicID:      t.epicID,
 	}
 }
 

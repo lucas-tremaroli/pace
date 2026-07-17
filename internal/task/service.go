@@ -54,8 +54,40 @@ func (s *Service) CreateTask(task Task) error {
 	if err := task.Validate(); err != nil {
 		return err
 	}
+	if err := s.assertEpicExists(task.EpicID()); err != nil {
+		return err
+	}
 
-	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority(), task.Link())
+	return s.db.CreateTask(task.ID(), task.Title(), task.Description(), int(task.Status()), task.Priority(), task.Link(), task.EpicID())
+}
+
+// SetEpic assigns a task to an epic, or clears it when epicID is empty.
+func (s *Service) SetEpic(taskID, epicID string) error {
+	if _, err := s.db.GetTaskByID(taskID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if err := s.assertEpicExists(epicID); err != nil {
+		return err
+	}
+	return s.db.SetTaskEpic(taskID, epicID)
+}
+
+// assertEpicExists returns nil when epicID is empty (no epic) or references
+// an existing epic; otherwise ErrEpicNotFound.
+func (s *Service) assertEpicExists(epicID string) error {
+	if epicID == "" {
+		return nil
+	}
+	if _, err := s.db.GetEpicByID(epicID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, storage.ErrNotFound) {
+			return ErrEpicNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 // UpdateTask updates an existing task in the database.
@@ -132,6 +164,7 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 	var tasks []Task
 	for _, record := range taskRecords {
 		task := NewTaskComplete(record.ID, Status(record.Status), record.Title, record.Description, record.Priority, record.Link)
+		task.SetEpicID(record.EpicID)
 		task.SetBlockedBy(blockedByMap[record.ID])
 		task.SetBlocks(blocksMap[record.ID])
 		task.SetLabels(labelsMap[record.ID])
@@ -153,6 +186,7 @@ func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	}
 
 	task := NewTaskComplete(record.ID, Status(record.Status), record.Title, record.Description, record.Priority, record.Link)
+	task.SetEpicID(record.EpicID)
 
 	// Load dependencies for this task
 	blockedBy, err := s.db.GetBlockers(taskID)
@@ -183,14 +217,20 @@ func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	return &task, nil
 }
 
-// AddDependency creates a blocking relationship where blocker blocks blocked
+// AddDependency creates a blocking relationship where blocker blocks blocked.
+// Dependencies are scoped within an epic: both tasks must share the same
+// epic_id (or both be epic-less). Cross-epic links are rejected.
 func (s *Service) AddDependency(blockerID, blockedID string) error {
-	// Verify both tasks exist
-	if _, err := s.db.GetTaskByID(blockerID); err != nil {
+	blocker, err := s.db.GetTaskByID(blockerID)
+	if err != nil {
 		return err
 	}
-	if _, err := s.db.GetTaskByID(blockedID); err != nil {
+	blocked, err := s.db.GetTaskByID(blockedID)
+	if err != nil {
 		return err
+	}
+	if blocker.EpicID != blocked.EpicID {
+		return fmt.Errorf("%w: %s (epic %q) and %s (epic %q)", ErrCrossEpicDep, blockerID, blocker.EpicID, blockedID, blocked.EpicID)
 	}
 	return s.db.AddDependency(blockerID, blockedID)
 }
