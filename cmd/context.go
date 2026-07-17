@@ -62,7 +62,10 @@ var contextCmd = &cobra.Command{
 		var activeEpics []epic.Epic
 		if err := cmdutil.WithEpicService(func(epicSvc *epic.Service) error {
 			activeEpics, err = epicSvc.LoadEpicsByStatus(epic.Active)
-			return err
+			if err != nil {
+				return output.Error(err)
+			}
+			return nil
 		}); err != nil {
 			return err
 		}

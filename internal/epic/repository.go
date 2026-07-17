@@ -12,5 +12,4 @@ type EpicRepository interface {
 	GetEpicByID(id string) (*storage.EpicRecord, error)
 	UpdateEpic(rec storage.EpicRecord) error
 	DeleteEpic(id string) error
-	ClearTaskEpic(epicID string) error
 }

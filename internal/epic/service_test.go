@@ -62,8 +62,6 @@ func (m *memRepo) DeleteEpic(id string) error {
 	return nil
 }
 
-func (m *memRepo) ClearTaskEpic(string) error { return nil }
-
 func TestService_CreateAndGet(t *testing.T) {
 	svc := NewServiceWithRepository(newMemRepo())
 	e := NewEpic("epic-aaa", Planning, "spec the thing", "rough notes")

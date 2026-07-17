@@ -52,18 +52,20 @@ func NewHandler() (*Handler, error) {
 	}, nil
 }
 
-// Close cleans up handler resources
+// Close cleans up handler resources, closing every service and returning a
+// combined error so no close failure is silently dropped.
 func (h *Handler) Close() error {
+	var errs []error
 	if h.epicService != nil {
-		h.epicService.Close()
+		errs = append(errs, h.epicService.Close())
 	}
 	if h.noteService != nil {
-		h.noteService.Close()
+		errs = append(errs, h.noteService.Close())
 	}
 	if h.taskService != nil {
-		return h.taskService.Close()
+		errs = append(errs, h.taskService.Close())
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // HandleRequest processes a JSON-RPC request and returns a response

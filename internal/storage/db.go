@@ -813,16 +813,20 @@ func (db *DB) UpdateEpic(rec EpicRecord) error {
 	return nil
 }
 
-// ClearTaskEpic unlinks every task from the given epic (sets epic_id back to
-// ''). Called when an epic is deleted so no task points at a dead epic.
-func (db *DB) ClearTaskEpic(epicID string) error {
-	_, err := db.conn.Exec(`UPDATE tasks SET epic_id = '' WHERE epic_id = ?`, epicID)
-	return err
-}
-
+// DeleteEpic removes an epic and, in the same transaction, unlinks any task
+// that pointed at it (epic_id back to ''). Atomic so a task can never be left
+// pointing at a deleted epic, nor unlinked from an epic that still exists.
 func (db *DB) DeleteEpic(id string) error {
-	query := `DELETE FROM epics WHERE id = ?`
-	result, err := db.conn.Exec(query, id)
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`UPDATE tasks SET epic_id = '' WHERE epic_id = ?`, id); err != nil {
+		return err
+	}
+	result, err := tx.Exec(`DELETE FROM epics WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}
@@ -833,5 +837,5 @@ func (db *DB) DeleteEpic(id string) error {
 	if rows == 0 {
 		return ErrNotFound
 	}
-	return nil
+	return tx.Commit()
 }
