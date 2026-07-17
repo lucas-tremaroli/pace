@@ -9,9 +9,14 @@ import (
 type StorageType string
 
 const (
-	StorageTypeProject StorageType = "project"
-	StorageTypeGlobal  StorageType = "global"
+	StorageTypeProject  StorageType = "project"
+	StorageTypeGlobal   StorageType = "global"
+	StorageTypeExplicit StorageType = "explicit"
 )
+
+// PaceDirEnv is the environment variable that, when set, overrides storage
+// resolution and points pace directly at the given directory.
+const PaceDirEnv = "PACE_DIR"
 
 // ResolvedPath contains the resolved pace directory path and its type
 type ResolvedPath struct {
@@ -23,10 +28,16 @@ type ResolvedPath struct {
 const PaceDirName = ".pace"
 
 // ResolvePaceDir determines the appropriate pace directory using the following priority:
-// 1. Search upward from cwd for .pace/ directory (project storage)
-// 2. Fall back to ~/.config/pace/ (global storage)
+// 1. PACE_DIR environment variable, if set (explicit override)
+// 2. Search upward from cwd for .pace/ directory (project storage)
+// 3. Fall back to ~/.config/pace/ (global storage)
 func ResolvePaceDir() (ResolvedPath, error) {
-	// Priority 1: Search upward from cwd for .pace/ directory
+	// Priority 1: explicit override via PACE_DIR
+	if dir := os.Getenv(PaceDirEnv); dir != "" {
+		return ResolvedPath{Path: dir, Type: StorageTypeExplicit}, nil
+	}
+
+	// Priority 2: Search upward from cwd for .pace/ directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		return ResolvedPath{}, err
@@ -39,7 +50,7 @@ func ResolvePaceDir() (ResolvedPath, error) {
 		}, nil
 	}
 
-	// Priority 2: Fall back to global ~/.config/pace/
+	// Priority 3: Fall back to global ~/.config/pace/
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return ResolvedPath{}, err

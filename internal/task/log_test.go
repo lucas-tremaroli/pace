@@ -1,7 +1,6 @@
 package task
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -17,10 +16,6 @@ func setupTestService(t *testing.T) *Service {
 	if err != nil {
 		t.Fatalf("failed to create test db: %v", err)
 	}
-
-	// Set PACE_DIR so GetOrInitPrefix doesn't fail
-	os.Setenv("PACE_DIR", dir)
-	t.Cleanup(func() { os.Unsetenv("PACE_DIR") })
 
 	prefix, err := GetOrInitPrefix(db)
 	if err != nil {
