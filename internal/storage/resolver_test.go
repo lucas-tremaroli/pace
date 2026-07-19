@@ -6,7 +6,39 @@ import (
 	"testing"
 )
 
+func TestResolvePaceDir_ExplicitEnvOverride(t *testing.T) {
+	// PACE_DIR must win over an in-scope .pace/ project directory.
+	tmpDir := t.TempDir()
+	projectDir := filepath.Join(tmpDir, "myproject")
+	if err := os.MkdirAll(filepath.Join(projectDir, ".pace"), 0755); err != nil {
+		t.Fatalf("failed to create .pace dir: %v", err)
+	}
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("failed to chdir to projectDir: %v", err)
+	}
+
+	explicit := filepath.Join(tmpDir, "explicit-store")
+	t.Setenv(PaceDirEnv, explicit)
+
+	resolved, err := ResolvePaceDir()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Path != explicit {
+		t.Errorf("expected path %q, got %q", explicit, resolved.Path)
+	}
+	if resolved.Type != StorageTypeExplicit {
+		t.Errorf("expected type %q, got %q", StorageTypeExplicit, resolved.Type)
+	}
+}
+
 func TestResolvePaceDir_ProjectDirectory(t *testing.T) {
+	t.Setenv(PaceDirEnv, "") // ignore any ambient PACE_DIR
 	// Set up temp directory with .pace/
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "myproject")
@@ -38,6 +70,7 @@ func TestResolvePaceDir_ProjectDirectory(t *testing.T) {
 }
 
 func TestResolvePaceDir_ProjectSubdirectory(t *testing.T) {
+	t.Setenv(PaceDirEnv, "") // ignore any ambient PACE_DIR
 	// Set up temp directory with .pace/ and a subdirectory
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "myproject")
@@ -73,6 +106,7 @@ func TestResolvePaceDir_ProjectSubdirectory(t *testing.T) {
 }
 
 func TestResolvePaceDir_GlobalFallback(t *testing.T) {
+	t.Setenv(PaceDirEnv, "") // ignore any ambient PACE_DIR
 	// Set up temp directory WITHOUT .pace/
 	tmpDir := t.TempDir()
 
