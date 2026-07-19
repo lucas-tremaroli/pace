@@ -13,9 +13,14 @@ func TestResolvePaceDir_ExplicitEnvOverride(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(projectDir, ".pace"), 0755); err != nil {
 		t.Fatalf("failed to create .pace dir: %v", err)
 	}
-	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
-	os.Chdir(projectDir)
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("failed to chdir to projectDir: %v", err)
+	}
 
 	explicit := filepath.Join(tmpDir, "explicit-store")
 	t.Setenv(PaceDirEnv, explicit)
