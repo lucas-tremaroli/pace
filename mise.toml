@@ -12,3 +12,12 @@ run = "go install -ldflags='-s -w' ."
 
 [tasks.clean]
 run = "rm -rf bin/"
+
+[tasks.tui]
+description = "Build and run the TUI from source against a throwaway store"
+run = '''
+go build -o bin/pace .
+export PACE_DIR="${PACE_DIR:-$(mktemp -d)}"
+echo "store: $PACE_DIR"
+./bin/pace tui
+'''
