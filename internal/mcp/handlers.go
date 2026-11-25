@@ -4,12 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/lucas-tremaroli/pace/internal/epic"
-	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/lucas-tremaroli/pace/internal/task"
@@ -21,7 +18,6 @@ var Version = "dev"
 // Handler manages MCP request handling
 type Handler struct {
 	taskService *task.Service
-	noteService *note.Service
 	epicService *epic.Service
 }
 
@@ -32,22 +28,14 @@ func NewHandler() (*Handler, error) {
 		return nil, fmt.Errorf("failed to initialize task service: %w", err)
 	}
 
-	noteService, err := note.NewService()
-	if err != nil {
-		taskService.Close()
-		return nil, fmt.Errorf("failed to initialize note service: %w", err)
-	}
-
 	epicService, err := epic.NewService()
 	if err != nil {
 		taskService.Close()
-		noteService.Close()
 		return nil, fmt.Errorf("failed to initialize epic service: %w", err)
 	}
 
 	return &Handler{
 		taskService: taskService,
-		noteService: noteService,
 		epicService: epicService,
 	}, nil
 }
@@ -58,9 +46,6 @@ func (h *Handler) Close() error {
 	var errs []error
 	if h.epicService != nil {
 		errs = append(errs, h.epicService.Close())
-	}
-	if h.noteService != nil {
-		errs = append(errs, h.noteService.Close())
 	}
 	if h.taskService != nil {
 		errs = append(errs, h.taskService.Close())
@@ -145,21 +130,7 @@ func (h *Handler) toolContext() ToolCallResult {
 		inProgressList = append(inProgressList, t.ToJSON())
 	}
 
-	notes, err := h.noteService.ListNotesWithMeta(false)
-	if err != nil {
-		return errorResult(fmt.Sprintf("failed to list notes: %v", err))
-	}
-
-	noteList := make([]map[string]any, 0, len(notes))
-	for _, n := range notes {
-		noteList = append(noteList, map[string]any{
-			"filename":    n.Filename,
-			"description": n.Description,
-			"labels":      n.Labels,
-		})
-	}
-
-	activeEpics, err := h.epicService.LoadEpicsByStatus(epic.Active)
+	activeEpics, err := h.epicService.LoadOpenEpics()
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to load epics: %v", err))
 	}
@@ -183,7 +154,6 @@ func (h *Handler) toolContext() ToolCallResult {
 			"in_progress": inProgressList,
 			"todo":        todoList,
 		},
-		"notes": noteList,
 		"summary": map[string]any{
 			"tasks": map[string]any{
 				"total":       len(tasks),
@@ -191,7 +161,6 @@ func (h *Handler) toolContext() ToolCallResult {
 				"in_progress": len(inProgressList),
 				"done":        len(tasks) - len(todoList) - len(inProgressList),
 			},
-			"notes": len(noteList),
 			"epics": len(epicList),
 		},
 	})
@@ -335,6 +304,9 @@ func (h *Handler) toolTaskCreate(args map[string]any) ToolCallResult {
 	// Generate ID and create task
 	id := h.taskService.GenerateTaskID()
 	newTask := task.NewTaskComplete(id, status, title, description, priority, link)
+	if epicID, ok := args["epic_id"].(string); ok {
+		newTask.SetEpicID(epicID)
+	}
 
 	if err := h.taskService.CreateTask(newTask); err != nil {
 		return errorResult(fmt.Sprintf("failed to create task: %v", err))
@@ -421,6 +393,13 @@ func (h *Handler) toolTaskUpdate(args map[string]any) ToolCallResult {
 		return errorResult(fmt.Sprintf("failed to update task: %v", err))
 	}
 
+	// Assign (or clear, with "") the epic if provided
+	if epicID, ok := args["epic_id"].(string); ok {
+		if err := h.taskService.SetEpic(id, epicID); err != nil {
+			return errorResult(fmt.Sprintf("task updated but failed to set epic: %v", err))
+		}
+	}
+
 	// Set label if provided
 	if l, ok := args["label"].(string); ok {
 		if err := task.ValidateLabel(l); err != nil {
@@ -502,186 +481,6 @@ func (h *Handler) toolTaskDepRemove(args map[string]any) ToolCallResult {
 	return jsonResult(map[string]any{
 		"success": true,
 		"message": fmt.Sprintf("%s no longer blocks %s", blockerID, blockedID),
-	})
-}
-
-func (h *Handler) toolTaskNoteLink(args map[string]any) ToolCallResult {
-	taskID, ok := args["task_id"].(string)
-	if !ok || taskID == "" {
-		return codedError(output.ErrCodeMissingField, "task_id is required", "Provide the task ID to link the note to")
-	}
-
-	noteFilename, ok := args["note_filename"].(string)
-	if !ok || noteFilename == "" {
-		return codedError(output.ErrCodeMissingField, "note_filename is required", "Provide the note filename")
-	}
-
-	// Normalize filename to include .md extension
-	if !strings.HasSuffix(noteFilename, ".md") {
-		noteFilename += ".md"
-	}
-
-	if err := h.taskService.LinkNote(taskID, noteFilename); err != nil {
-		if errors.Is(err, task.ErrTaskNotFound) {
-			return codedError(output.ErrCodeTaskNotFound, fmt.Sprintf("task not found: %s", taskID), "Use pace_task_list to see available task IDs")
-		}
-		return errorResult(fmt.Sprintf("failed to link note: %v", err))
-	}
-
-	return jsonResult(map[string]any{
-		"success": true,
-		"message": fmt.Sprintf("linked %s to task %s", noteFilename, taskID),
-	})
-}
-
-func (h *Handler) toolTaskNoteUnlink(args map[string]any) ToolCallResult {
-	taskID, ok := args["task_id"].(string)
-	if !ok || taskID == "" {
-		return codedError(output.ErrCodeMissingField, "task_id is required", "Provide the task ID to unlink the note from")
-	}
-
-	noteFilename, ok := args["note_filename"].(string)
-	if !ok || noteFilename == "" {
-		return codedError(output.ErrCodeMissingField, "note_filename is required", "Provide the note filename")
-	}
-
-	// Normalize filename to include .md extension
-	if !strings.HasSuffix(noteFilename, ".md") {
-		noteFilename += ".md"
-	}
-
-	if err := h.taskService.UnlinkNote(taskID, noteFilename); err != nil {
-		return errorResult(fmt.Sprintf("failed to unlink note: %v", err))
-	}
-
-	return jsonResult(map[string]any{
-		"success": true,
-		"message": fmt.Sprintf("unlinked %s from task %s", noteFilename, taskID),
-	})
-}
-
-func (h *Handler) toolNoteList(args map[string]any) ToolCallResult {
-	notes, err := h.noteService.ListNotesWithMeta(false)
-	if err != nil {
-		return errorResult(fmt.Sprintf("failed to list notes: %v", err))
-	}
-
-	// Apply head truncation
-	if head := parseHead(args); head > 0 && head < len(notes) {
-		notes = notes[:head]
-	}
-
-	// Apply field filtering
-	if fields := parseFields(args); len(fields) > 0 {
-		maps, err := output.ToMapSlice(notes)
-		if err != nil {
-			return errorResult(fmt.Sprintf("failed to filter fields: %v", err))
-		}
-		filtered := output.FilterFields(maps, fields)
-		return jsonResult(map[string]any{"notes": filtered, "count": len(filtered)})
-	}
-
-	return jsonResult(output.NoteListResponse{Notes: notes, Count: len(notes)})
-}
-
-func (h *Handler) toolNoteCreate(args map[string]any) ToolCallResult {
-	filename, ok := args["filename"].(string)
-	if !ok || filename == "" {
-		return codedError(output.ErrCodeMissingField, "filename is required", "Provide a filename without the .md extension")
-	}
-	if err := validateFilename(filename); err != nil {
-		return codedError(output.ErrCodeInvalidFilename, err.Error(), "Use a simple filename without path separators (e.g. my-note)")
-	}
-
-	content, ok := args["content"].(string)
-	if !ok {
-		return codedError(output.ErrCodeMissingField, "content is required", "Provide the note content as a markdown string")
-	}
-
-	if err := h.noteService.WriteNote(filename, content); err != nil {
-		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to create note: %v", err), "")
-	}
-
-	// Ensure filename has .md extension for display
-	displayName := filename
-	if !strings.HasSuffix(displayName, ".md") {
-		displayName += ".md"
-	}
-
-	// Link to tasks if task_ids provided
-	if taskIDsRaw, ok := args["task_ids"]; ok {
-		if taskIDs, ok := taskIDsRaw.([]any); ok {
-			for _, tid := range taskIDs {
-				if id, ok := tid.(string); ok && id != "" {
-					if err := h.taskService.LinkNote(id, displayName); err != nil {
-						return errorResult(fmt.Sprintf("note %s created but failed to link to task %s: %v", displayName, id, err))
-					}
-				}
-			}
-		}
-	}
-
-	return jsonResult(map[string]any{
-		"success":  true,
-		"message":  fmt.Sprintf("created note %s", displayName),
-		"filename": displayName,
-	})
-}
-
-func (h *Handler) toolNoteRead(args map[string]any) ToolCallResult {
-	filename, ok := args["filename"].(string)
-	if !ok || filename == "" {
-		return codedError(output.ErrCodeMissingField, "filename is required", "Provide the note filename (with or without .md extension)")
-	}
-	if err := validateFilename(filename); err != nil {
-		return codedError(output.ErrCodeInvalidFilename, err.Error(), "Use a simple filename without path separators (e.g. my-note)")
-	}
-
-	noteData, err := h.noteService.ReadNoteWithMeta(filename)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return codedError(output.ErrCodeNoteNotFound, fmt.Sprintf("note not found: %s", filename), "Use pace_note_list to see available notes")
-		}
-		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to read note: %v", err), "")
-	}
-
-	result := map[string]any{
-		"filename":    noteData.Filename,
-		"content":     noteData.Content,
-		"description": noteData.Description,
-		"labels":      noteData.Labels,
-		"modTime":     noteData.ModTime,
-	}
-	if len(noteData.Tasks) > 0 {
-		result["tasks"] = noteData.Tasks
-	}
-	return jsonResult(result)
-}
-
-func (h *Handler) toolNoteDelete(args map[string]any) ToolCallResult {
-	filename, ok := args["filename"].(string)
-	if !ok || filename == "" {
-		return codedError(output.ErrCodeMissingField, "filename is required", "Provide the note filename to delete")
-	}
-	if err := validateFilename(filename); err != nil {
-		return codedError(output.ErrCodeInvalidFilename, err.Error(), "Use a simple filename without path separators (e.g. my-note)")
-	}
-
-	// Ensure filename has .md extension
-	if !strings.HasSuffix(filename, ".md") {
-		filename += ".md"
-	}
-
-	if err := h.noteService.DeleteNote(filename); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return codedError(output.ErrCodeNoteNotFound, fmt.Sprintf("note not found: %s", filename), "Use pace_note_list to see available notes")
-		}
-		return codedError(output.ErrCodeStorageError, fmt.Sprintf("failed to delete note: %v", err), "")
-	}
-
-	return jsonResult(map[string]any{
-		"success": true,
-		"message": fmt.Sprintf("deleted note %s", filename),
 	})
 }
 
@@ -971,6 +770,7 @@ func activeEpicSummary(e epic.Epic) map[string]any {
 		"id":            e.ID(),
 		"title":         e.Title(),
 		"status":        e.Status().String(),
+		"summary":       e.Summary(),
 		"current_state": headline(spec.CurrentState),
 		"target_state":  headline(spec.TargetState),
 	}
@@ -1040,15 +840,4 @@ func parseHead(args map[string]any) int {
 		}
 	}
 	return 0
-}
-
-// validateFilename rejects filenames that could escape the notes directory.
-func validateFilename(filename string) error {
-	if filepath.IsAbs(filename) {
-		return fmt.Errorf("filename must not be an absolute path")
-	}
-	if filepath.Base(filename) != filename {
-		return fmt.Errorf("filename must not contain path separators")
-	}
-	return nil
 }

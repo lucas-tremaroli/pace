@@ -29,13 +29,6 @@ type TaskRepository interface {
 	GetLabels(taskID string) ([]string, error)
 	GetAllLabels() (map[string][]string, error)
 	RemoveAllLabels(taskID string) error
-	// Task-note links
-	AddTaskNote(taskID, noteFilename string) error
-	RemoveTaskNote(taskID, noteFilename string) error
-	GetNotesForTask(taskID string) ([]string, error)
-	GetTasksForNote(noteFilename string) ([]string, error)
-	GetAllTaskNotes() (map[string][]string, error)
-	RemoveAllTaskNotes(taskID string) error
 	// Logs
 	CreateLog(taskID, message, logType string) error
 	GetLogsByTaskID(taskID string) ([]storage.LogRecord, error)

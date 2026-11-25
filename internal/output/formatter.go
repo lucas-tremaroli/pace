@@ -46,7 +46,6 @@ func ToMapSlice(v any) ([]map[string]any, error) {
 // Error code constants for machine-readable error identification
 const (
 	ErrCodeTaskNotFound       = "TASK_NOT_FOUND"
-	ErrCodeNoteNotFound       = "NOTE_NOT_FOUND"
 	ErrCodeEpicNotFound       = "EPIC_NOT_FOUND"
 	ErrCodeMissingField       = "MISSING_REQUIRED_FIELD"
 	ErrCodeInvalidStatus      = "INVALID_STATUS"

@@ -6,10 +6,9 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/note"
+	"github.com/lucas-tremaroli/pace/internal/epic"
 	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/lucas-tremaroli/pace/internal/task"
 )
@@ -35,7 +34,7 @@ type Root struct {
 	// Retained so Close() can shut the underlying DB connections
 	// down deterministically — both services wrap a SQLite handle.
 	taskSvc *task.Service
-	noteSvc *note.Service
+	epicSvc *epic.Service
 }
 
 type rootKeys struct {
@@ -55,10 +54,10 @@ func New() (*Root, error) {
 	if err != nil {
 		return nil, fmt.Errorf("task service: %w", err)
 	}
-	ns, err := note.NewService()
+	es, err := epic.NewService()
 	if err != nil {
 		ts.Close()
-		return nil, fmt.Errorf("note service: %w", err)
+		return nil, fmt.Errorf("epic service: %w", err)
 	}
 
 	var storePath string
@@ -69,13 +68,13 @@ func New() (*Root, error) {
 	}
 
 	return &Root{
-		tabs:        []tab{newKanban(ts), newNotes(ns)},
+		tabs:        []tab{newKanban(ts), newEpics(es, ts)},
 		help:        help.New(),
 		rootKeys:    newRootKeys(),
 		storagePath: storePath,
 		storageType: storeType,
 		taskSvc:     ts,
-		noteSvc:     ns,
+		epicSvc:     es,
 	}, nil
 }
 
@@ -91,11 +90,11 @@ func (r *Root) Close() error {
 		}
 		r.taskSvc = nil
 	}
-	if r.noteSvc != nil {
-		if err := r.noteSvc.Close(); err != nil && firstErr == nil {
+	if r.epicSvc != nil {
+		if err := r.epicSvc.Close(); err != nil && firstErr == nil {
 			firstErr = err
 		}
-		r.noteSvc = nil
+		r.epicSvc = nil
 	}
 	return firstErr
 }
@@ -172,10 +171,6 @@ func isCapturing(t tab) bool {
 		return f.inFilterMode()
 	}
 	return false
-}
-
-func (n *notes) inFilterMode() bool {
-	return n.list.FilterState() == list.Filtering
 }
 
 func (r *Root) View() string {
@@ -278,5 +273,5 @@ func (r *Root) renderFooter() string {
 // drive the footer.
 type footerKeys struct{ bindings []key.Binding }
 
-func (f footerKeys) ShortHelp() []key.Binding     { return f.bindings }
-func (f footerKeys) FullHelp() [][]key.Binding    { return [][]key.Binding{f.bindings} }
+func (f footerKeys) ShortHelp() []key.Binding  { return f.bindings }
+func (f footerKeys) FullHelp() [][]key.Binding { return [][]key.Binding{f.bindings} }

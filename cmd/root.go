@@ -10,7 +10,6 @@ import (
 	"github.com/lucas-tremaroli/pace/cmd/epic"
 	"github.com/lucas-tremaroli/pace/cmd/joke"
 	"github.com/lucas-tremaroli/pace/cmd/mcp"
-	"github.com/lucas-tremaroli/pace/cmd/note"
 	"github.com/lucas-tremaroli/pace/cmd/task"
 	"github.com/lucas-tremaroli/pace/cmd/tick"
 	"github.com/lucas-tremaroli/pace/cmd/tui"
@@ -111,7 +110,6 @@ func init() {
 
 	rootCmd.AddCommand(tui.TuiCmd)
 	rootCmd.AddCommand(task.TaskCmd)
-	rootCmd.AddCommand(note.NoteCmd)
 	rootCmd.AddCommand(epic.EpicCmd)
 	rootCmd.AddCommand(tick.TickCmd)
 	rootCmd.AddCommand(joke.JokeCmd)

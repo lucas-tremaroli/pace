@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lucas-tremaroli/pace/internal/cmdutil"
 	"github.com/lucas-tremaroli/pace/internal/epic"
-	"github.com/lucas-tremaroli/pace/internal/note"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/lucas-tremaroli/pace/internal/task"
@@ -26,8 +25,8 @@ var (
 
 var contextCmd = &cobra.Command{
 	Use:   "context",
-	Short: "Dump active tasks and notes for agent consumption",
-	Long:  `Displays storage info, active tasks (todo and in-progress), and notes as structured data. Use --pretty for human-readable output.`,
+	Short: "Dump active tasks and epics for agent consumption",
+	Long:  `Displays storage info, active tasks (todo and in-progress), and active epics as structured data. Use --pretty for human-readable output.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		taskSvc, err := task.NewService()
 		if err != nil {
@@ -49,19 +48,9 @@ var contextCmd = &cobra.Command{
 		todoTasks := todoFilter.Apply(tasks)
 		inProgressTasks := inProgressFilter.Apply(tasks)
 
-		noteSvc, err := note.NewService()
-		if err != nil {
-			return output.Error(err)
-		}
-
-		notes, err := noteSvc.ListNotesWithMeta(false)
-		if err != nil {
-			return output.Error(err)
-		}
-
 		var activeEpics []epic.Epic
 		if err := cmdutil.WithEpicService(func(epicSvc *epic.Service) error {
-			activeEpics, err = epicSvc.LoadEpicsByStatus(epic.Active)
+			activeEpics, err = epicSvc.LoadOpenEpics()
 			if err != nil {
 				return output.Error(err)
 			}
@@ -76,7 +65,7 @@ var contextCmd = &cobra.Command{
 		}
 
 		if contextPretty {
-			printContextPretty(resolved, tasks, todoTasks, inProgressTasks, notes, activeEpics)
+			printContextPretty(resolved, tasks, todoTasks, inProgressTasks, activeEpics)
 			return nil
 		}
 
@@ -88,15 +77,6 @@ var contextCmd = &cobra.Command{
 		for _, t := range inProgressTasks {
 			inProgressList = append(inProgressList, t.ToJSON())
 		}
-		noteList := make([]map[string]any, 0, len(notes))
-		for _, n := range notes {
-			noteList = append(noteList, map[string]any{
-				"filename":    n.Filename,
-				"description": n.Description,
-				"labels":      n.Labels,
-			})
-		}
-
 		epicList := make([]map[string]any, 0, len(activeEpics))
 		for _, e := range activeEpics {
 			epicList = append(epicList, epicSummary(e))
@@ -112,7 +92,6 @@ var contextCmd = &cobra.Command{
 				"in_progress": inProgressList,
 				"todo":        todoList,
 			},
-			"notes": noteList,
 			"summary": map[string]any{
 				"tasks": map[string]any{
 					"total":       len(tasks),
@@ -120,7 +99,6 @@ var contextCmd = &cobra.Command{
 					"in_progress": len(inProgressList),
 					"done":        len(tasks) - len(todoList) - len(inProgressList),
 				},
-				"notes": len(noteList),
 				"epics": len(epicList),
 			},
 		})
@@ -135,6 +113,7 @@ func epicSummary(e epic.Epic) map[string]any {
 		"id":            e.ID(),
 		"title":         e.Title(),
 		"status":        e.Status().String(),
+		"summary":       e.Summary(),
 		"current_state": firstLine(spec.CurrentState),
 		"target_state":  firstLine(spec.TargetState),
 	}
@@ -150,7 +129,7 @@ func firstLine(s string) string {
 	return ""
 }
 
-func printContextPretty(resolved storage.ResolvedPath, all, todo, inProgress []task.Task, notes []note.Note, activeEpics []epic.Epic) {
+func printContextPretty(resolved storage.ResolvedPath, all, todo, inProgress []task.Task, activeEpics []epic.Epic) {
 	done := len(all) - len(todo) - len(inProgress)
 	fmt.Println()
 	fmt.Println(ctxHeading.Render("Storage"))
@@ -158,7 +137,7 @@ func printContextPretty(resolved storage.ResolvedPath, all, todo, inProgress []t
 	fmt.Println()
 
 	if len(activeEpics) > 0 {
-		fmt.Println(ctxHeading.Render("Active epics"))
+		fmt.Println(ctxHeading.Render("Open epics"))
 		for _, e := range activeEpics {
 			fmt.Println("  " + ctxID.Render(e.ID()) + " " + ctxTitle.Render(e.Title()))
 			if h := firstLine(e.Spec().TargetState); h != "" {
@@ -184,17 +163,6 @@ func printContextPretty(resolved storage.ResolvedPath, all, todo, inProgress []t
 	}
 	fmt.Println()
 
-	fmt.Println(ctxHeading.Render("Notes"))
-	fmt.Printf("  %s %d total\n", ctxDim.Render("›"), len(notes))
-	for _, n := range notes {
-		name := strings.TrimSuffix(n.Filename, ".md")
-		line := "    " + ctxTitle.Render(name)
-		if n.Description != "" {
-			line += " " + ctxDim.Render("— "+n.Description)
-		}
-		fmt.Println(line)
-	}
-	fmt.Println()
 }
 
 func init() {

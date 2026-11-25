@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -12,17 +11,15 @@ import (
 )
 
 var (
-	migrateFrom      string
-	migrateTo        string
-	migrateDryRun    bool
-	migrateTasksOnly bool
-	migrateNotesOnly bool
+	migrateFrom   string
+	migrateTo     string
+	migrateDryRun bool
 )
 
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
-	Short: "Move tasks and notes between storages",
-	Long: `Migrate tasks and notes between global (~/.config/pace/) and project-specific (.pace/) storage.
+	Short: "Move tasks and their epics between storages",
+	Long: `Migrate tasks (and the epics they belong to) between global (~/.config/pace/) and project-specific (.pace/) storage.
 
 Examples:
   # Move tasks from global to current project
@@ -33,12 +30,7 @@ Examples:
 
   # Preview what would be migrated
   pace migrate --from global --to project --dry-run
-
-  # Migrate only tasks (not notes)
-  pace migrate --from global --to project --tasks-only
-
-  # Migrate only notes (not tasks)
-  pace migrate --from global --to project --notes-only`,
+`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate flags
 		if migrateFrom == "" || migrateTo == "" {
@@ -52,9 +44,6 @@ Examples:
 		}
 		if migrateFrom == migrateTo {
 			return output.ErrorMsg("--from and --to cannot be the same")
-		}
-		if migrateTasksOnly && migrateNotesOnly {
-			return output.ErrorMsg("cannot use both --tasks-only and --notes-only")
 		}
 
 		// Get source and destination paths
@@ -100,23 +89,11 @@ Examples:
 			"dry_run": migrateDryRun,
 		}
 
-		// Migrate tasks
-		if !migrateNotesOnly {
-			taskResult, err := migrateTasks(sourceDir, destDir, migrateDryRun)
-			if err != nil {
-				return output.Error(err)
-			}
-			result["tasks"] = taskResult
+		taskResult, err := migrateTasks(sourceDir, destDir, migrateDryRun)
+		if err != nil {
+			return output.Error(err)
 		}
-
-		// Migrate notes
-		if !migrateTasksOnly {
-			noteResult, err := migrateNotes(sourceDir, destDir, migrateDryRun)
-			if err != nil {
-				return output.Error(err)
-			}
-			result["notes"] = noteResult
-		}
+		result["tasks"] = taskResult
 
 		if migrateDryRun {
 			output.Success("migration preview", result)
@@ -180,6 +157,19 @@ func migrateTasks(sourceDir, destDir string, dryRun bool) (map[string]any, error
 		}
 
 		if !dryRun {
+			// Bring the task's epic along so epic_id doesn't dangle
+			if task.EpicID != "" {
+				if _, err := destDB.GetEpicByID(task.EpicID); err != nil {
+					rec, err := sourceDB.GetEpicByID(task.EpicID)
+					if err != nil {
+						return nil, fmt.Errorf("failed to load epic %s for task %s: %w", task.EpicID, task.ID, err)
+					}
+					if err := destDB.CreateEpic(*rec); err != nil {
+						return nil, fmt.Errorf("failed to migrate epic %s: %w", task.EpicID, err)
+					}
+				}
+			}
+
 			// Create task in destination
 			if err := destDB.CreateTask(task.ID, task.Title, task.Description, task.Status, task.Priority, task.Link, task.EpicID); err != nil {
 				return nil, fmt.Errorf("failed to migrate task %s: %w", task.ID, err)
@@ -245,94 +235,10 @@ func migrateTasks(sourceDir, destDir string, dryRun bool) (map[string]any, error
 	}, nil
 }
 
-func migrateNotes(sourceDir, destDir string, dryRun bool) (map[string]any, error) {
-	sourceNotesDir := filepath.Join(sourceDir, "notes")
-	destNotesDir := filepath.Join(destDir, "notes")
-
-	// Check if source notes dir exists
-	if _, err := os.Stat(sourceNotesDir); os.IsNotExist(err) {
-		return map[string]any{
-			"migrated":  0,
-			"skipped":   0,
-			"conflicts": []string{},
-		}, nil
-	}
-
-	// Ensure destination notes dir exists
-	if !dryRun {
-		if err := os.MkdirAll(destNotesDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create destination notes directory: %w", err)
-		}
-	}
-
-	// List source notes
-	entries, err := os.ReadDir(sourceNotesDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read source notes directory: %w", err)
-	}
-
-	var migrated, skipped int
-	var conflicts []string
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		sourcePath := filepath.Join(sourceNotesDir, entry.Name())
-		destPath := filepath.Join(destNotesDir, entry.Name())
-
-		// Check if file exists in destination
-		if _, err := os.Stat(destPath); err == nil {
-			conflicts = append(conflicts, entry.Name())
-			skipped++
-			continue
-		}
-
-		if !dryRun {
-			// Copy file to destination
-			if err := copyFile(sourcePath, destPath); err != nil {
-				return nil, fmt.Errorf("failed to copy note %s: %w", entry.Name(), err)
-			}
-
-			// Delete from source
-			if err := os.Remove(sourcePath); err != nil {
-				return nil, fmt.Errorf("failed to delete source note %s: %w", entry.Name(), err)
-			}
-		}
-		migrated++
-	}
-
-	return map[string]any{
-		"migrated":  migrated,
-		"skipped":   skipped,
-		"conflicts": conflicts,
-	}, nil
-}
-
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	return err
-}
-
 func init() {
 	migrateCmd.GroupID = "setup"
 	migrateCmd.Flags().StringVar(&migrateFrom, "from", "", "Source storage (global or project)")
 	migrateCmd.Flags().StringVar(&migrateTo, "to", "", "Destination storage (global or project)")
 	migrateCmd.Flags().BoolVar(&migrateDryRun, "dry-run", false, "Preview migration without making changes")
-	migrateCmd.Flags().BoolVar(&migrateTasksOnly, "tasks-only", false, "Migrate only tasks (not notes)")
-	migrateCmd.Flags().BoolVar(&migrateNotesOnly, "notes-only", false, "Migrate only notes (not tasks)")
 	rootCmd.AddCommand(migrateCmd)
 }

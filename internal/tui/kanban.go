@@ -104,7 +104,7 @@ func newKanban(svc kanbanService) *kanban {
 	return &kanban{svc: svc, cols: cols, keys: newKanbanKeys()}
 }
 
-func (k *kanban) Title() string         { return "Kanban" }
+func (k *kanban) Title() string               { return "Kanban" }
 func (k *kanban) HelpBindings() []key.Binding { return k.keys.ShortHelp() }
 func (k *kanban) Counts() (todo, inProg, done int) {
 	return len(k.cols[0].Items()), len(k.cols[1].Items()), len(k.cols[2].Items())
@@ -337,8 +337,8 @@ func (k *kanban) View() string {
 		}
 		// Width(N) on a bordered style produces a box of total width N.
 		rendered[i] = style.
-			Width(widths[i] - 2).
-			Height(k.height - 2).
+			Width(widths[i]-2).
+			Height(k.height-2).
 			Padding(0, 1).
 			Render(body)
 	}
@@ -470,7 +470,6 @@ func (k *kanban) saveTaskCmd() tea.Cmd {
 		updated.SetLabel(s.label)
 		updated.SetBlockedBy(existing.BlockedBy())
 		updated.SetBlocks(existing.Blocks())
-		updated.SetNotes(existing.Notes())
 		svc.UpdateTask(updated)
 		svc.SetLabel(s.id, s.label)
 		return taskMutatedMsg{}

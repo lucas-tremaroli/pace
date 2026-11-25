@@ -138,3 +138,18 @@ func (s *Service) LoadEpicsByStatus(status Status) ([]Epic, error) {
 	}
 	return out, nil
 }
+
+// LoadOpenEpics returns epics that still need work: planning or active.
+func (s *Service) LoadOpenEpics() ([]Epic, error) {
+	epics, err := s.LoadAllEpics()
+	if err != nil {
+		return nil, err
+	}
+	var out []Epic
+	for _, e := range epics {
+		if e.Status() != Done {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}

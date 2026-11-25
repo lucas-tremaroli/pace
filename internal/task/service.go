@@ -125,10 +125,6 @@ func (s *Service) DeleteTask(taskID string) error {
 	if err := s.db.RemoveAllLabels(taskID); err != nil {
 		return err
 	}
-	// Remove all note links for this task
-	if err := s.db.RemoveAllTaskNotes(taskID); err != nil {
-		return err
-	}
 	// Remove all logs for this task
 	if err := s.db.DeleteLogsByTaskID(taskID); err != nil {
 		return err
@@ -155,12 +151,6 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 		return nil, err
 	}
 
-	// Load all note links at once for efficiency
-	notesMap, err := s.db.GetAllTaskNotes()
-	if err != nil {
-		return nil, err
-	}
-
 	var tasks []Task
 	for _, record := range taskRecords {
 		task := NewTaskComplete(record.ID, Status(record.Status), record.Title, record.Description, record.Priority, record.Link)
@@ -168,7 +158,6 @@ func (s *Service) LoadAllTasks() ([]Task, error) {
 		task.SetBlockedBy(blockedByMap[record.ID])
 		task.SetBlocks(blocksMap[record.ID])
 		task.SetLabels(labelsMap[record.ID])
-		task.SetNotes(notesMap[record.ID])
 		tasks = append(tasks, task)
 	}
 
@@ -207,13 +196,6 @@ func (s *Service) GetTaskByID(taskID string) (*Task, error) {
 	}
 	task.SetLabels(labels)
 
-	// Load linked notes for this task
-	notes, err := s.db.GetNotesForTask(taskID)
-	if err != nil {
-		return nil, err
-	}
-	task.SetNotes(notes)
-
 	return &task, nil
 }
 
@@ -248,24 +230,6 @@ func (s *Service) SetLabel(taskID, label string) error {
 		return err
 	}
 	return s.db.SetLabel(taskID, label)
-}
-
-// LinkNote links a note to a task
-func (s *Service) LinkNote(taskID, noteFilename string) error {
-	if _, err := s.db.GetTaskByID(taskID); err != nil {
-		return err
-	}
-	return s.db.AddTaskNote(taskID, noteFilename)
-}
-
-// UnlinkNote removes a note link from a task
-func (s *Service) UnlinkNote(taskID, noteFilename string) error {
-	return s.db.RemoveTaskNote(taskID, noteFilename)
-}
-
-// GetTasksForNote returns task IDs linked to a note
-func (s *Service) GetTasksForNote(noteFilename string) ([]string, error) {
-	return s.db.GetTasksForNote(noteFilename)
 }
 
 // GetReadyTasks returns tasks that have no blockers or all blockers are done
