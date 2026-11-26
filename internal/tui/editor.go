@@ -19,21 +19,25 @@ type epicEditedMsg struct {
 }
 
 // editEpicCmd writes base to a temp file, opens it in $EDITOR and reports back
-// with epicEditedMsg. The file is read and removed by saveEditedEpicCmd.
+// with epicEditedMsg. The temp file is created inside the Cmd (no I/O in
+// Update) and is read and removed by saveEditedCmd.
 func editEpicCmd(base epic.Epic, create bool) tea.Cmd {
-	f, err := os.CreateTemp("", "pace-epic-*.md")
-	if err != nil {
-		return func() tea.Msg { return epicEditedMsg{err: err} }
+	open := func() tea.Msg {
+		f, err := os.CreateTemp("", "pace-epic-*.md")
+		if err != nil {
+			return epicEditedMsg{err: err}
+		}
+		_, werr := f.WriteString(epic.Format(base))
+		f.Close()
+		if werr != nil {
+			os.Remove(f.Name())
+			return epicEditedMsg{err: werr}
+		}
+		path := f.Name()
+		c := exec.Command(cmdutil.ResolveEditor(), path)
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			return epicEditedMsg{path: path, base: base, create: create, err: err}
+		})()
 	}
-	_, werr := f.WriteString(epic.Format(base))
-	f.Close()
-	if werr != nil {
-		os.Remove(f.Name())
-		return func() tea.Msg { return epicEditedMsg{err: werr} }
-	}
-	path := f.Name()
-	c := exec.Command(cmdutil.ResolveEditor(), path)
-	return tea.Sequence(tea.ClearScreen, tea.ExecProcess(c, func(err error) tea.Msg {
-		return epicEditedMsg{path: path, base: base, create: create, err: err}
-	}))
+	return tea.Sequence(tea.ClearScreen, open)
 }

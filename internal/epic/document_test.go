@@ -43,3 +43,17 @@ func TestParseErrorsAndPreamble(t *testing.T) {
 		t.Errorf("preamble handling wrong: %+v", got.Spec())
 	}
 }
+
+func TestParseIgnoresHeadingsInCodeFences(t *testing.T) {
+	base := NewEpic("epic-abc", Planning, "t", "")
+	body := "```md\n## Constraints\nnot a section\n```"
+	e := NewEpic("epic-abc", Planning, "t", "")
+	e.SetTargetState(body)
+	got, err := Parse(Format(e), base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Spec().TargetState != body || got.Spec().Constraints != "" {
+		t.Errorf("fenced heading split the section: %+v", got.Spec())
+	}
+}

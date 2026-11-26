@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
@@ -250,11 +251,34 @@ func renderEpicDetail(e epic.Epic, members []task.Task, w int) string {
 	return b.String()
 }
 
+var (
+	mdMu       sync.Mutex
+	mdRenderer *glamour.TermRenderer
+	mdWidth    int
+)
+
+// mdRendererFor returns a renderer for width, cached per width: WithAutoStyle
+// probes the terminal for its background, which must not happen on every
+// render inside a running TUI.
+func mdRendererFor(width int) *glamour.TermRenderer {
+	mdMu.Lock()
+	defer mdMu.Unlock()
+	if mdRenderer != nil && mdWidth == width {
+		return mdRenderer
+	}
+	r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(width))
+	if err != nil {
+		return nil
+	}
+	mdRenderer, mdWidth = r, width
+	return r
+}
+
 // renderMarkdown renders markdown for the detail pane, falling back to the
 // raw text if glamour fails.
 func renderMarkdown(content string, width int) string {
-	r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(width))
-	if err != nil {
+	r := mdRendererFor(width)
+	if r == nil {
 		return content
 	}
 	out, err := r.Render(content)

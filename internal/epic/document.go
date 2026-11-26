@@ -81,8 +81,13 @@ func Parse(content string, base Epic) (Epic, error) {
 		}
 		buf = nil
 	}
+	inFence := false
 	for _, line := range strings.Split(body, "\n") {
-		if name, ok := strings.CutPrefix(line, "## "); ok {
+		// Headings inside fenced code blocks are content, not section breaks.
+		if t := strings.TrimSpace(line); strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~") {
+			inFence = !inFence
+		}
+		if name, ok := strings.CutPrefix(line, "## "); ok && !inFence {
 			if sec := findSection(strings.TrimSpace(name)); sec != nil {
 				flush()
 				current = sec.get(&spec)
