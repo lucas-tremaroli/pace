@@ -1,6 +1,10 @@
 package epic
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
 
 // Status represents the lifecycle stage of an epic.
 type Status int
@@ -57,17 +61,19 @@ type Epic struct {
 	title     string
 	summary   string
 	spec      Spec
+	labels    []string
 	createdAt string
 }
 
 // EpicJSON is the JSON-serializable form of an Epic.
 type EpicJSON struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Summary   string `json:"summary,omitempty"`
-	Status    string `json:"status"`
-	Spec      Spec   `json:"spec"`
-	CreatedAt string `json:"created_at,omitempty"`
+	ID        string   `json:"id"`
+	Title     string   `json:"title"`
+	Summary   string   `json:"summary,omitempty"`
+	Status    string   `json:"status"`
+	Spec      Spec     `json:"spec"`
+	Labels    []string `json:"labels,omitempty"`
+	CreatedAt string   `json:"created_at,omitempty"`
 }
 
 // NewEpic constructs a new epic.
@@ -86,6 +92,20 @@ func (e Epic) Summary() string   { return e.summary }
 func (e Epic) Status() Status    { return e.status }
 func (e Epic) Spec() Spec        { return e.spec }
 func (e Epic) CreatedAt() string { return e.createdAt }
+func (e Epic) Labels() []string  { return e.labels }
+
+// HasLabel reports whether the epic carries the label.
+func (e Epic) HasLabel(l string) bool { return slices.Contains(e.labels, l) }
+
+// SetLabels replaces the epic's labels, dropping empties and duplicates.
+func (e *Epic) SetLabels(labels []string) {
+	e.labels = nil
+	for _, l := range labels {
+		if l = strings.TrimSpace(l); l != "" && !slices.Contains(e.labels, l) {
+			e.labels = append(e.labels, l)
+		}
+	}
+}
 
 // SetTitle updates the title.
 func (e *Epic) SetTitle(title string) { e.title = title }
@@ -145,6 +165,7 @@ func (e Epic) ToJSON() EpicJSON {
 		Summary:   e.summary,
 		Status:    e.status.String(),
 		Spec:      e.spec,
+		Labels:    e.labels,
 		CreatedAt: e.createdAt,
 	}
 }

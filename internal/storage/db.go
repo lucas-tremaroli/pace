@@ -21,10 +21,10 @@ type TaskRecord struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
-	Status   int    `json:"status"`
-	Priority int    `json:"priority"`
-	Link     string `json:"link"`
-	EpicID   string `json:"epic_id"`
+	Status      int    `json:"status"`
+	Priority    int    `json:"priority"`
+	Link        string `json:"link"`
+	EpicID      string `json:"epic_id"`
 }
 
 type LogRecord struct {
@@ -45,6 +45,7 @@ type EpicRecord struct {
 	Constraints  string `json:"constraints"`
 	Exclusions   string `json:"exclusions"`
 	Freeform     string `json:"freeform"`
+	Labels       string `json:"labels"` // JSON array, e.g. ["design"]
 	CreatedAt    string `json:"created_at"`
 }
 
@@ -231,6 +232,14 @@ func (db *DB) createTables() error {
 			continue
 		}
 		if _, err := db.conn.Exec(`ALTER TABLE epics ADD COLUMN ` + col + ` TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
+
+	if has, err := db.hasColumn("epics", "labels"); err != nil {
+		return err
+	} else if !has {
+		if _, err := db.conn.Exec(`ALTER TABLE epics ADD COLUMN labels TEXT NOT NULL DEFAULT '[]'`); err != nil {
 			return err
 		}
 	}
@@ -665,13 +674,13 @@ func (db *DB) DeleteLogsByTaskID(taskID string) error {
 }
 
 func (db *DB) CreateEpic(rec EpicRecord) error {
-	query := `INSERT INTO epics (id, title, summary, status, current_state, target_state, constraints, exclusions, freeform) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(query, rec.ID, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform)
+	query := `INSERT INTO epics (id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(query, rec.ID, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, labelsOrEmpty(rec.Labels))
 	return err
 }
 
 func (db *DB) GetAllEpics() ([]EpicRecord, error) {
-	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, created_at FROM epics ORDER BY created_at DESC`
+	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, labels, created_at FROM epics ORDER BY created_at DESC`
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
@@ -681,7 +690,7 @@ func (db *DB) GetAllEpics() ([]EpicRecord, error) {
 	var epics []EpicRecord
 	for rows.Next() {
 		var e EpicRecord
-		if err := rows.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.Labels, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		epics = append(epics, e)
@@ -690,19 +699,19 @@ func (db *DB) GetAllEpics() ([]EpicRecord, error) {
 }
 
 func (db *DB) GetEpicByID(id string) (*EpicRecord, error) {
-	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, created_at FROM epics WHERE id = ?`
+	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, labels, created_at FROM epics WHERE id = ?`
 	row := db.conn.QueryRow(query, id)
 
 	var e EpicRecord
-	if err := row.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.CreatedAt); err != nil {
+	if err := row.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.Labels, &e.CreatedAt); err != nil {
 		return nil, err
 	}
 	return &e, nil
 }
 
 func (db *DB) UpdateEpic(rec EpicRecord) error {
-	query := `UPDATE epics SET title = ?, summary = ?, status = ?, current_state = ?, target_state = ?, constraints = ?, exclusions = ?, freeform = ? WHERE id = ?`
-	result, err := db.conn.Exec(query, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, rec.ID)
+	query := `UPDATE epics SET title = ?, summary = ?, status = ?, current_state = ?, target_state = ?, constraints = ?, exclusions = ?, freeform = ?, labels = ? WHERE id = ?`
+	result, err := db.conn.Exec(query, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, labelsOrEmpty(rec.Labels), rec.ID)
 	if err != nil {
 		return err
 	}
@@ -739,6 +748,41 @@ func (db *DB) DeleteEpic(id string) error {
 	}
 	if rows == 0 {
 		return ErrNotFound
+	}
+	return tx.Commit()
+}
+
+// labelsOrEmpty keeps the labels column a valid JSON array.
+func labelsOrEmpty(s string) string {
+	if s == "" {
+		return "[]"
+	}
+	return s
+}
+
+// MergeEpics creates rec, moves every task of the source epics into it and
+// deletes the sources, all in one transaction so tasks are never left
+// pointing at a deleted epic.
+func (db *DB) MergeEpics(rec EpicRecord, sourceIDs []string) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(
+		`INSERT INTO epics (id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, labelsOrEmpty(rec.Labels),
+	); err != nil {
+		return err
+	}
+	for _, id := range sourceIDs {
+		if _, err := tx.Exec(`UPDATE tasks SET epic_id = ? WHERE epic_id = ?`, rec.ID, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM epics WHERE id = ?`, id); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

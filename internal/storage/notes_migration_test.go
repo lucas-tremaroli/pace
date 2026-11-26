@@ -32,7 +32,7 @@ func TestMigrateNotesToEpics(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	writeNote("auth.md", "---\ndescription: \"Login flow\"\nlabels: []\n---\n\n# Auth\n\nUse sessions.\n")
+	writeNote("auth.md", "---\ndescription: \"Login flow\"\nlabels: [design, api]\n---\n\n# Auth\n\nUse sessions.\n")
 	writeNote("plain.md", "no frontmatter\n")
 	// t-1 links to both notes (first by filename wins), t-2 to plain.
 	for _, l := range [][2]string{{"t-1", "plain.md"}, {"t-1", "auth.md"}, {"t-2", "plain.md"}} {
@@ -62,6 +62,9 @@ func TestMigrateNotesToEpics(t *testing.T) {
 	}
 	if auth.Summary != "Login flow" || auth.Freeform != "# Auth\n\nUse sessions.\n" {
 		t.Errorf("auth epic wrong: %+v", auth)
+	}
+	if auth.Labels != `["design","api"]` {
+		t.Errorf("labels not carried over: %s", auth.Labels)
 	}
 	if byTitle["plain"].Freeform != "no frontmatter\n" {
 		t.Errorf("plain epic wrong: %+v", byTitle["plain"])

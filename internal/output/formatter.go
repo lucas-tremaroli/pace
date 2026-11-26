@@ -45,15 +45,15 @@ func ToMapSlice(v any) ([]map[string]any, error) {
 
 // Error code constants for machine-readable error identification
 const (
-	ErrCodeTaskNotFound       = "TASK_NOT_FOUND"
-	ErrCodeEpicNotFound       = "EPIC_NOT_FOUND"
-	ErrCodeMissingField       = "MISSING_REQUIRED_FIELD"
-	ErrCodeInvalidStatus      = "INVALID_STATUS"
-	ErrCodeInvalidType        = "INVALID_TYPE"
-	ErrCodeInvalidPriority    = "INVALID_PRIORITY"
-	ErrCodeInvalidFilename    = "INVALID_FILENAME"
-	ErrCodeInvalidParams      = "INVALID_PARAMS"
-	ErrCodeStorageError       = "STORAGE_ERROR"
+	ErrCodeTaskNotFound    = "TASK_NOT_FOUND"
+	ErrCodeEpicNotFound    = "EPIC_NOT_FOUND"
+	ErrCodeMissingField    = "MISSING_REQUIRED_FIELD"
+	ErrCodeInvalidStatus   = "INVALID_STATUS"
+	ErrCodeInvalidType     = "INVALID_TYPE"
+	ErrCodeInvalidPriority = "INVALID_PRIORITY"
+	ErrCodeInvalidFilename = "INVALID_FILENAME"
+	ErrCodeInvalidParams   = "INVALID_PARAMS"
+	ErrCodeStorageError    = "STORAGE_ERROR"
 )
 
 // Response represents a standard JSON response

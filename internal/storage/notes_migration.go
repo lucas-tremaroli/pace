@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -46,15 +47,15 @@ func (db *DB) migrateNotesToEpics(paceDir string) error {
 		if err != nil {
 			return err
 		}
-		summary, body := splitNoteFrontmatter(string(raw))
+		summary, labels, body := splitNoteFrontmatter(string(raw))
 		filename := filepath.Base(path)
 		id, err := newEpicID(tx)
 		if err != nil {
 			return err
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO epics (id, title, summary, status, freeform) VALUES (?, ?, ?, 0, ?)`,
-			id, strings.TrimSuffix(filename, ".md"), summary, body,
+			`INSERT INTO epics (id, title, summary, status, freeform, labels) VALUES (?, ?, ?, 0, ?, ?)`,
+			id, strings.TrimSuffix(filename, ".md"), summary, body, labelsJSON(labels),
 		); err != nil {
 			return err
 		}
@@ -101,25 +102,34 @@ func (db *DB) migrateNotesToEpics(paceDir string) error {
 	return nil
 }
 
-// splitNoteFrontmatter returns the frontmatter description and the remaining
-// body. Content without valid frontmatter is returned whole.
-func splitNoteFrontmatter(content string) (description, body string) {
+// splitNoteFrontmatter returns the frontmatter description and labels and the
+// remaining body. Content without valid frontmatter is returned whole.
+func splitNoteFrontmatter(content string) (description string, labels []string, body string) {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	rest, ok := strings.CutPrefix(content, "---\n")
 	if !ok {
-		return "", content
+		return "", nil, content
 	}
 	yml, after, ok := strings.Cut(rest, "\n---")
 	if !ok {
-		return "", content
+		return "", nil, content
 	}
 	var fm struct {
-		Description string `yaml:"description"`
+		Description string   `yaml:"description"`
+		Labels      []string `yaml:"labels"`
 	}
 	if err := yaml.Unmarshal([]byte(yml), &fm); err != nil {
-		return "", content
+		return "", nil, content
 	}
-	return fm.Description, strings.TrimPrefix(strings.TrimPrefix(after, "\n"), "\n")
+	return fm.Description, fm.Labels, strings.TrimPrefix(strings.TrimPrefix(after, "\n"), "\n")
+}
+
+func labelsJSON(labels []string) string {
+	if len(labels) == 0 {
+		return "[]"
+	}
+	b, _ := json.Marshal(labels)
+	return string(b)
 }
 
 // newEpicID mirrors epic.GenerateID (epic imports storage, so it can't be

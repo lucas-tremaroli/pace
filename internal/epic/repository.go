@@ -12,4 +12,5 @@ type EpicRepository interface {
 	GetEpicByID(id string) (*storage.EpicRecord, error)
 	UpdateEpic(rec storage.EpicRecord) error
 	DeleteEpic(id string) error
+	MergeEpics(rec storage.EpicRecord, sourceIDs []string) error
 }
