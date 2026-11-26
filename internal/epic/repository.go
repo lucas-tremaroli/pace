@@ -1,6 +1,6 @@
 package epic
 
-import "github.com/lucas-tremaroli/pace/internal/storage"
+import "github.com/lucas-tremaroli/pace/v2/internal/storage"
 
 // EpicRepository abstracts storage operations the service needs.
 // *storage.DB satisfies this interface; alternative implementations (e.g.

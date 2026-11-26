@@ -1,4 +1,4 @@
-module github.com/lucas-tremaroli/pace
+module github.com/lucas-tremaroli/pace/v2
 
 go 1.25.1
 

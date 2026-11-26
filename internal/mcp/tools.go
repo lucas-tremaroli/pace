@@ -1,6 +1,6 @@
 package mcp
 
-import "github.com/lucas-tremaroli/pace/internal/task"
+import "github.com/lucas-tremaroli/pace/v2/internal/task"
 
 // GetToolDefinitions returns all available MCP tools
 func GetToolDefinitions() []Tool {

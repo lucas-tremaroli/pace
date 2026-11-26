@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lucas-tremaroli/pace/internal/storage"
+	"github.com/lucas-tremaroli/pace/v2/internal/storage"
 )
 
 func newStore(t *testing.T) (string, *storage.DB) {

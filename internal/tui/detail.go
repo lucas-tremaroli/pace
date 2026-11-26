@@ -7,8 +7,8 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/epic"
-	"github.com/lucas-tremaroli/pace/internal/task"
+	"github.com/lucas-tremaroli/pace/v2/internal/epic"
+	"github.com/lucas-tremaroli/pace/v2/internal/task"
 	"github.com/muesli/reflow/wrap"
 )
 

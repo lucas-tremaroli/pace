@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lucas-tremaroli/pace/internal/mcp"
-	"github.com/lucas-tremaroli/pace/internal/output"
+	"github.com/lucas-tremaroli/pace/v2/internal/mcp"
+	"github.com/lucas-tremaroli/pace/v2/internal/output"
 	"github.com/spf13/cobra"
 )
 

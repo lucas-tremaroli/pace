@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lucas-tremaroli/pace/internal/storage"
+	"github.com/lucas-tremaroli/pace/v2/internal/storage"
 )
 
 const (

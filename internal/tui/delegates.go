@@ -8,8 +8,8 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/epic"
-	"github.com/lucas-tremaroli/pace/internal/task"
+	"github.com/lucas-tremaroli/pace/v2/internal/epic"
+	"github.com/lucas-tremaroli/pace/v2/internal/task"
 )
 
 // taskItem adapts task.Task to list.Item.

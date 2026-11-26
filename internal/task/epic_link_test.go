@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/lucas-tremaroli/pace/internal/storage"
+	"github.com/lucas-tremaroli/pace/v2/internal/storage"
 )
 
 // mkEpic inserts an epic straight into the shared storage so tasks can link to it.

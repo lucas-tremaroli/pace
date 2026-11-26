@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lucas-tremaroli/pace/internal/storage"
+	"github.com/lucas-tremaroli/pace/v2/internal/storage"
 )
 
 // Service handles task business logic and database operations

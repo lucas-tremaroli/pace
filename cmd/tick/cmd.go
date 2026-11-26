@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/lucas-tremaroli/pace/internal/task"
-	"github.com/lucas-tremaroli/pace/internal/tick"
+	"github.com/lucas-tremaroli/pace/v2/internal/task"
+	"github.com/lucas-tremaroli/pace/v2/internal/tick"
 	"github.com/spf13/cobra"
 )
 
