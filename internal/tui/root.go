@@ -112,8 +112,8 @@ func (r *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		r.width, r.height = m.Width, m.Height
 		r.tooSmall = m.Width < minWidth || m.Height < minHeight
-		r.help.Width = m.Width
-		bodyMsg := tea.WindowSizeMsg{Width: m.Width, Height: r.bodyHeight()}
+		r.help.Width = m.Width - 2 // theme.Help pads 1 column per side
+		bodyMsg := tea.WindowSizeMsg{Width: r.contentWidth(), Height: r.bodyHeight()}
 		cmds := make([]tea.Cmd, len(r.tabs))
 		for i, t := range r.tabs {
 			r.tabs[i], cmds[i] = t.Update(bodyMsg)
@@ -184,7 +184,9 @@ func (r *Root) View() string {
 	header := r.renderHeader()
 	body := r.tabs[r.active].View()
 	footer := r.renderFooter()
-	base := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
+	inset := lipgloss.NewStyle().PaddingLeft(sidePad)
+	// Footer is already inset by theme.Help's own padding.
+	base := lipgloss.JoinVertical(lipgloss.Left, inset.Render(header), inset.Render(body), footer)
 
 	if overlay := r.tabs[r.active].ModalOverlay(); overlay != "" {
 		return lipgloss.Place(r.width, r.height, lipgloss.Center, lipgloss.Center, overlay)
@@ -200,26 +202,33 @@ func (r *Root) bodyHeight() int {
 	return h
 }
 
-// headerHeight: title row + horizontal rule.
+// headerHeight: top margin + title row.
 func (r *Root) headerHeight() int { return 2 }
 
 const (
-	tabSeparatorGlyph = " · "
-	minStoreGap       = 2
+	minStoreGap = 2
+	// sidePad is the left/right margin around the header and body, matching
+	// the 1-column padding of the footer.
+	sidePad = 1
 )
+
+// contentWidth is the width available inside the side margins.
+func (r *Root) contentWidth() int { return r.width - 2*sidePad }
 
 func (r *Root) renderHeader() string {
 	titleRow := r.renderTitleRow()
-	rule := theme.OverviewLabel.Render(strings.Repeat("─", r.width))
-	return lipgloss.JoinVertical(lipgloss.Left, titleRow, rule)
+	// Blank top row keeps the tabs off a host tab bar (e.g. herdr) above us.
+	// No row below: the body's border glyph already sits mid-cell, which is
+	// all the separation the tabs need.
+	return lipgloss.JoinVertical(lipgloss.Left, "", titleRow)
 }
 
 func (r *Root) renderTitleRow() string {
 	tabStrip := r.renderTabStrip()
-	store := r.renderStorageInfo(r.width - lipgloss.Width(tabStrip) - minStoreGap)
+	store := r.renderStorageInfo(r.contentWidth() - lipgloss.Width(tabStrip) - minStoreGap)
 
 	used := lipgloss.Width(tabStrip) + lipgloss.Width(store)
-	gap := r.width - used
+	gap := r.contentWidth() - used
 	if gap < minStoreGap {
 		gap = minStoreGap
 	}
@@ -230,7 +239,7 @@ func (r *Root) renderTabStrip() string {
 	parts := make([]string, 0, len(r.tabs)*2)
 	for i, t := range r.tabs {
 		if i > 0 {
-			parts = append(parts, theme.OverviewLabel.Render(tabSeparatorGlyph))
+			parts = append(parts, " ")
 		}
 		if i == r.active {
 			parts = append(parts, theme.TabActive.Render(t.Title()))
