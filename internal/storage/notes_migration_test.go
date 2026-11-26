@@ -92,3 +92,101 @@ func TestMigrateNotesToEpics(t *testing.T) {
 		t.Errorf("migration should be idempotent, got %d epics", len(again))
 	}
 }
+
+// legacyStore builds a store in dir with one task linked to one note.
+func legacyStore(t *testing.T, dir string) string {
+	t.Helper()
+	dbPath := filepath.Join(dir, "tasks.db")
+	db, err := NewDBWithPath(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.CreateTask("t-1", "task", "", 0, 2, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.conn.Exec(`CREATE TABLE task_notes (task_id VARCHAR NOT NULL, note_filename VARCHAR NOT NULL, PRIMARY KEY (task_id, note_filename))`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.conn.Exec(`INSERT INTO task_notes VALUES ('t-1', 'plan.md')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "notes"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "notes", "plan.md"), []byte("the plan\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	return dbPath
+}
+
+func TestMigrateNotesInPathWithGlobCharacters(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "app[1]", ".pace")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := legacyStore(t, dir)
+
+	db, err := NewDBWithPath(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	epics, _ := db.GetAllEpics()
+	if len(epics) != 1 || epics[0].Title != "plan" {
+		t.Fatalf("note in a glob-character path was not imported: %+v", epics)
+	}
+	if task, _ := db.GetTaskByID("t-1"); task.EpicID != epics[0].ID {
+		t.Errorf("link lost: task epic = %q", task.EpicID)
+	}
+}
+
+// If removing the note files fails after the commit, the next open must only
+// finish the cleanup, not import the same notes again.
+func TestMigrateNotesRetryDoesNotDuplicate(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := legacyStore(t, dir)
+
+	db, err := NewDBWithPath(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	// Simulate the interrupted cleanup: the note file is still on disk.
+	if err := os.WriteFile(filepath.Join(dir, "notes", "plan.md"), []byte("the plan\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err = NewDBWithPath(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if epics, _ := db.GetAllEpics(); len(epics) != 1 {
+		t.Errorf("retry duplicated the epic: have %d", len(epics))
+	}
+	if m, _ := filepath.Glob(filepath.Join(dir, "notes", "*.md")); len(m) != 0 {
+		t.Errorf("retry should finish cleanup, left %v", m)
+	}
+}
+
+func TestNewDBWithPathNoMigrationLeavesStoreUntouched(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := legacyStore(t, dir)
+
+	db, err := NewDBWithPathNoMigration(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if epics, _ := db.GetAllEpics(); len(epics) != 0 {
+		t.Errorf("no-migration open created epics: %+v", epics)
+	}
+	if has, _ := db.tableExists("task_notes"); !has {
+		t.Error("task_notes should still exist")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "notes", "plan.md")); err != nil {
+		t.Errorf("note file should be untouched: %v", err)
+	}
+}

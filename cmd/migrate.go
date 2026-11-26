@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/lucas-tremaroli/pace/internal/epic"
 	"github.com/lucas-tremaroli/pace/internal/output"
 	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/spf13/cobra"
@@ -117,13 +120,20 @@ func migrateTasks(sourceDir, destDir string, dryRun bool) (map[string]any, error
 		}, nil
 	}
 
-	sourceDB, err := storage.NewDBWithPath(sourceDBPath)
+	// A preview must not touch either store: opening with the default
+	// constructor would convert legacy notes (and delete the note files).
+	open := storage.NewDBWithPath
+	if dryRun {
+		open = storage.NewDBWithPathNoMigration
+	}
+
+	sourceDB, err := open(sourceDBPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open source database: %w", err)
 	}
 	defer sourceDB.Close()
 
-	destDB, err := storage.NewDBWithPath(destDBPath)
+	destDB, err := open(destDBPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open destination database: %w", err)
 	}
@@ -147,6 +157,7 @@ func migrateTasks(sourceDir, destDir string, dryRun bool) (map[string]any, error
 
 	var migrated, skipped int
 	var conflicts []string
+	epicIDs := map[string]string{} // source epic ID -> destination epic ID
 
 	for _, task := range sourceTasks {
 		if destIDs[task.ID] {
@@ -158,20 +169,16 @@ func migrateTasks(sourceDir, destDir string, dryRun bool) (map[string]any, error
 
 		if !dryRun {
 			// Bring the task's epic along so epic_id doesn't dangle
+			destEpicID := task.EpicID
 			if task.EpicID != "" {
-				if _, err := destDB.GetEpicByID(task.EpicID); err != nil {
-					rec, err := sourceDB.GetEpicByID(task.EpicID)
-					if err != nil {
-						return nil, fmt.Errorf("failed to load epic %s for task %s: %w", task.EpicID, task.ID, err)
-					}
-					if err := destDB.CreateEpic(*rec); err != nil {
-						return nil, fmt.Errorf("failed to migrate epic %s: %w", task.EpicID, err)
-					}
+				var err error
+				if destEpicID, err = migrateEpic(sourceDB, destDB, task.EpicID, epicIDs); err != nil {
+					return nil, fmt.Errorf("failed to migrate epic %s for task %s: %w", task.EpicID, task.ID, err)
 				}
 			}
 
 			// Create task in destination
-			if err := destDB.CreateTask(task.ID, task.Title, task.Description, task.Status, task.Priority, task.Link, task.EpicID); err != nil {
+			if err := destDB.CreateTask(task.ID, task.Title, task.Description, task.Status, task.Priority, task.Link, destEpicID); err != nil {
 				return nil, fmt.Errorf("failed to migrate task %s: %w", task.ID, err)
 			}
 
@@ -228,11 +235,78 @@ func migrateTasks(sourceDir, destDir string, dryRun bool) (map[string]any, error
 		}
 	}
 
-	return map[string]any{
+	result := map[string]any{
 		"migrated":  migrated,
 		"skipped":   skipped,
 		"conflicts": conflicts,
-	}, nil
+	}
+	if remapped := remappedEpics(epicIDs); len(remapped) > 0 {
+		result["epics_remapped"] = remapped
+	}
+	return result, nil
+}
+
+// migrateEpic makes sure the source epic srcID exists in the destination and
+// returns the ID tasks should point at there. Epic IDs are generated per
+// store, so the destination may already hold a different epic under the same
+// ID: that one is left alone and the source epic is copied under a fresh ID.
+// An identical epic is reused. Results are memoised in epicIDs.
+func migrateEpic(sourceDB, destDB *storage.DB, srcID string, epicIDs map[string]string) (string, error) {
+	if id, ok := epicIDs[srcID]; ok {
+		return id, nil
+	}
+	src, err := sourceDB.GetEpicByID(srcID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil // dangling link in the source: carry the task over unlinked
+	}
+	if err != nil {
+		return "", err
+	}
+
+	newID := srcID
+	existing, err := destDB.GetEpicByID(srcID)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		// free in the destination: copy under the same ID
+	case err != nil:
+		return "", err
+	case sameEpic(*src, *existing):
+		epicIDs[srcID] = srcID
+		return srcID, nil
+	default:
+		for {
+			newID = epic.GenerateID()
+			if _, err := destDB.GetEpicByID(newID); errors.Is(err, sql.ErrNoRows) {
+				break
+			} else if err != nil {
+				return "", err
+			}
+		}
+	}
+
+	rec := *src
+	rec.ID = newID
+	if err := destDB.CreateEpic(rec); err != nil {
+		return "", err
+	}
+	epicIDs[srcID] = newID
+	return newID, nil
+}
+
+func sameEpic(a, b storage.EpicRecord) bool {
+	a.CreatedAt, b.CreatedAt = "", ""
+	return a == b
+}
+
+// remappedEpics lists the epics that had to change ID in the destination.
+func remappedEpics(epicIDs map[string]string) map[string]string {
+	out := map[string]string{}
+	for from, to := range epicIDs {
+		if from != to {
+			out[from] = to
+		}
+	}
+	return out
 }
 
 func init() {

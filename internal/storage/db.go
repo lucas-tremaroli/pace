@@ -58,8 +58,20 @@ func NewDB() (*DB, error) {
 	return NewDBWithPath(dbPath)
 }
 
-// NewDBWithPath creates a new DB instance with a specific database path
+// NewDBWithPath creates a new DB instance with a specific database path and
+// folds any legacy notes into epics (see migrateNotesToEpics).
 func NewDBWithPath(dbPath string) (*DB, error) {
+	return openDB(dbPath, true)
+}
+
+// NewDBWithPathNoMigration opens a database without converting legacy notes.
+// For read-only previews (e.g. `pace migrate --dry-run`), which must leave
+// the store's tables and note files untouched.
+func NewDBWithPathNoMigration(dbPath string) (*DB, error) {
+	return openDB(dbPath, false)
+}
+
+func openDB(dbPath string, migrateNotes bool) (*DB, error) {
 	conn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -70,9 +82,11 @@ func NewDBWithPath(dbPath string) (*DB, error) {
 		conn.Close()
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
-	if err := db.migrateNotesToEpics(filepath.Dir(dbPath)); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("failed to migrate notes to epics: %w", err)
+	if migrateNotes {
+		if err := db.migrateNotesToEpics(filepath.Dir(dbPath)); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("failed to migrate notes to epics: %w", err)
+		}
 	}
 
 	return db, nil
