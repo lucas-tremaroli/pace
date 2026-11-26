@@ -187,6 +187,8 @@ func (r *Root) View() string {
 	inset := lipgloss.NewStyle().PaddingLeft(sidePad)
 	// Footer is already inset by theme.Help's own padding.
 	base := lipgloss.JoinVertical(lipgloss.Left, inset.Render(header), inset.Render(body), footer)
+	// Safety net: whatever a tab renders, never exceed the terminal.
+	base = lipgloss.NewStyle().MaxWidth(r.width).MaxHeight(r.height).Render(base)
 
 	if overlay := r.tabs[r.active].ModalOverlay(); overlay != "" {
 		return lipgloss.Place(r.width, r.height, lipgloss.Center, lipgloss.Center, overlay)
@@ -194,16 +196,15 @@ func (r *Root) View() string {
 	return base
 }
 
+// bodyHeight is what remains once the header and footer have taken the rows
+// they actually render, so adding or removing a row there needs no edit here.
 func (r *Root) bodyHeight() int {
-	h := r.height - r.headerHeight() - 1 // footer is 1 line
+	h := r.height - lipgloss.Height(r.renderHeader()) - lipgloss.Height(r.renderFooter())
 	if h < 1 {
 		return 1
 	}
 	return h
 }
-
-// headerHeight: top margin + title row.
-func (r *Root) headerHeight() int { return 2 }
 
 const (
 	minStoreGap = 2

@@ -177,10 +177,8 @@ func (e *epics) Update(msg tea.Msg) (tab, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		e.width, e.height = m.Width, m.Height
 		lw, dw, h := e.paneSizes()
-		// inner = visual - border(2). Padding(0,1) is horizontal only.
-		e.list.SetSize(lw-4, h-2)
-		e.vp.Width = dw - 4
-		e.vp.Height = h - 2
+		e.list.SetSize(paneInner(paneStyle(false), lw, h))
+		e.vp.Width, e.vp.Height = paneInner(paneStyle(false), dw, h)
 		return e, nil
 
 	case epicsListedMsg:
@@ -320,8 +318,8 @@ func (e *epics) paneSizes() (listW, detailW, h int) {
 }
 
 func (e *epics) detailContentWidth() int {
-	_, dw, _ := e.paneSizes()
-	w := dw - 4 // border + padding
+	_, dw, h := e.paneSizes()
+	w, _ := paneInner(paneStyle(false), dw, h)
 	if w < 20 {
 		w = 20
 	}
@@ -341,28 +339,20 @@ func (e *epics) View() string {
 	}
 	lw, dw, h := e.paneSizes()
 
-	listStyle := theme.BorderBlurred
-	detailStyle := theme.BorderBlurred
-	if e.focus == epicsFocusList {
-		listStyle = theme.BorderFocused
-	} else {
-		detailStyle = theme.BorderFocused
-	}
-
 	var listBody string
 	if len(e.list.Items()) == 0 {
 		listBody = theme.NoTasks.Render("  no epics")
 	} else {
 		listBody = e.list.View()
 	}
-	leftBox := listStyle.Width(lw-2).Height(h-2).Padding(0, 1).Render(listBody)
+	leftBox := pane(paneStyle(e.focus == epicsFocusList), lw, h, listBody)
 	var detailBody string
 	if e.loading {
 		detailBody = e.spinner.View() + theme.DetailDim.Render(" Loading "+e.loadingKey+"…")
 	} else {
 		detailBody = e.vp.View()
 	}
-	rightBox := detailStyle.Width(dw-2).Height(h-2).Padding(0, 1).Render(detailBody)
+	rightBox := pane(paneStyle(e.focus == epicsFocusDetail), dw, h, detailBody)
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
 }
 
