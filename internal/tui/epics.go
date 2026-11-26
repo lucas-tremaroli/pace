@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -18,6 +19,7 @@ type epicsService interface {
 	LoadAllEpics() ([]epic.Epic, error)
 	GenerateEpicID() string
 	CreateEpic(e epic.Epic) error
+	UpdateEpic(e epic.Epic) error
 	DeleteEpic(id string) error
 }
 
@@ -44,7 +46,7 @@ type epicLoadedMsg struct {
 // --- model -------------------------------------------------------------
 
 type epicsKeys struct {
-	Focus, Open, Filter, Reload, New, Delete key.Binding
+	Focus, Open, Filter, Reload, New, Edit, Delete key.Binding
 }
 
 func newEpicsKeys() epicsKeys {
@@ -54,12 +56,13 @@ func newEpicsKeys() epicsKeys {
 		Filter: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		Reload: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
 		New:    key.NewBinding(key.WithKeys("+"), key.WithHelp("+", "new epic")),
+		Edit:   key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit")),
 		Delete: key.NewBinding(key.WithKeys("backspace"), key.WithHelp("⌫", "delete")),
 	}
 }
 
 func (k epicsKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.New, k.Delete, k.Focus, k.Open, k.Filter, k.Reload}
+	return []key.Binding{k.New, k.Edit, k.Delete, k.Focus, k.Open, k.Filter, k.Reload}
 }
 func (k epicsKeys) FullHelp() [][]key.Binding { return [][]key.Binding{k.ShortHelp()} }
 
@@ -159,9 +162,9 @@ func (e *epics) Update(msg tea.Msg) (tab, tea.Cmd) {
 			e.form.form = f
 			switch e.form.form.State {
 			case huh.StateCompleted:
-				create := e.createCmd(e.form.title)
+				base := epic.NewEpic(e.svc.GenerateEpicID(), epic.Planning, e.form.title, "")
 				e.form = nil
-				return e, create
+				return e, editEpicCmd(base, true)
 			case huh.StateAborted:
 				e.form = nil
 				return e, nil
@@ -184,6 +187,9 @@ func (e *epics) Update(msg tea.Msg) (tab, tea.Cmd) {
 		e.loadErr = m.err
 		e.list.SetItems(m.items)
 		return e, nil
+
+	case epicEditedMsg:
+		return e, e.saveEditedCmd(m)
 
 	case epicsMutatedMsg:
 		// Force the next Enter to reload; the epic may be gone or changed.
@@ -235,6 +241,12 @@ func (e *epics) Update(msg tea.Msg) (tab, tea.Cmd) {
 				"Its tasks are kept but unlinked from the epic.",
 			)
 			return e, e.confirm.form.Init()
+		case "e":
+			it, ok := e.list.SelectedItem().(epicItem)
+			if !ok {
+				return e, nil
+			}
+			return e, editEpicCmd(it.Epic, false)
 		case "+":
 			e.form = newEpicFormState()
 			return e, e.form.form.Init()
@@ -372,11 +384,35 @@ func (e *epics) deleteCmd(id string) tea.Cmd {
 	}
 }
 
-func (e *epics) createCmd(title string) tea.Cmd {
+// saveEditedCmd reads the edited document, parses it onto the epic it was
+// opened from and persists it. A parse error keeps the temp file so the edit
+// isn't lost, and its path is shown in the detail pane.
+func (e *epics) saveEditedCmd(m epicEditedMsg) tea.Cmd {
 	svc := e.svc
+	fail := func(err error) tea.Msg {
+		return epicLoadedMsg{content: theme.StatusBlocked.Render(fmt.Sprintf("save epic: %v", err))}
+	}
 	return func() tea.Msg {
-		if err := svc.CreateEpic(epic.NewEpic(svc.GenerateEpicID(), epic.Planning, title, "")); err != nil {
-			return epicLoadedMsg{content: theme.StatusBlocked.Render(fmt.Sprintf("create epic: %v", err))}
+		if m.err != nil {
+			os.Remove(m.path)
+			return fail(m.err)
+		}
+		raw, err := os.ReadFile(m.path)
+		if err != nil {
+			return fail(err)
+		}
+		edited, err := epic.Parse(string(raw), m.base)
+		if err != nil {
+			return fail(fmt.Errorf("%w (your edit is kept in %s)", err, m.path))
+		}
+		os.Remove(m.path)
+		if m.create {
+			err = svc.CreateEpic(edited)
+		} else {
+			err = svc.UpdateEpic(edited)
+		}
+		if err != nil {
+			return fail(err)
 		}
 		return epicsMutatedMsg{}
 	}

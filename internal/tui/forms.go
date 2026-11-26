@@ -132,7 +132,7 @@ func newEpicFormState() *EpicFormState {
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Title").
-				Description("Fill in the spec with `pace epic spec set` or your agent").
+				Description("The editor opens next to write the spec").
 				Value(&s.title).
 				Validate(huh.ValidateNotEmpty()),
 		),

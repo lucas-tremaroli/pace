@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -102,7 +103,9 @@ func (taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 // epicItem adapts epic.Epic to list.Item.
 type epicItem struct{ Epic epic.Epic }
 
-func (i epicItem) FilterValue() string { return i.Epic.Title() }
+func (i epicItem) FilterValue() string {
+	return i.Epic.Title() + " " + strings.Join(i.Epic.Labels(), " ")
+}
 
 // epicDelegate renders one epic per row: title, then "id · status" and the
 // summary on a dim second line.
@@ -126,6 +129,9 @@ func (epicDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 	fmt.Fprint(w, truncateText(style.Render(prefix+ei.Epic.Title()), m.Width()))
 	fmt.Fprint(w, "\n")
 	meta := fmt.Sprintf("  %s · %s", ei.Epic.ID(), ei.Epic.Status())
+	if len(ei.Epic.Labels()) > 0 {
+		meta += " (" + strings.Join(ei.Epic.Labels(), ", ") + ")"
+	}
 	if s := ei.Epic.Summary(); s != "" {
 		meta += " — " + s
 	}

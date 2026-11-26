@@ -207,7 +207,12 @@ func renderEpicDetail(e epic.Epic, members []task.Task, w int) string {
 	b.WriteString(theme.DetailHeader.Render(wrap.String(e.Title(), w)))
 	b.WriteString("\n")
 	b.WriteString(theme.DetailDim.Render(e.ID() + " · " + e.Status().String()))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+	if len(e.Labels()) > 0 {
+		b.WriteString(renderChips(e.Labels()))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
 
 	if e.Summary() != "" {
 		b.WriteString(theme.DetailLabel.Render(wrap.String(e.Summary(), w)))
