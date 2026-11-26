@@ -294,16 +294,51 @@ func GetToolDefinitions() []Tool {
 						Description: "Epic status (default: planning)",
 						Enum:        []string{"planning", "active", "done"},
 					},
+					"current_state": {
+						Type:        "string",
+						Description: "Current state section (markdown)",
+					},
+					"target_state": {
+						Type:        "string",
+						Description: "Target state section (markdown)",
+					},
+					"constraints": {
+						Type:        "string",
+						Description: "Constraints section (markdown)",
+					},
+					"exclusions": {
+						Type:        "string",
+						Description: "Exclusions section (markdown)",
+					},
+					"freeform": {
+						Type:        "string",
+						Description: "Freeform fallback section (markdown)",
+					},
+					"labels": {
+						Type:        "array",
+						Description: "Epic labels",
+						Items:       &Property{Type: "string"},
+					},
 				},
 				Required: []string{"title"},
 			},
 		},
 		{
 			Name:        "pace_epic_list",
-			Description: "List all epics with their status and spec",
+			Description: "List all epics with their status, spec and labels",
 			InputSchema: ToolInputSchema{
-				Type:       "object",
-				Properties: map[string]Property{},
+				Type: "object",
+				Properties: map[string]Property{
+					"labels": {
+						Type:        "array",
+						Description: "Only epics having any of these labels",
+						Items:       &Property{Type: "string"},
+					},
+					"head": {
+						Type:        "integer",
+						Description: "Limit output to first N epics",
+					},
+				},
 			},
 		},
 		{
@@ -322,7 +357,7 @@ func GetToolDefinitions() []Tool {
 		},
 		{
 			Name:        "pace_epic_update",
-			Description: "Update an epic's title, summary, or status. Only provided fields change.",
+			Description: "Update an epic's title, summary, status, or labels. Only provided fields change; labels replaces the full set.",
 			InputSchema: ToolInputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -342,6 +377,11 @@ func GetToolDefinitions() []Tool {
 						Type:        "string",
 						Description: "New status",
 						Enum:        []string{"planning", "active", "done"},
+					},
+					"labels": {
+						Type:        "array",
+						Description: "Replace the epic's labels (empty array clears them)",
+						Items:       &Property{Type: "string"},
 					},
 				},
 				Required: []string{"id"},

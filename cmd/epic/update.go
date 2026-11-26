@@ -13,6 +13,7 @@ var (
 	updateTitle   string
 	updateSummary string
 	updateStatus  string
+	updateLabels  []string
 )
 
 var updateCmd = &cobra.Command{
@@ -37,6 +38,9 @@ var updateCmd = &cobra.Command{
 			if cmd.Flags().Changed("summary") {
 				e.SetSummary(updateSummary)
 			}
+			if cmd.Flags().Changed("label") {
+				e.SetLabels(updateLabels)
+			}
 			if cmd.Flags().Changed("status") {
 				status, err := epic.ParseStatus(updateStatus)
 				if err != nil {
@@ -60,4 +64,5 @@ func init() {
 	updateCmd.Flags().StringVar(&updateTitle, "title", "", "Epic title")
 	updateCmd.Flags().StringVar(&updateSummary, "summary", "", "Epic summary")
 	updateCmd.Flags().StringVar(&updateStatus, "status", "", "Epic status (planning, active, done)")
+	updateCmd.Flags().StringArrayVar(&updateLabels, "label", nil, "Replace the epic's labels (repeatable; pass --label= to clear)")
 }

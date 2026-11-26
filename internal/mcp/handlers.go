@@ -638,6 +638,16 @@ func (h *Handler) toolEpicCreate(args map[string]any) ToolCallResult {
 	}
 
 	e := epic.NewEpic(h.epicService.GenerateEpicID(), status, title, summary)
+	e.SetSpec(epic.Spec{
+		CurrentState: stringArg(args, "current_state"),
+		TargetState:  stringArg(args, "target_state"),
+		Constraints:  stringArg(args, "constraints"),
+		Exclusions:   stringArg(args, "exclusions"),
+		Freeform:     stringArg(args, "freeform"),
+	})
+	if labels, ok := stringSliceArg(args, "labels"); ok {
+		e.SetLabels(labels)
+	}
 	if err := h.epicService.CreateEpic(e); err != nil {
 		return errorResult(fmt.Sprintf("failed to create epic: %v", err))
 	}
@@ -648,10 +658,25 @@ func (h *Handler) toolEpicCreate(args map[string]any) ToolCallResult {
 	})
 }
 
-func (h *Handler) toolEpicList(_ map[string]any) ToolCallResult {
+func (h *Handler) toolEpicList(args map[string]any) ToolCallResult {
 	epics, err := h.epicService.LoadAllEpics()
 	if err != nil {
 		return errorResult(fmt.Sprintf("failed to list epics: %v", err))
+	}
+	if labels, ok := stringSliceArg(args, "labels"); ok && len(labels) > 0 {
+		var filtered []epic.Epic
+		for _, e := range epics {
+			for _, l := range labels {
+				if e.HasLabel(l) {
+					filtered = append(filtered, e)
+					break
+				}
+			}
+		}
+		epics = filtered
+	}
+	if head := parseHead(args); head > 0 && head < len(epics) {
+		epics = epics[:head]
 	}
 	jsons := make([]epic.EpicJSON, 0, len(epics))
 	for _, e := range epics {
@@ -687,6 +712,9 @@ func (h *Handler) toolEpicUpdate(args map[string]any) ToolCallResult {
 	}
 	if summary, ok := args["summary"].(string); ok {
 		e.SetSummary(summary)
+	}
+	if labels, ok := stringSliceArg(args, "labels"); ok {
+		e.SetLabels(labels)
 	}
 	if s, ok := args["status"].(string); ok && s != "" {
 		parsed, err := epic.ParseStatus(s)
@@ -840,4 +868,25 @@ func parseHead(args map[string]any) int {
 		}
 	}
 	return 0
+}
+
+func stringArg(args map[string]any, key string) string {
+	s, _ := args[key].(string)
+	return s
+}
+
+// stringSliceArg reads a JSON string array argument. ok is false when the key
+// is absent, so callers can tell "not provided" from "clear".
+func stringSliceArg(args map[string]any, key string) ([]string, bool) {
+	raw, ok := args[key].([]any)
+	if !ok {
+		return nil, false
+	}
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if s, ok := v.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out, true
 }

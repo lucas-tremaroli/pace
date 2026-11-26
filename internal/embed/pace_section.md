@@ -11,7 +11,7 @@ Pace is a project management tool exposed via MCP server. Use pace tools (prefix
 
 When tackling complex work, use pace to break it down and track execution:
 
-1. **Start with an epic** — use `pace_epic_create`, then `pace_epic_spec_set` to capture current state, target state, constraints, and exclusions (or the freeform section) as markdown. Set the epic `active` with `pace_epic_update` when work begins
+1. **Start with an epic** — use `pace_epic_create` with the spec (`current_state`, `target_state`, `constraints`, `exclusions`, or `freeform` as markdown) and optional `labels`; refine later with `pace_epic_spec_set`. Set the epic `active` with `pace_epic_update` when work begins
 2. **Create tasks under the epic** — use `pace_task_create` with `epic_id` for each discrete unit of work. Set `label` (feature/bug/task/docs) and `priority` (high/medium/low) to communicate intent
 3. **Wire up dependencies** — use `pace_task_dep_add` to express ordering (e.g. "define schema" blocks "implement API"). Both tasks must be in the same epic. This lets `ready: true` surface only unblocked tasks
 
