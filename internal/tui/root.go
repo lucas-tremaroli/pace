@@ -6,10 +6,9 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/note"
+	"github.com/lucas-tremaroli/pace/internal/epic"
 	"github.com/lucas-tremaroli/pace/internal/storage"
 	"github.com/lucas-tremaroli/pace/internal/task"
 )
@@ -35,7 +34,7 @@ type Root struct {
 	// Retained so Close() can shut the underlying DB connections
 	// down deterministically — both services wrap a SQLite handle.
 	taskSvc *task.Service
-	noteSvc *note.Service
+	epicSvc *epic.Service
 }
 
 type rootKeys struct {
@@ -55,10 +54,10 @@ func New() (*Root, error) {
 	if err != nil {
 		return nil, fmt.Errorf("task service: %w", err)
 	}
-	ns, err := note.NewService()
+	es, err := epic.NewService()
 	if err != nil {
 		ts.Close()
-		return nil, fmt.Errorf("note service: %w", err)
+		return nil, fmt.Errorf("epic service: %w", err)
 	}
 
 	var storePath string
@@ -69,13 +68,13 @@ func New() (*Root, error) {
 	}
 
 	return &Root{
-		tabs:        []tab{newKanban(ts), newNotes(ns)},
+		tabs:        []tab{newKanban(ts), newEpics(es, ts)},
 		help:        help.New(),
 		rootKeys:    newRootKeys(),
 		storagePath: storePath,
 		storageType: storeType,
 		taskSvc:     ts,
-		noteSvc:     ns,
+		epicSvc:     es,
 	}, nil
 }
 
@@ -91,11 +90,11 @@ func (r *Root) Close() error {
 		}
 		r.taskSvc = nil
 	}
-	if r.noteSvc != nil {
-		if err := r.noteSvc.Close(); err != nil && firstErr == nil {
+	if r.epicSvc != nil {
+		if err := r.epicSvc.Close(); err != nil && firstErr == nil {
 			firstErr = err
 		}
-		r.noteSvc = nil
+		r.epicSvc = nil
 	}
 	return firstErr
 }
@@ -113,8 +112,8 @@ func (r *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		r.width, r.height = m.Width, m.Height
 		r.tooSmall = m.Width < minWidth || m.Height < minHeight
-		r.help.Width = m.Width
-		bodyMsg := tea.WindowSizeMsg{Width: m.Width, Height: r.bodyHeight()}
+		r.help.Width = m.Width - 2 // theme.Help pads 1 column per side
+		bodyMsg := tea.WindowSizeMsg{Width: r.contentWidth(), Height: r.bodyHeight()}
 		cmds := make([]tea.Cmd, len(r.tabs))
 		for i, t := range r.tabs {
 			r.tabs[i], cmds[i] = t.Update(bodyMsg)
@@ -174,10 +173,6 @@ func isCapturing(t tab) bool {
 	return false
 }
 
-func (n *notes) inFilterMode() bool {
-	return n.list.FilterState() == list.Filtering
-}
-
 func (r *Root) View() string {
 	if r.width == 0 {
 		return "Loading..."
@@ -189,7 +184,11 @@ func (r *Root) View() string {
 	header := r.renderHeader()
 	body := r.tabs[r.active].View()
 	footer := r.renderFooter()
-	base := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
+	inset := lipgloss.NewStyle().PaddingLeft(sidePad)
+	// Footer is already inset by theme.Help's own padding.
+	base := lipgloss.JoinVertical(lipgloss.Left, inset.Render(header), inset.Render(body), footer)
+	// Safety net: whatever a tab renders, never exceed the terminal.
+	base = lipgloss.NewStyle().MaxWidth(r.width).MaxHeight(r.height).Render(base)
 
 	if overlay := r.tabs[r.active].ModalOverlay(); overlay != "" {
 		return lipgloss.Place(r.width, r.height, lipgloss.Center, lipgloss.Center, overlay)
@@ -197,34 +196,40 @@ func (r *Root) View() string {
 	return base
 }
 
+// bodyHeight is what remains once the header and footer have taken the rows
+// they actually render, so adding or removing a row there needs no edit here.
 func (r *Root) bodyHeight() int {
-	h := r.height - r.headerHeight() - 1 // footer is 1 line
+	h := r.height - lipgloss.Height(r.renderHeader()) - lipgloss.Height(r.renderFooter())
 	if h < 1 {
 		return 1
 	}
 	return h
 }
 
-// headerHeight: title row + horizontal rule.
-func (r *Root) headerHeight() int { return 2 }
-
 const (
-	tabSeparatorGlyph = " · "
-	minStoreGap       = 2
+	minStoreGap = 2
+	// sidePad is the left/right margin around the header and body, matching
+	// the 1-column padding of the footer.
+	sidePad = 1
 )
+
+// contentWidth is the width available inside the side margins.
+func (r *Root) contentWidth() int { return r.width - 2*sidePad }
 
 func (r *Root) renderHeader() string {
 	titleRow := r.renderTitleRow()
-	rule := theme.OverviewLabel.Render(strings.Repeat("─", r.width))
-	return lipgloss.JoinVertical(lipgloss.Left, titleRow, rule)
+	// Blank top row keeps the tabs off a host tab bar (e.g. herdr) above us.
+	// No row below: the body's border glyph already sits mid-cell, which is
+	// all the separation the tabs need.
+	return lipgloss.JoinVertical(lipgloss.Left, "", titleRow)
 }
 
 func (r *Root) renderTitleRow() string {
 	tabStrip := r.renderTabStrip()
-	store := r.renderStorageInfo(r.width - lipgloss.Width(tabStrip) - minStoreGap)
+	store := r.renderStorageInfo(r.contentWidth() - lipgloss.Width(tabStrip) - minStoreGap)
 
 	used := lipgloss.Width(tabStrip) + lipgloss.Width(store)
-	gap := r.width - used
+	gap := r.contentWidth() - used
 	if gap < minStoreGap {
 		gap = minStoreGap
 	}
@@ -235,7 +240,7 @@ func (r *Root) renderTabStrip() string {
 	parts := make([]string, 0, len(r.tabs)*2)
 	for i, t := range r.tabs {
 		if i > 0 {
-			parts = append(parts, theme.OverviewLabel.Render(tabSeparatorGlyph))
+			parts = append(parts, " ")
 		}
 		if i == r.active {
 			parts = append(parts, theme.TabActive.Render(t.Title()))
@@ -278,5 +283,5 @@ func (r *Root) renderFooter() string {
 // drive the footer.
 type footerKeys struct{ bindings []key.Binding }
 
-func (f footerKeys) ShortHelp() []key.Binding     { return f.bindings }
-func (f footerKeys) FullHelp() [][]key.Binding    { return [][]key.Binding{f.bindings} }
+func (f footerKeys) ShortHelp() []key.Binding  { return f.bindings }
+func (f footerKeys) FullHelp() [][]key.Binding { return [][]key.Binding{f.bindings} }

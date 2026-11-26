@@ -104,7 +104,7 @@ func newKanban(svc kanbanService) *kanban {
 	return &kanban{svc: svc, cols: cols, keys: newKanbanKeys()}
 }
 
-func (k *kanban) Title() string         { return "Kanban" }
+func (k *kanban) Title() string               { return "Kanban" }
 func (k *kanban) HelpBindings() []key.Binding { return k.keys.ShortHelp() }
 func (k *kanban) Counts() (todo, inProg, done int) {
 	return len(k.cols[0].Items()), len(k.cols[1].Items()), len(k.cols[2].Items())
@@ -292,7 +292,7 @@ func (k *kanban) resizeColumns() {
 	widths := k.colWidths()
 	innerH := k.colInnerH()
 	for i := range k.cols {
-		inner := widths[i] - 4 // border (2) + padding (2)
+		inner, _ := paneInner(paneStyle(false), widths[i], k.height)
 		if inner < 8 {
 			inner = 8
 		}
@@ -308,8 +308,13 @@ func (k *kanban) colWidths() [3]int {
 	return [3]int{base, base, base + rem}
 }
 
+// listChrome is the extra rows kept free inside a column beyond the box
+// frame (carried over from the original sizing).
+const listChrome = 2
+
 func (k *kanban) colInnerH() int {
-	h := k.height - 4
+	_, h := paneInner(paneStyle(false), 0, k.height)
+	h -= listChrome
 	if h < 4 {
 		return 4
 	}
@@ -326,21 +331,12 @@ func (k *kanban) View() string {
 	widths := k.colWidths()
 	var rendered [3]string
 	for i := range k.cols {
-		style := theme.BorderBlurred
-		if i == k.col {
-			style = theme.BorderFocused
-		}
 		body := k.cols[i].View()
 		if len(k.cols[i].Items()) == 0 {
 			title := theme.ListTitle.Render(k.cols[i].Title)
 			body = title + "\n\n" + theme.NoTasks.Render("  empty")
 		}
-		// Width(N) on a bordered style produces a box of total width N.
-		rendered[i] = style.
-			Width(widths[i] - 2).
-			Height(k.height - 2).
-			Padding(0, 1).
-			Render(body)
+		rendered[i] = pane(paneStyle(i == k.col), widths[i], k.height, body)
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, rendered[0], rendered[1], rendered[2])
 }
@@ -369,8 +365,7 @@ func (k *kanban) openDetailCmd() tea.Cmd {
 }
 
 func (k *kanban) detailContentWidth() int {
-	mw, _ := modalSize(k.width, k.height)
-	w := mw - 8
+	w, _ := modalInner(k.width, k.height)
 	if w < 30 {
 		w = 30
 	}
@@ -470,7 +465,6 @@ func (k *kanban) saveTaskCmd() tea.Cmd {
 		updated.SetLabel(s.label)
 		updated.SetBlockedBy(existing.BlockedBy())
 		updated.SetBlocks(existing.Blocks())
-		updated.SetNotes(existing.Notes())
 		svc.UpdateTask(updated)
 		svc.SetLabel(s.id, s.label)
 		return taskMutatedMsg{}

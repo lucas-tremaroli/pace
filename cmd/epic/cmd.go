@@ -31,6 +31,8 @@ func init() {
 	EpicCmd.AddCommand(listCmd)
 	EpicCmd.AddCommand(getCmd)
 	EpicCmd.AddCommand(updateCmd)
+	EpicCmd.AddCommand(editCmd)
+	EpicCmd.AddCommand(mergeCmd)
 	EpicCmd.AddCommand(deleteCmd)
 	EpicCmd.AddCommand(specCmd)
 }

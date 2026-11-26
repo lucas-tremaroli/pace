@@ -2,6 +2,7 @@ package epic
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/lucas-tremaroli/pace/internal/cmdutil"
 	"github.com/lucas-tremaroli/pace/internal/epic"
@@ -12,6 +13,8 @@ import (
 var (
 	listPretty       bool
 	listFilterStatus string
+	listLabels       []string
+	listHead         int
 )
 
 var listCmd = &cobra.Command{
@@ -40,6 +43,23 @@ var listCmd = &cobra.Command{
 				epics = filtered
 			}
 
+			if len(listLabels) > 0 {
+				var filtered []epic.Epic
+				for _, e := range epics {
+					for _, l := range listLabels {
+						if e.HasLabel(l) {
+							filtered = append(filtered, e)
+							break
+						}
+					}
+				}
+				epics = filtered
+			}
+
+			if listHead > 0 && listHead < len(epics) {
+				epics = epics[:listHead]
+			}
+
 			if listPretty {
 				printEpicsPretty(epics)
 				return nil
@@ -63,6 +83,9 @@ func printEpicsPretty(epics []epic.Epic) {
 	fmt.Println()
 	for _, e := range epics {
 		line := idStyle.Render(e.ID()) + " " + titleStyle.Render(e.Title()) + " " + labelStyle.Render("["+e.Status().String()+"]")
+		if len(e.Labels()) > 0 {
+			line += " " + dimStyle.Render("("+strings.Join(e.Labels(), ", ")+")")
+		}
 		if e.Summary() != "" {
 			line += " " + dimStyle.Render("— "+e.Summary())
 		}
@@ -74,5 +97,7 @@ func printEpicsPretty(epics []epic.Epic) {
 
 func init() {
 	listCmd.Flags().BoolVar(&listPretty, "pretty", false, "Human-readable formatted output")
+	listCmd.Flags().StringArrayVar(&listLabels, "label", nil, "Only epics with this label (repeatable; any match)")
+	listCmd.Flags().IntVar(&listHead, "head", 0, "Limit output to the first N epics")
 	listCmd.Flags().StringVar(&listFilterStatus, "status", "", "Filter by status (planning, active, done)")
 }

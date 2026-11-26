@@ -91,12 +91,6 @@ func InitProjectDir(targetDir string) (string, error) {
 		return "", err
 	}
 
-	// Create notes/ subdirectory
-	notesDir := filepath.Join(paceDir, "notes")
-	if err := os.MkdirAll(notesDir, 0755); err != nil {
-		return "", err
-	}
-
 	return paceDir, nil
 }
 

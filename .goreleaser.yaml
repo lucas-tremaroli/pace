@@ -50,7 +50,7 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/lucas-tremaroli/pace"
-    description: "A CLI tool for task management, notes, focus timer, and more"
+    description: "A CLI tool for task management, epics, focus timer, and more"
     license: "MIT"
     commit_author:
       name: goreleaserbot

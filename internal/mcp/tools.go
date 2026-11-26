@@ -7,7 +7,7 @@ func GetToolDefinitions() []Tool {
 	return []Tool{
 		{
 			Name:        "pace_context",
-			Description: "Get storage location, active tasks (todo/in-progress), and notes for session context",
+			Description: "Get storage location, active tasks (todo/in-progress), and active epics for session context",
 			InputSchema: ToolInputSchema{
 				Type:       "object",
 				Properties: map[string]Property{},
@@ -37,7 +37,7 @@ func GetToolDefinitions() []Tool {
 					},
 					"fields": {
 						Type:        "array",
-						Description: "Limit response to specific fields. Available: id, title, description, status, priority, blocked_by, blocks, label, notes, link",
+						Description: "Limit response to specific fields. Available: id, title, description, status, priority, blocked_by, blocks, label, link",
 						Items: &Property{
 							Type: "string",
 						},
@@ -98,6 +98,10 @@ func GetToolDefinitions() []Tool {
 						Enum:        task.ValidLabels,
 						Default:     task.LabelTask,
 					},
+					"epic_id": {
+						Type:        "string",
+						Description: "Epic ID (e.g. epic-a1b) to create the task under",
+					},
 					"link": {
 						Type:        "string",
 						Description: "URL link associated with the task",
@@ -137,6 +141,10 @@ func GetToolDefinitions() []Tool {
 						Type:        "string",
 						Description: "New task label",
 						Enum:        task.ValidLabels,
+					},
+					"epic_id": {
+						Type:        "string",
+						Description: "Epic ID to move the task into; empty string unlinks it from its epic",
 					},
 					"link": {
 						Type:        "string",
@@ -194,115 +202,6 @@ func GetToolDefinitions() []Tool {
 					},
 				},
 				Required: []string{"blocker_id", "blocked_id"},
-			},
-		},
-		{
-			Name:        "pace_task_note_link",
-			Description: "Link a note to a task",
-			InputSchema: ToolInputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"task_id": {
-						Type:        "string",
-						Description: "Task ID to link the note to",
-					},
-					"note_filename": {
-						Type:        "string",
-						Description: "Note filename (with or without .md extension)",
-					},
-				},
-				Required: []string{"task_id", "note_filename"},
-			},
-		},
-		{
-			Name:        "pace_task_note_unlink",
-			Description: "Unlink a note from a task",
-			InputSchema: ToolInputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"task_id": {
-						Type:        "string",
-						Description: "Task ID to unlink the note from",
-					},
-					"note_filename": {
-						Type:        "string",
-						Description: "Note filename (with or without .md extension)",
-					},
-				},
-				Required: []string{"task_id", "note_filename"},
-			},
-		},
-		{
-			Name:        "pace_note_list",
-			Description: "List all notes with their filenames, descriptions, and labels",
-			InputSchema: ToolInputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"fields": {
-						Type:        "array",
-						Description: "Limit response to specific fields. Available: filename, description, labels, modTime",
-						Items: &Property{
-							Type: "string",
-						},
-					},
-					"head": {
-						Type:        "integer",
-						Description: "Limit output to first N notes",
-					},
-				},
-			},
-		},
-		{
-			Name:        "pace_note_create",
-			Description: "Create a new note",
-			InputSchema: ToolInputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"filename": {
-						Type:        "string",
-						Description: "Note filename without .md extension (required)",
-					},
-					"content": {
-						Type:        "string",
-						Description: "Note content in markdown format (required)",
-					},
-					"task_ids": {
-						Type:        "array",
-						Description: "Task IDs to link to this note",
-						Items: &Property{
-							Type: "string",
-						},
-					},
-				},
-				Required: []string{"filename", "content"},
-			},
-		},
-		{
-			Name:        "pace_note_read",
-			Description: "Read a note's content and metadata",
-			InputSchema: ToolInputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"filename": {
-						Type:        "string",
-						Description: "Note filename (with or without .md extension)",
-					},
-				},
-				Required: []string{"filename"},
-			},
-		},
-		{
-			Name:        "pace_note_delete",
-			Description: "Delete a note",
-			InputSchema: ToolInputSchema{
-				Type: "object",
-				Properties: map[string]Property{
-					"filename": {
-						Type:        "string",
-						Description: "Note filename to delete",
-					},
-				},
-				Required: []string{"filename"},
 			},
 		},
 		{
@@ -395,16 +294,51 @@ func GetToolDefinitions() []Tool {
 						Description: "Epic status (default: planning)",
 						Enum:        []string{"planning", "active", "done"},
 					},
+					"current_state": {
+						Type:        "string",
+						Description: "Current state section (markdown)",
+					},
+					"target_state": {
+						Type:        "string",
+						Description: "Target state section (markdown)",
+					},
+					"constraints": {
+						Type:        "string",
+						Description: "Constraints section (markdown)",
+					},
+					"exclusions": {
+						Type:        "string",
+						Description: "Exclusions section (markdown)",
+					},
+					"freeform": {
+						Type:        "string",
+						Description: "Freeform fallback section (markdown)",
+					},
+					"labels": {
+						Type:        "array",
+						Description: "Epic labels",
+						Items:       &Property{Type: "string"},
+					},
 				},
 				Required: []string{"title"},
 			},
 		},
 		{
 			Name:        "pace_epic_list",
-			Description: "List all epics with their status and spec",
+			Description: "List all epics with their status, spec and labels",
 			InputSchema: ToolInputSchema{
-				Type:       "object",
-				Properties: map[string]Property{},
+				Type: "object",
+				Properties: map[string]Property{
+					"labels": {
+						Type:        "array",
+						Description: "Only epics having any of these labels",
+						Items:       &Property{Type: "string"},
+					},
+					"head": {
+						Type:        "integer",
+						Description: "Limit output to first N epics",
+					},
+				},
 			},
 		},
 		{
@@ -423,7 +357,7 @@ func GetToolDefinitions() []Tool {
 		},
 		{
 			Name:        "pace_epic_update",
-			Description: "Update an epic's title, summary, or status. Only provided fields change.",
+			Description: "Update an epic's title, summary, status, or labels. Only provided fields change; labels replaces the full set.",
 			InputSchema: ToolInputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -443,6 +377,11 @@ func GetToolDefinitions() []Tool {
 						Type:        "string",
 						Description: "New status",
 						Enum:        []string{"planning", "active", "done"},
+					},
+					"labels": {
+						Type:        "array",
+						Description: "Replace the epic's labels (empty array clears them)",
+						Items:       &Property{Type: "string"},
 					},
 				},
 				Required: []string{"id"},

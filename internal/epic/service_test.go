@@ -54,6 +54,14 @@ func (m *memRepo) UpdateEpic(rec storage.EpicRecord) error {
 	return nil
 }
 
+func (m *memRepo) MergeEpics(rec storage.EpicRecord, sourceIDs []string) error {
+	m.records[rec.ID] = rec
+	for _, id := range sourceIDs {
+		delete(m.records, id)
+	}
+	return nil
+}
+
 func (m *memRepo) DeleteEpic(id string) error {
 	if _, ok := m.records[id]; !ok {
 		return storage.ErrNotFound

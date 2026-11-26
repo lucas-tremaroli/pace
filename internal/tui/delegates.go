@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/note"
+	"github.com/lucas-tremaroli/pace/internal/epic"
 	"github.com/lucas-tremaroli/pace/internal/task"
 )
 
@@ -100,20 +100,22 @@ func (taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 	fmt.Fprint(w, "\n"+truncateText(theme.TaskMeta.Render(meta), m.Width()))
 }
 
-// noteItem adapts note.Note to list.Item.
-type noteItem struct{ Note note.Note }
+// epicItem adapts epic.Epic to list.Item.
+type epicItem struct{ Epic epic.Epic }
 
-func (i noteItem) FilterValue() string { return i.Note.Filename }
+func (i epicItem) FilterValue() string {
+	return i.Epic.Title() + " " + strings.Join(i.Epic.Labels(), " ")
+}
 
-// noteDelegate renders one note per row: filename (without .md) and
-// description on a dim second line if present.
-type noteDelegate struct{}
+// epicDelegate renders one epic per row: title, then "id · status" and the
+// summary on a dim second line.
+type epicDelegate struct{}
 
-func (noteDelegate) Height() int                             { return 2 }
-func (noteDelegate) Spacing() int                            { return 0 }
-func (noteDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
-func (noteDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
-	ni, ok := item.(noteItem)
+func (epicDelegate) Height() int                             { return 2 }
+func (epicDelegate) Spacing() int                            { return 0 }
+func (epicDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (epicDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	ei, ok := item.(epicItem)
 	if !ok {
 		return
 	}
@@ -124,12 +126,14 @@ func (noteDelegate) Render(w io.Writer, m list.Model, index int, item list.Item)
 		prefix = "> "
 		style = theme.TaskSelected
 	}
-	name := strings.TrimSuffix(ni.Note.Filename, ".md")
-	fmt.Fprint(w, truncateText(style.Render(prefix+name), m.Width()))
+	fmt.Fprint(w, truncateText(style.Render(prefix+ei.Epic.Title()), m.Width()))
 	fmt.Fprint(w, "\n")
-	desc := ni.Note.Description
-	if desc == "" {
-		desc = "—"
+	meta := fmt.Sprintf("  %s · %s", ei.Epic.ID(), ei.Epic.Status())
+	if len(ei.Epic.Labels()) > 0 {
+		meta += " (" + strings.Join(ei.Epic.Labels(), ", ") + ")"
 	}
-	fmt.Fprint(w, truncateText(theme.TaskMeta.Render("  "+desc), m.Width()))
+	if s := ei.Epic.Summary(); s != "" {
+		meta += " — " + s
+	}
+	fmt.Fprint(w, truncateText(theme.TaskMeta.Render(meta), m.Width()))
 }

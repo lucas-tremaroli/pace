@@ -2,7 +2,10 @@ package epic
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/lucas-tremaroli/pace/internal/storage"
 )
@@ -98,6 +101,7 @@ func toRecord(e Epic) storage.EpicRecord {
 		Constraints:  spec.Constraints,
 		Exclusions:   spec.Exclusions,
 		Freeform:     spec.Freeform,
+		Labels:       encodeLabels(e.Labels()),
 	}
 }
 
@@ -110,6 +114,7 @@ func fromRecord(r storage.EpicRecord) Epic {
 		Exclusions:   r.Exclusions,
 		Freeform:     r.Freeform,
 	})
+	epic.SetLabels(decodeLabels(r.Labels))
 	epic.setCreatedAt(r.CreatedAt)
 	return epic
 }
@@ -124,17 +129,86 @@ func (s *Service) DeleteEpic(id string) error {
 	return err
 }
 
-// LoadEpicsByStatus returns every epic in the given lifecycle state.
-func (s *Service) LoadEpicsByStatus(status Status) ([]Epic, error) {
+// LoadOpenEpics returns epics that still need work: planning or active.
+func (s *Service) LoadOpenEpics() ([]Epic, error) {
 	epics, err := s.LoadAllEpics()
 	if err != nil {
 		return nil, err
 	}
 	var out []Epic
 	for _, e := range epics {
-		if e.Status() == status {
+		if e.Status() != Done {
 			out = append(out, e)
 		}
 	}
 	return out, nil
+}
+
+func encodeLabels(labels []string) string {
+	if len(labels) == 0 {
+		return "[]"
+	}
+	b, _ := json.Marshal(labels) // []string never fails to marshal
+	return string(b)
+}
+
+func decodeLabels(s string) []string {
+	var labels []string
+	_ = json.Unmarshal([]byte(s), &labels) // empty/invalid column reads as no labels
+	return labels
+}
+
+// MergeEpics combines two or more epics into a new one titled title. Each
+// spec section is the sources' sections joined with "---" separators, labels
+// are the deduplicated union, and the new status is the furthest-along of the
+// sources. Tasks move to the new epic and the sources are deleted.
+func (s *Service) MergeEpics(ids []string, title string) (*Epic, error) {
+	if len(ids) < 2 {
+		return nil, fmt.Errorf("at least 2 epics required for merge")
+	}
+	if title == "" {
+		return nil, ErrEmptyTitle
+	}
+	seen := make(map[string]bool, len(ids))
+	var parts [5][]string
+	var labels, summaries []string
+	status := Planning
+	for _, id := range ids {
+		if seen[id] {
+			return nil, fmt.Errorf("duplicate epic %s", id)
+		}
+		seen[id] = true
+		e, err := s.GetEpicByID(id)
+		if err != nil {
+			return nil, fmt.Errorf("epic %s: %w", id, err)
+		}
+		if e.Status() > status {
+			status = e.Status()
+		}
+		labels = append(labels, e.Labels()...)
+		if e.Summary() != "" {
+			summaries = append(summaries, e.Summary())
+		}
+		spec := e.Spec()
+		for i, sec := range sectionHeadings {
+			if body := strings.TrimSpace(*sec.get(&spec)); body != "" {
+				parts[i] = append(parts[i], body)
+			}
+		}
+	}
+
+	merged := NewEpic(s.GenerateEpicID(), status, title, strings.Join(summaries, " / "))
+	var spec Spec
+	for i, sec := range sectionHeadings {
+		*sec.get(&spec) = strings.Join(parts[i], "\n\n---\n\n")
+	}
+	merged.SetSpec(spec)
+	merged.SetLabels(labels)
+	if err := merged.Validate(); err != nil {
+		return nil, err
+	}
+	if err := s.db.MergeEpics(toRecord(merged), ids); err != nil {
+		return nil, err
+	}
+	return s.GetEpicByID(merged.ID())
 }

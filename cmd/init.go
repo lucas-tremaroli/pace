@@ -29,12 +29,11 @@ var initCmd = &cobra.Command{
 	Short: "Initialize project-specific pace storage",
 	Long: `Creates a .pace/ directory in the current working directory for project-specific storage.
 
-This allows you to have separate tasks and notes for each project, instead of using
+This allows you to have separate tasks and epics for each project, instead of using
 the global ~/.config/pace/ storage.
 
 The command will:
   - Create .pace/ directory in the current directory
-  - Create .pace/notes/ subdirectory for project notes
   - Add .pace/ to .gitignore if present (skip with --no-gitignore)
   - Generate CLAUDE.md for Claude Code (skip with --no-claude-md)
   - Report if already initialized (searches upward for existing .pace/)`,

@@ -69,10 +69,6 @@ func TestGetToolDefinitions(t *testing.T) {
 		"pace_task_delete",
 		"pace_task_dep_add",
 		"pace_task_dep_remove",
-		"pace_note_list",
-		"pace_note_create",
-		"pace_note_read",
-		"pace_note_delete",
 	}
 
 	for _, name := range expectedTools {

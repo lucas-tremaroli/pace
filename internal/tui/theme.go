@@ -79,8 +79,8 @@ func DefaultTheme() Theme {
 		ListTitle:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62")),
 		ListTitleBar:  lipgloss.NewStyle().MarginBottom(1),
 
-		TabActive:   lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212")),
-		TabInactive: lipgloss.NewStyle().Foreground(lipgloss.Color("241")),
+		TabActive:   lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("232")).Background(lipgloss.Color("212")).Padding(0, 2),
+		TabInactive: lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Background(lipgloss.Color("237")).Padding(0, 2),
 
 		DetailHeader:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).MarginBottom(1),
 		DetailTitle:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255")),

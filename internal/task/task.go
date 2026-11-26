@@ -16,7 +16,6 @@ type Task struct {
 	blockedBy   []string
 	blocks      []string
 	labels      []string
-	notes       []string
 	link        string
 	epicID      string
 }
@@ -31,7 +30,6 @@ type TaskJSON struct {
 	BlockedBy   []string `json:"blocked_by,omitempty"`
 	Blocks      []string `json:"blocks,omitempty"`
 	Label       string   `json:"label,omitempty"`
-	Notes       []string `json:"notes,omitempty"`
 	Link        string   `json:"link,omitempty"`
 	EpicID      string   `json:"epic_id,omitempty"`
 }
@@ -196,16 +194,6 @@ func (t *Task) SetLabels(labels []string) {
 	}
 }
 
-// Notes returns the task's linked note filenames
-func (t Task) Notes() []string {
-	return t.notes
-}
-
-// SetNotes sets the task's linked note filenames
-func (t *Task) SetNotes(notes []string) {
-	t.notes = notes
-}
-
 // HasLabel returns true if the task has the given label
 func (t Task) HasLabel(label string) bool {
 	return t.Label() == label
@@ -236,7 +224,6 @@ func (t Task) ToJSON() TaskJSON {
 		BlockedBy:   t.blockedBy,
 		Blocks:      t.blocks,
 		Label:       t.Label(),
-		Notes:       t.notes,
 		Link:        t.link,
 		EpicID:      t.epicID,
 	}

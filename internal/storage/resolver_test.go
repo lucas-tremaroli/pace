@@ -153,11 +153,6 @@ func TestInitProjectDir(t *testing.T) {
 		t.Error(".pace directory was not created")
 	}
 
-	// Verify notes/ subdirectory was created
-	notesDir := filepath.Join(expectedPaceDir, "notes")
-	if _, err := os.Stat(notesDir); os.IsNotExist(err) {
-		t.Error("notes directory was not created")
-	}
 }
 
 func TestFindExistingProjectDir(t *testing.T) {

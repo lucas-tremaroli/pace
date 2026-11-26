@@ -3,9 +3,11 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"sync"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/note"
+	"github.com/lucas-tremaroli/pace/internal/epic"
 	"github.com/lucas-tremaroli/pace/internal/task"
 	"github.com/muesli/reflow/wrap"
 )
@@ -151,8 +153,8 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 	hasLink := tk.Link() != ""
 	hasBlockedBy := len(tk.BlockedBy()) > 0
 	hasBlocks := len(tk.Blocks()) > 0
-	hasNotes := len(tk.Notes()) > 0
-	if hasLink || hasBlockedBy || hasBlocks || hasNotes {
+	hasEpic := tk.EpicID() != ""
+	if hasLink || hasBlockedBy || hasBlocks || hasEpic {
 		const metaLabelW = 13
 		metaRow := func(label, value string) {
 			padded := label + ":" + strings.Repeat(" ", metaLabelW-len(label)-1)
@@ -169,8 +171,8 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 		if hasBlocks {
 			metaRow("Blocks", renderChips(tk.Blocks()))
 		}
-		if hasNotes {
-			metaRow("Notes", renderChips(tk.Notes()))
+		if hasEpic {
+			metaRow("Epic", renderChips([]string{tk.EpicID()}))
 		}
 	} else {
 		b.WriteString(theme.DetailDim.Render("No metadata"))
@@ -201,22 +203,87 @@ func renderTaskDetail(tk task.Task, w int, logs []LogEntry) string {
 	return b.String()
 }
 
-func renderNoteDetail(n note.Note, w int) string {
+func renderEpicDetail(e epic.Epic, members []task.Task, w int) string {
 	var b strings.Builder
-	b.WriteString(theme.DetailHeader.Render(wrap.String(n.Filename, w)))
+	b.WriteString(theme.DetailHeader.Render(wrap.String(e.Title(), w)))
+	b.WriteString("\n")
+	b.WriteString(theme.DetailDim.Render(e.ID() + " · " + e.Status().String()))
+	b.WriteString("\n")
+	if len(e.Labels()) > 0 {
+		b.WriteString(renderChips(e.Labels()))
+		b.WriteString("\n")
+	}
 	b.WriteString("\n")
 
-	if n.Description != "" {
-		b.WriteString(theme.DetailLabel.Render(wrap.String(n.Description, w)))
+	if e.Summary() != "" {
+		b.WriteString(theme.DetailLabel.Render(wrap.String(e.Summary(), w)))
 		b.WriteString("\n\n")
 	}
-	if len(n.Tasks) > 0 {
-		b.WriteString(theme.DetailLabel.Render("Linked tasks: "))
-		b.WriteString(theme.DetailValue.Render(wrap.String(strings.Join(n.Tasks, ", "), w)))
-		b.WriteString("\n\n")
+
+	spec := e.Spec()
+	var md strings.Builder
+	for _, sec := range []struct{ name, body string }{
+		{"Current state", spec.CurrentState},
+		{"Target state", spec.TargetState},
+		{"Constraints", spec.Constraints},
+		{"Exclusions", spec.Exclusions},
+		{"Notes", spec.Freeform},
+	} {
+		if sec.body != "" {
+			md.WriteString("## " + sec.name + "\n\n" + sec.body + "\n\n")
+		}
 	}
-	if n.Content != "" {
-		b.WriteString(note.RenderMarkdownWithWidth(n.Content, w))
+	if md.Len() > 0 {
+		b.WriteString(renderMarkdown(md.String(), w))
+	} else {
+		b.WriteString(theme.DetailDim.Render("No spec yet"))
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(theme.DetailLabel.Render(fmt.Sprintf("Tasks (%d):", len(members))))
+	b.WriteString("\n")
+	for _, t := range members {
+		line := fmt.Sprintf("  %s [%s] %s", t.ID(), t.Status(), t.Title())
+		b.WriteString(theme.DetailValue.Render(wrap.String(line, w)))
+		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+var (
+	mdMu       sync.Mutex
+	mdRenderer *glamour.TermRenderer
+	mdWidth    int
+)
+
+// mdRendererFor returns a renderer for width, cached per width: WithAutoStyle
+// probes the terminal for its background, which must not happen on every
+// render inside a running TUI.
+func mdRendererFor(width int) *glamour.TermRenderer {
+	mdMu.Lock()
+	defer mdMu.Unlock()
+	if mdRenderer != nil && mdWidth == width {
+		return mdRenderer
+	}
+	r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(width))
+	if err != nil {
+		return nil
+	}
+	mdRenderer, mdWidth = r, width
+	return r
+}
+
+// renderMarkdown renders markdown for the detail pane, falling back to the
+// raw text if glamour fails.
+func renderMarkdown(content string, width int) string {
+	r := mdRendererFor(width)
+	if r == nil {
+		return content
+	}
+	out, err := r.Render(content)
+	if err != nil {
+		return content
+	}
+	return out
 }

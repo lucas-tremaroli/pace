@@ -18,8 +18,7 @@ type modal struct {
 }
 
 func newModal(content string, screenW, screenH int) *modal {
-	mw, mh := modalSize(screenW, screenH)
-	vp := viewport.New(mw-4, mh-4)
+	vp := viewport.New(modalInner(screenW, screenH))
 	vp.SetContent(content)
 	return &modal{vp: vp, width: screenW, height: screenH}
 }
@@ -39,15 +38,25 @@ func modalSize(w, h int) (int, int) {
 	return mw, mh
 }
 
+// modalOuter is the modal box's outer size on a screen of the given size.
+func modalOuter(screenW, screenH int) (int, int) {
+	mw, mh := modalSize(screenW, screenH)
+	return mw - 2, mh
+}
+
+// modalInner is the scrollable content area inside the modal's frame.
+func modalInner(screenW, screenH int) (int, int) {
+	ow, oh := modalOuter(screenW, screenH)
+	return paneInner(modalBorder, ow, oh)
+}
+
 func (m *modal) Closed() bool { return m.closed }
 
 func (m *modal) Update(msg tea.Msg) tea.Cmd {
 	switch t := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = t.Width, t.Height
-		mw, mh := modalSize(t.Width, t.Height)
-		m.vp.Width = mw - 4
-		m.vp.Height = mh - 4
+		m.vp.Width, m.vp.Height = modalInner(t.Width, t.Height)
 		return nil
 	case tea.KeyMsg:
 		switch t.String() {
@@ -78,8 +87,8 @@ var modalBorder = lipgloss.NewStyle().
 
 // View returns the raw modal box; root.View does the screen placement.
 func (m *modal) View() string {
-	mw, mh := modalSize(m.width, m.height)
-	return modalBorder.Width(mw - 4).Height(mh - 2).Render(m.vp.View())
+	ow, oh := modalOuter(m.width, m.height)
+	return pane(modalBorder, ow, oh, m.vp.View())
 }
 
 // boxedOverlay wraps a huh form view in the same rounded border used

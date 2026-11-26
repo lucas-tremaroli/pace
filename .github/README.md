@@ -18,7 +18,7 @@
    -----------------------------------------------------
 ```
 
-A terminal-based productivity tool designed to work hand-in-hand with [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Manage tasks, take Markdown notes, and let your AI assistant track its own work through a built-in MCP server.
+A terminal-based productivity tool designed to work hand-in-hand with [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Manage tasks, plan work in spec-first epics, and let your AI assistant track its own work through a built-in MCP server.
 
 > [!NOTE]
 > **Opinionated by design** — Pace is built specifically for Claude Code integration. It prioritizes structured MCP communication over raw CLI usage, and keeps everything local in a `.pace/` directory alongside your code.
@@ -47,16 +47,16 @@ pace init
 pace mcp install
 ```
 
-That's it. Claude Code can now manage tasks and notes for your project through MCP tools automatically.
+That's it. Claude Code can now manage tasks and epics for your project through MCP tools automatically.
 
 ## How It Works
 
-Pace exposes an **MCP server** (`pace mcp run`) that Claude Code uses to manage tasks and notes. When you run `pace mcp install`, it registers the server with Claude Code, giving it access to 18 structured tools for task management, note-taking, dependency tracking, and more.
+Pace exposes an **MCP server** (`pace mcp run`) that Claude Code uses to manage tasks and epics. When you run `pace mcp install`, it registers the server with Claude Code, giving it access to 18 structured tools for task management, epics, dependency tracking, and more.
 
 This means Claude Code can:
 - **Track its own work** — create tasks, update status, log progress, and mark things done
 - **Manage dependencies** — model blocking relationships so it knows what's actionable
-- **Write and reference notes** — persist specs, ADRs, and decisions across sessions
+- **Plan in epics** — write the spec first, then create tasks under it, with specs and decisions persisting across sessions
 - **Understand project context** — run `pace_context` to immediately grasp the project state
 
 All data lives in `.pace/` inside your repo — no external services, no API tokens, no network requests.
@@ -69,7 +69,7 @@ While Claude Code interacts with Pace through MCP, you get an interactive termin
 pace tui
 ```
 
-A unified dashboard showing your tasks and notes side by side with a detail panel. Create, edit, and move tasks, browse notes, and manage your project — all from one screen.
+A unified dashboard showing your tasks and epics side by side with a detail panel. Create, edit, and move tasks, browse epics, and manage your project — all from one screen.
 
 ## Recharge
 
@@ -88,7 +88,7 @@ pace joke
 
 ## Project Storage
 
-Pace uses per-project storage to keep tasks and notes isolated to each repository.
+Pace uses per-project storage to keep tasks and epics isolated to each repository.
 
 ```bash
 # Initialize in current directory (creates .pace/)

@@ -1,10 +1,6 @@
 package tui
 
 import (
-	"fmt"
-	"os"
-	"strings"
-
 	"github.com/charmbracelet/huh"
 	"github.com/lucas-tremaroli/pace/internal/task"
 )
@@ -124,36 +120,21 @@ func (s *TaskFormState) build() *huh.Form {
 	).WithWidth(formWidth).WithShowHelp(true)
 }
 
-// NoteFormState owns the input for the new-note dialog.
-type NoteFormState struct {
-	form     *huh.Form
-	filename string
+// EpicFormState owns the input for the new-epic dialog.
+type EpicFormState struct {
+	form  *huh.Form
+	title string
 }
 
-func newNoteFormState(noteExists func(string) (bool, error)) *NoteFormState {
-	s := &NoteFormState{}
+func newEpicFormState() *EpicFormState {
+	s := &EpicFormState{}
 	s.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
-				Title("Filename").
-				Description("Without .md extension").
-				Value(&s.filename).
-				Validate(func(v string) error {
-					if v == "" {
-						return fmt.Errorf("filename is required")
-					}
-					if strings.Contains(v, "/") || strings.Contains(v, "\\") || strings.HasPrefix(v, ".") {
-						return fmt.Errorf("no path separators or leading dot")
-					}
-					exists, err := noteExists(v)
-					if err != nil && !os.IsNotExist(err) {
-						return fmt.Errorf("check %s: %v", v, err)
-					}
-					if exists {
-						return fmt.Errorf("note %s already exists", v)
-					}
-					return nil
-				}),
+				Title("Title").
+				Description("The editor opens next to write the spec").
+				Value(&s.title).
+				Validate(huh.ValidateNotEmpty()),
 		),
 	).WithWidth(formWidth).WithShowHelp(true)
 	return s

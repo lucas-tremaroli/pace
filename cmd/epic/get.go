@@ -3,6 +3,7 @@ package epic
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/lucas-tremaroli/pace/internal/cmdutil"
 	"github.com/lucas-tremaroli/pace/internal/epic"
@@ -43,6 +44,9 @@ func printEpicDetail(e epic.Epic) {
 	if e.Summary() != "" {
 		fmt.Println(dimStyle.Render(e.Summary()))
 	}
+	if len(e.Labels()) > 0 {
+		fmt.Println(dimStyle.Render("labels: " + strings.Join(e.Labels(), ", ")))
+	}
 	spec := e.Spec()
 	printSection("Current state", spec.CurrentState)
 	printSection("Target state", spec.TargetState)
@@ -57,7 +61,7 @@ func printSection(name, body string) {
 		return
 	}
 	fmt.Println()
-	fmt.Println(labelStyle.Render(name+":"))
+	fmt.Println(labelStyle.Render(name + ":"))
 	fmt.Println(titleStyle.Render(body))
 }
 

@@ -3,22 +3,41 @@ package tui
 import (
 	"os"
 	"os/exec"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/lucas-tremaroli/pace/internal/cmdutil"
+	"github.com/lucas-tremaroli/pace/internal/epic"
 )
 
-// editorFinishedMsg is sent when the external editor process exits.
-type editorFinishedMsg struct{ err error }
+// epicEditedMsg is sent when the external editor exits; path holds the edited
+// document and base the epic it was opened from.
+type epicEditedMsg struct {
+	path   string
+	base   epic.Epic
+	create bool
+	err    error
+}
 
-// resolveEditor picks an editor, preferring $EDITOR, then nvim/vim/vi/nano.
-func resolveEditor() string {
-	if e := os.Getenv("EDITOR"); e != "" {
-		if _, err := exec.LookPath(e); err == nil {
-			return e
+// editEpicCmd writes base to a temp file, opens it in $EDITOR and reports back
+// with epicEditedMsg. The temp file is created inside the Cmd (no I/O in
+// Update) and is read and removed by saveEditedCmd.
+func editEpicCmd(base epic.Epic, create bool) tea.Cmd {
+	open := func() tea.Msg {
+		f, err := os.CreateTemp("", "pace-epic-*.md")
+		if err != nil {
+			return epicEditedMsg{err: err}
 		}
-	}
-	for _, e := range []string{"nvim", "vim", "vi", "nano"} {
-		if _, err := exec.LookPath(e); err == nil {
-			return e
+		_, werr := f.WriteString(epic.Format(base))
+		f.Close()
+		if werr != nil {
+			os.Remove(f.Name())
+			return epicEditedMsg{err: werr}
 		}
+		path := f.Name()
+		c := exec.Command(cmdutil.ResolveEditor(), path)
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			return epicEditedMsg{path: path, base: base, create: create, err: err}
+		})()
 	}
-	return "vi"
+	return tea.Sequence(tea.ClearScreen, open)
 }

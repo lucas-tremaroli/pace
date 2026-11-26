@@ -21,10 +21,10 @@ type TaskRecord struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
-	Status   int    `json:"status"`
-	Priority int    `json:"priority"`
-	Link     string `json:"link"`
-	EpicID   string `json:"epic_id"`
+	Status      int    `json:"status"`
+	Priority    int    `json:"priority"`
+	Link        string `json:"link"`
+	EpicID      string `json:"epic_id"`
 }
 
 type LogRecord struct {
@@ -45,6 +45,7 @@ type EpicRecord struct {
 	Constraints  string `json:"constraints"`
 	Exclusions   string `json:"exclusions"`
 	Freeform     string `json:"freeform"`
+	Labels       string `json:"labels"` // JSON array, e.g. ["design"]
 	CreatedAt    string `json:"created_at"`
 }
 
@@ -57,8 +58,20 @@ func NewDB() (*DB, error) {
 	return NewDBWithPath(dbPath)
 }
 
-// NewDBWithPath creates a new DB instance with a specific database path
+// NewDBWithPath creates a new DB instance with a specific database path and
+// folds any legacy notes into epics (see migrateNotesToEpics).
 func NewDBWithPath(dbPath string) (*DB, error) {
+	return openDB(dbPath, true)
+}
+
+// NewDBWithPathNoMigration opens a database without converting legacy notes.
+// For read-only previews (e.g. `pace migrate --dry-run`), which must leave
+// the store's tables and note files untouched.
+func NewDBWithPathNoMigration(dbPath string) (*DB, error) {
+	return openDB(dbPath, false)
+}
+
+func openDB(dbPath string, migrateNotes bool) (*DB, error) {
 	conn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -68,6 +81,12 @@ func NewDBWithPath(dbPath string) (*DB, error) {
 	if err := db.createTables(); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to create tables: %w", err)
+	}
+	if migrateNotes {
+		if err := db.migrateNotesToEpics(filepath.Dir(dbPath)); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("failed to migrate notes to epics: %w", err)
+		}
 	}
 
 	return db, nil
@@ -200,19 +219,6 @@ func (db *DB) createTables() error {
 		return err
 	}
 
-	// Create task_notes join table for note-task associations
-	taskNotesQuery := `
-		CREATE TABLE IF NOT EXISTS task_notes (
-			task_id VARCHAR NOT NULL,
-			note_filename VARCHAR NOT NULL,
-			PRIMARY KEY (task_id, note_filename),
-			FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-		);
-	`
-	if _, err := db.conn.Exec(taskNotesQuery); err != nil {
-		return err
-	}
-
 	// Create epics table for grouping tasks under a spec-first container
 	epicsQuery := `
 		CREATE TABLE IF NOT EXISTS epics (
@@ -240,6 +246,14 @@ func (db *DB) createTables() error {
 			continue
 		}
 		if _, err := db.conn.Exec(`ALTER TABLE epics ADD COLUMN ` + col + ` TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
+
+	if has, err := db.hasColumn("epics", "labels"); err != nil {
+		return err
+	} else if !has {
+		if _, err := db.conn.Exec(`ALTER TABLE epics ADD COLUMN labels TEXT NOT NULL DEFAULT '[]'`); err != nil {
 			return err
 		}
 	}
@@ -632,94 +646,6 @@ func (db *DB) SearchLogs(query string, limit int) ([]LogRecord, error) {
 	return logs, rows.Err()
 }
 
-// AddTaskNote links a note to a task
-func (db *DB) AddTaskNote(taskID, noteFilename string) error {
-	query := `INSERT OR IGNORE INTO task_notes (task_id, note_filename) VALUES (?, ?)`
-	_, err := db.conn.Exec(query, taskID, noteFilename)
-	return err
-}
-
-// RemoveTaskNote unlinks a note from a task
-func (db *DB) RemoveTaskNote(taskID, noteFilename string) error {
-	query := `DELETE FROM task_notes WHERE task_id = ? AND note_filename = ?`
-	_, err := db.conn.Exec(query, taskID, noteFilename)
-	return err
-}
-
-// GetNotesForTask returns all note filenames linked to a task
-func (db *DB) GetNotesForTask(taskID string) ([]string, error) {
-	query := `SELECT note_filename FROM task_notes WHERE task_id = ? ORDER BY note_filename`
-	rows, err := db.conn.Query(query, taskID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var notes []string
-	for rows.Next() {
-		var filename string
-		if err := rows.Scan(&filename); err != nil {
-			return nil, err
-		}
-		notes = append(notes, filename)
-	}
-	return notes, rows.Err()
-}
-
-// GetTasksForNote returns all task IDs linked to a note
-func (db *DB) GetTasksForNote(noteFilename string) ([]string, error) {
-	query := `SELECT task_id FROM task_notes WHERE note_filename = ? ORDER BY task_id`
-	rows, err := db.conn.Query(query, noteFilename)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var tasks []string
-	for rows.Next() {
-		var taskID string
-		if err := rows.Scan(&taskID); err != nil {
-			return nil, err
-		}
-		tasks = append(tasks, taskID)
-	}
-	return tasks, rows.Err()
-}
-
-// GetAllTaskNotes returns a map of task ID to linked note filenames
-func (db *DB) GetAllTaskNotes() (map[string][]string, error) {
-	query := `SELECT task_id, note_filename FROM task_notes ORDER BY task_id, note_filename`
-	rows, err := db.conn.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	notes := make(map[string][]string)
-	for rows.Next() {
-		var taskID, filename string
-		if err := rows.Scan(&taskID, &filename); err != nil {
-			return nil, err
-		}
-		notes[taskID] = append(notes[taskID], filename)
-	}
-	return notes, rows.Err()
-}
-
-// RemoveAllTaskNotes removes all note links for a task
-func (db *DB) RemoveAllTaskNotes(taskID string) error {
-	query := `DELETE FROM task_notes WHERE task_id = ?`
-	_, err := db.conn.Exec(query, taskID)
-	return err
-}
-
-// RemoveAllNoteLinks removes all task links for a note
-func (db *DB) RemoveAllNoteLinks(noteFilename string) error {
-	query := `DELETE FROM task_notes WHERE note_filename = ?`
-	_, err := db.conn.Exec(query, noteFilename)
-	return err
-}
-
 // DeleteLogsByTaskID removes all logs for a task and cleans up FTS5
 func (db *DB) DeleteLogsByTaskID(taskID string) error {
 	// Get IDs for FTS cleanup
@@ -762,13 +688,13 @@ func (db *DB) DeleteLogsByTaskID(taskID string) error {
 }
 
 func (db *DB) CreateEpic(rec EpicRecord) error {
-	query := `INSERT INTO epics (id, title, summary, status, current_state, target_state, constraints, exclusions, freeform) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(query, rec.ID, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform)
+	query := `INSERT INTO epics (id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(query, rec.ID, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, labelsOrEmpty(rec.Labels))
 	return err
 }
 
 func (db *DB) GetAllEpics() ([]EpicRecord, error) {
-	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, created_at FROM epics ORDER BY created_at DESC`
+	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, labels, created_at FROM epics ORDER BY created_at DESC`
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
@@ -778,7 +704,7 @@ func (db *DB) GetAllEpics() ([]EpicRecord, error) {
 	var epics []EpicRecord
 	for rows.Next() {
 		var e EpicRecord
-		if err := rows.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.Labels, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		epics = append(epics, e)
@@ -787,19 +713,19 @@ func (db *DB) GetAllEpics() ([]EpicRecord, error) {
 }
 
 func (db *DB) GetEpicByID(id string) (*EpicRecord, error) {
-	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, created_at FROM epics WHERE id = ?`
+	query := `SELECT id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, labels, created_at FROM epics WHERE id = ?`
 	row := db.conn.QueryRow(query, id)
 
 	var e EpicRecord
-	if err := row.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.CreatedAt); err != nil {
+	if err := row.Scan(&e.ID, &e.Title, &e.Summary, &e.Status, &e.CurrentState, &e.TargetState, &e.Constraints, &e.Exclusions, &e.Freeform, &e.Labels, &e.CreatedAt); err != nil {
 		return nil, err
 	}
 	return &e, nil
 }
 
 func (db *DB) UpdateEpic(rec EpicRecord) error {
-	query := `UPDATE epics SET title = ?, summary = ?, status = ?, current_state = ?, target_state = ?, constraints = ?, exclusions = ?, freeform = ? WHERE id = ?`
-	result, err := db.conn.Exec(query, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, rec.ID)
+	query := `UPDATE epics SET title = ?, summary = ?, status = ?, current_state = ?, target_state = ?, constraints = ?, exclusions = ?, freeform = ?, labels = ? WHERE id = ?`
+	result, err := db.conn.Exec(query, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, labelsOrEmpty(rec.Labels), rec.ID)
 	if err != nil {
 		return err
 	}
@@ -836,6 +762,41 @@ func (db *DB) DeleteEpic(id string) error {
 	}
 	if rows == 0 {
 		return ErrNotFound
+	}
+	return tx.Commit()
+}
+
+// labelsOrEmpty keeps the labels column a valid JSON array.
+func labelsOrEmpty(s string) string {
+	if s == "" {
+		return "[]"
+	}
+	return s
+}
+
+// MergeEpics creates rec, moves every task of the source epics into it and
+// deletes the sources, all in one transaction so tasks are never left
+// pointing at a deleted epic.
+func (db *DB) MergeEpics(rec EpicRecord, sourceIDs []string) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(
+		`INSERT INTO epics (id, title, summary, status, current_state, target_state, constraints, exclusions, freeform, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Title, rec.Summary, rec.Status, rec.CurrentState, rec.TargetState, rec.Constraints, rec.Exclusions, rec.Freeform, labelsOrEmpty(rec.Labels),
+	); err != nil {
+		return err
+	}
+	for _, id := range sourceIDs {
+		if _, err := tx.Exec(`UPDATE tasks SET epic_id = ? WHERE epic_id = ?`, rec.ID, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM epics WHERE id = ?`, id); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

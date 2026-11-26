@@ -179,3 +179,58 @@ func TestIntegration_PreFORK6Migration(t *testing.T) {
 		t.Errorf("spec did not survive re-open: %+v", got.Spec())
 	}
 }
+
+// TestIntegration_MergeEpics verifies a merge combines specs and labels,
+// takes the furthest status, moves tasks and removes the sources.
+func TestIntegration_MergeEpics(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "epics.db")
+	db, err := storage.NewDBWithPath(dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewServiceWithRepository(db)
+
+	a := NewEpic(svc.GenerateEpicID(), Planning, "a", "first")
+	a.SetTargetState("A target")
+	a.SetLabels([]string{"design", "api"})
+	b := NewEpic(svc.GenerateEpicID(), Active, "b", "second")
+	b.SetTargetState("B target")
+	b.SetLabels([]string{"api", "ux"})
+	for _, e := range []Epic{a, b} {
+		if err := svc.CreateEpic(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.CreateTask("t1", "in a", "", 0, 3, "", a.ID()); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateTask("t2", "in b", "", 0, 3, "", b.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := svc.MergeEpics([]string{a.ID(), b.ID()}, "merged")
+	if err != nil {
+		t.Fatalf("MergeEpics: %v", err)
+	}
+	if m.Status() != Active || m.Summary() != "first / second" {
+		t.Errorf("status/summary wrong: %v %q", m.Status(), m.Summary())
+	}
+	if got := m.Spec().TargetState; got != "A target\n\n---\n\nB target" {
+		t.Errorf("target state = %q", got)
+	}
+	if l := m.Labels(); len(l) != 3 || l[0] != "design" || l[1] != "api" || l[2] != "ux" {
+		t.Errorf("labels = %v", l)
+	}
+	for _, id := range []string{"t1", "t2"} {
+		if rec, _ := db.GetTaskByID(id); rec.EpicID != m.ID() {
+			t.Errorf("task %s epic = %q, want %q", id, rec.EpicID, m.ID())
+		}
+	}
+	if all, _ := svc.LoadAllEpics(); len(all) != 1 {
+		t.Errorf("sources should be deleted, have %d epics", len(all))
+	}
+	if _, err := svc.MergeEpics([]string{m.ID()}, "x"); err == nil {
+		t.Error("want error merging a single epic")
+	}
+}
