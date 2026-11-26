@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/lucas-tremaroli/pace/cmd"
-	"github.com/lucas-tremaroli/pace/cmd/mcp"
+	"github.com/lucas-tremaroli/pace/v2/cmd"
+	"github.com/lucas-tremaroli/pace/v2/cmd/mcp"
 )
 
 var (

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/task"
+	"github.com/lucas-tremaroli/pace/v2/internal/task"
 	"github.com/muesli/reflow/truncate"
 )
 

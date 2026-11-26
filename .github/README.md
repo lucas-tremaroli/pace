@@ -34,7 +34,7 @@ brew install lucas-tremaroli/tap/pace
 ### Go
 
 ```bash
-go install github.com/lucas-tremaroli/pace@latest
+go install github.com/lucas-tremaroli/pace/v2@latest
 ```
 
 ## Getting Started

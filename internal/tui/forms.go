@@ -2,7 +2,7 @@ package tui
 
 import (
 	"github.com/charmbracelet/huh"
-	"github.com/lucas-tremaroli/pace/internal/task"
+	"github.com/lucas-tremaroli/pace/v2/internal/task"
 )
 
 const formWidth = 60

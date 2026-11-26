@@ -8,9 +8,9 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/epic"
-	"github.com/lucas-tremaroli/pace/internal/storage"
-	"github.com/lucas-tremaroli/pace/internal/task"
+	"github.com/lucas-tremaroli/pace/v2/internal/epic"
+	"github.com/lucas-tremaroli/pace/v2/internal/storage"
+	"github.com/lucas-tremaroli/pace/v2/internal/task"
 )
 
 const (

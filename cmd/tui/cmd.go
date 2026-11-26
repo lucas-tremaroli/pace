@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/lucas-tremaroli/pace/internal/tui"
+	"github.com/lucas-tremaroli/pace/v2/internal/tui"
 	"github.com/spf13/cobra"
 )
 

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lucas-tremaroli/pace/internal/storage"
+	"github.com/lucas-tremaroli/pace/v2/internal/storage"
 )
 
 // Service handles epic business logic and storage operations.

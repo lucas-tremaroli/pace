@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/joke"
+	"github.com/lucas-tremaroli/pace/v2/internal/joke"
 	"github.com/spf13/cobra"
 )
 

@@ -3,9 +3,9 @@ package epic
 import (
 	"errors"
 
-	"github.com/lucas-tremaroli/pace/internal/cmdutil"
-	"github.com/lucas-tremaroli/pace/internal/epic"
-	"github.com/lucas-tremaroli/pace/internal/output"
+	"github.com/lucas-tremaroli/pace/v2/internal/cmdutil"
+	"github.com/lucas-tremaroli/pace/v2/internal/epic"
+	"github.com/lucas-tremaroli/pace/v2/internal/output"
 	"github.com/spf13/cobra"
 )
 

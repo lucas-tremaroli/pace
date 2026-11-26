@@ -1,6 +1,6 @@
 package task
 
-import "github.com/lucas-tremaroli/pace/internal/storage"
+import "github.com/lucas-tremaroli/pace/v2/internal/storage"
 
 // TaskRepository abstracts storage operations needed by the task service.
 // *storage.DB satisfies this interface; alternative implementations (e.g.

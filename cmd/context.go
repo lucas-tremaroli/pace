@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/internal/cmdutil"
-	"github.com/lucas-tremaroli/pace/internal/epic"
-	"github.com/lucas-tremaroli/pace/internal/output"
-	"github.com/lucas-tremaroli/pace/internal/storage"
-	"github.com/lucas-tremaroli/pace/internal/task"
+	"github.com/lucas-tremaroli/pace/v2/internal/cmdutil"
+	"github.com/lucas-tremaroli/pace/v2/internal/epic"
+	"github.com/lucas-tremaroli/pace/v2/internal/output"
+	"github.com/lucas-tremaroli/pace/v2/internal/storage"
+	"github.com/lucas-tremaroli/pace/v2/internal/task"
 	"github.com/spf13/cobra"
 )
 

@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	content "github.com/lucas-tremaroli/pace/internal/embed"
-	"github.com/lucas-tremaroli/pace/internal/output"
-	"github.com/lucas-tremaroli/pace/internal/storage"
+	content "github.com/lucas-tremaroli/pace/v2/internal/embed"
+	"github.com/lucas-tremaroli/pace/v2/internal/output"
+	"github.com/lucas-tremaroli/pace/v2/internal/storage"
 	"github.com/spf13/cobra"
 )
 

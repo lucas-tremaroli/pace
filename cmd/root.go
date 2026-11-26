@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lucas-tremaroli/pace/cmd/config"
-	"github.com/lucas-tremaroli/pace/cmd/epic"
-	"github.com/lucas-tremaroli/pace/cmd/joke"
-	"github.com/lucas-tremaroli/pace/cmd/mcp"
-	"github.com/lucas-tremaroli/pace/cmd/task"
-	"github.com/lucas-tremaroli/pace/cmd/tick"
-	"github.com/lucas-tremaroli/pace/cmd/tui"
+	"github.com/lucas-tremaroli/pace/v2/cmd/config"
+	"github.com/lucas-tremaroli/pace/v2/cmd/epic"
+	"github.com/lucas-tremaroli/pace/v2/cmd/joke"
+	"github.com/lucas-tremaroli/pace/v2/cmd/mcp"
+	"github.com/lucas-tremaroli/pace/v2/cmd/task"
+	"github.com/lucas-tremaroli/pace/v2/cmd/tick"
+	"github.com/lucas-tremaroli/pace/v2/cmd/tui"
 	"github.com/spf13/cobra"
 )
 

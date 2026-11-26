@@ -5,8 +5,8 @@ import (
 	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/lucas-tremaroli/pace/internal/cmdutil"
-	"github.com/lucas-tremaroli/pace/internal/epic"
+	"github.com/lucas-tremaroli/pace/v2/internal/cmdutil"
+	"github.com/lucas-tremaroli/pace/v2/internal/epic"
 )
 
 // epicEditedMsg is sent when the external editor exits; path holds the edited
