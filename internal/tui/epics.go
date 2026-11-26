@@ -39,7 +39,6 @@ type epicsListedMsg struct {
 type epicsMutatedMsg struct{}
 
 type epicLoadedMsg struct {
-	key     string
 	content string
 }
 
@@ -83,7 +82,6 @@ type epics struct {
 	width         int
 	height        int
 	loadErr       error
-	lastKey       string
 	keys          epicsKeys
 	form          *EpicFormState
 	confirm       *ConfirmFormState
@@ -190,14 +188,11 @@ func (e *epics) Update(msg tea.Msg) (tab, tea.Cmd) {
 		return e, e.saveEditedCmd(m)
 
 	case epicsMutatedMsg:
-		// Force the next Enter to reload; the epic may be gone or changed.
-		e.lastKey = ""
 		return e, e.Init()
 
 	case epicLoadedMsg:
 		e.loading = false
 		e.loadingKey = ""
-		e.lastKey = m.key
 		e.vp.SetContent(m.content)
 		e.vp.GotoTop()
 		return e, nil
@@ -226,7 +221,6 @@ func (e *epics) Update(msg tea.Msg) (tab, tea.Cmd) {
 		case "enter":
 			return e, e.loadCmd()
 		case "r":
-			e.lastKey = ""
 			return e, e.Init()
 		case "backspace":
 			it, ok := e.list.SelectedItem().(epicItem)
@@ -267,14 +261,16 @@ func (e *epics) Update(msg tea.Msg) (tab, tea.Cmd) {
 }
 
 // loadCmd fetches the selected epic's tasks and renders the detail pane.
-// Tasks are only read here (on Enter), never on navigation.
+// Tasks are only read here (on Enter), never on navigation. Every Enter
+// reloads, since tasks change on the Kanban tab without this tab hearing
+// about it; only a request already in flight for the same epic is skipped.
 func (e *epics) loadCmd() tea.Cmd {
 	it, ok := e.list.SelectedItem().(epicItem)
 	if !ok {
 		return nil
 	}
 	id := it.Epic.ID()
-	if id == e.lastKey || (e.loading && id == e.loadingKey) {
+	if e.loading && id == e.loadingKey {
 		return nil
 	}
 	selected := it.Epic
@@ -285,7 +281,7 @@ func (e *epics) loadCmd() tea.Cmd {
 	read := func() tea.Msg {
 		all, err := tasks.LoadAllTasks()
 		if err != nil {
-			return epicLoadedMsg{key: id, content: theme.StatusBlocked.Render(err.Error())}
+			return epicLoadedMsg{content: theme.StatusBlocked.Render(err.Error())}
 		}
 		var members []task.Task
 		for _, t := range all {
@@ -293,7 +289,7 @@ func (e *epics) loadCmd() tea.Cmd {
 				members = append(members, t)
 			}
 		}
-		return epicLoadedMsg{key: id, content: renderEpicDetail(selected, members, w)}
+		return epicLoadedMsg{content: renderEpicDetail(selected, members, w)}
 	}
 	return tea.Batch(e.spinner.Tick, read)
 }
@@ -369,7 +365,9 @@ func (e *epics) ModalOverlay() string {
 func (e *epics) deleteCmd(id string) tea.Cmd {
 	svc := e.svc
 	return func() tea.Msg {
-		svc.DeleteEpic(id)
+		if err := svc.DeleteEpic(id); err != nil {
+			return epicLoadedMsg{content: theme.StatusBlocked.Render(fmt.Sprintf("delete epic: %v", err))}
+		}
 		return epicsMutatedMsg{}
 	}
 }

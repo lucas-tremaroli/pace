@@ -12,7 +12,7 @@ import (
 )
 
 func testRoot() (*Root, *epics) {
-	ep := newEpics(&fakeEpicSvc{}, fakeTaskSvc{})
+	ep := newEpics(&fakeEpicSvc{}, &fakeTaskSvc{})
 	r := &Root{
 		tabs:        []tab{newKanban(nil), ep},
 		help:        help.New(),
